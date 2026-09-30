@@ -56,14 +56,23 @@ collego:
     first-name: System
     last-name: Admin
   storage:
-    # In prod, storage paths are S3 URIs — handled by StorageService
-    question-papers: ${QP_STORAGE_PATH:s3://collego-question-papers-prod/question-papers}
-    assignments: ${ASSIGNMENT_STORAGE_PATH:s3://collego-assignments-prod/assignments}
-    materials: ${MATERIAL_STORAGE_PATH:s3://collego-materials-prod/materials}
-    resumes: ${RESUME_STORAGE_PATH:s3://collego-resumes-prod/resumes}
+    # In prod, storage paths are S3 URIs — handled by S3StorageService
+    question-papers: s3://collego-question-papers-prod/question-papers
+    assignments: s3://collego-assignments-prod/assignments
+    materials: s3://collego-materials-prod/materials
+    resumes: s3://collego-resumes-prod/resumes
   aws:
     region: ${AWS_REGION:ap-south-1}
-    s3-bucket: ${S3_BUCKET_NAME:collego-question-papers-prod}
+    use-s3: true                                             # Phase 8: all file ops go to S3
+    s3-bucket-question-papers: ${QP_S3_BUCKET:collego-question-papers-prod}
+    s3-bucket-assignments: ${ASSIGNMENT_S3_BUCKET:collego-assignments-prod}
+    s3-bucket-materials: ${MATERIAL_S3_BUCKET:collego-materials-prod}
+    s3-bucket-resumes: ${RESUME_S3_BUCKET:collego-resumes-prod}
+    s3-bucket-marksheets: ${MARKSHEET_S3_BUCKET:collego-marksheets-prod}
+    s3-backup-bucket: ${BACKUP_S3_BUCKET:collego-db-backups-prod}
+    ec2-instance-id: ${EC2_INSTANCE_ID:}                    # Phase 8: enables SSM backup
+  ai-service:
+    url: ${AI_SERVICE_URL:http://collego-ai-service:8000}
 
 logging:
   level:

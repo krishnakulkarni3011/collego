@@ -4,12 +4,16 @@ import com.collego.dto.*;
 import com.collego.service.FacultyPortalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -86,6 +90,28 @@ public class FacultyController {
         return ResponseEntity.ok(facultyPortalService.getAssignments(auth.getName(), sectionId));
     }
 
+    /** Phase 8: Upload a file to an existing assignment (multipart) */
+    @PostMapping(value = "/assignments/{assignmentId}/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<AssignmentResponse> uploadAssignmentFile(
+            Authentication auth,
+            @PathVariable Long assignmentId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(
+                facultyPortalService.uploadAssignmentFile(auth.getName(), assignmentId, file));
+    }
+
+    /** Phase 8: Download the file for an assignment */
+    @GetMapping("/assignments/{assignmentId}/file")
+    public ResponseEntity<byte[]> downloadAssignmentFile(
+            Authentication auth,
+            @PathVariable Long assignmentId) throws IOException {
+        byte[] bytes = facultyPortalService.downloadAssignmentFile(auth.getName(), assignmentId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(bytes);
+    }
+
     // ==================== Course Materials ====================
 
     @PostMapping("/materials")
@@ -101,6 +127,28 @@ public class FacultyController {
             Authentication auth,
             @PathVariable Long sectionId) {
         return ResponseEntity.ok(facultyPortalService.getCourseMaterials(auth.getName(), sectionId));
+    }
+
+    /** Phase 8: Upload a file to an existing course material (multipart) */
+    @PostMapping(value = "/materials/{materialId}/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CourseMaterialResponse> uploadMaterialFile(
+            Authentication auth,
+            @PathVariable Long materialId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(
+                facultyPortalService.uploadMaterialFile(auth.getName(), materialId, file));
+    }
+
+    /** Phase 8: Download the file for a course material */
+    @GetMapping("/materials/{materialId}/file")
+    public ResponseEntity<byte[]> downloadMaterialFile(
+            Authentication auth,
+            @PathVariable Long materialId) throws IOException {
+        byte[] bytes = facultyPortalService.downloadMaterialFile(auth.getName(), materialId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(bytes);
     }
 
     // ==================== Question Papers ====================

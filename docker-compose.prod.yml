@@ -22,11 +22,19 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
-      # Storage — use S3 paths in prod
-      QP_STORAGE_PATH: s3://${S3_BUCKET_NAME}/question-papers
-      ASSIGNMENT_STORAGE_PATH: s3://${S3_BUCKET_NAME}/assignments
-      MATERIAL_STORAGE_PATH: s3://${S3_BUCKET_NAME}/materials
-      RESUME_STORAGE_PATH: s3://${S3_BUCKET_NAME}/resumes
+      # Phase 8: Enable S3StorageService
+      USE_S3: "true"
+      # Per-bucket names (mapped from Phase 8 Terraform outputs)
+      QP_S3_BUCKET: collego-question-papers-prod
+      ASSIGNMENT_S3_BUCKET: collego-assignments-prod
+      MATERIAL_S3_BUCKET: collego-materials-prod
+      RESUME_S3_BUCKET: collego-resumes-prod
+      MARKSHEET_S3_BUCKET: collego-marksheets-prod
+      BACKUP_S3_BUCKET: collego-db-backups-prod
+      # Phase 8: Backup via SSM
+      EC2_INSTANCE_ID: ${EC2_INSTANCE_ID}
+      # Phase 8/9: AI microservice URL (Docker internal)
+      AI_SERVICE_URL: http://collego-ai-service:8000
       # Spring profile
       SPRING_PROFILES_ACTIVE: prod
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
@@ -74,6 +82,8 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      # Phase 9: LLM API key for AI notice generation (leave blank to use stub mode)
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     expose:
       - "8000"
     networks:

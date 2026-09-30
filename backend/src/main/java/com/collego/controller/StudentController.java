@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -114,5 +115,41 @@ public class StudentController {
     @GetMapping("/academic-history")
     public ResponseEntity<CgpaResponse> getAcademicHistory(Authentication auth) {
         return ResponseEntity.ok(studentPortalService.getAcademicHistory(auth.getName()));
+    }
+
+    // ==================== Assignments ====================
+
+    @GetMapping("/assignments")
+    public ResponseEntity<List<AssignmentResponse>> getAssignments(Authentication auth) {
+        return ResponseEntity.ok(studentPortalService.getAssignmentsForStudent(auth.getName()));
+    }
+
+    @GetMapping("/assignments/{assignmentId}/file")
+    public ResponseEntity<byte[]> downloadAssignmentFile(
+            Authentication auth,
+            @PathVariable Long assignmentId) throws IOException {
+        byte[] bytes = studentPortalService.downloadAssignmentFile(auth.getName(), assignmentId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(bytes);
+    }
+
+    // ==================== Course Materials ====================
+
+    @GetMapping("/materials")
+    public ResponseEntity<List<CourseMaterialResponse>> getMaterials(Authentication auth) {
+        return ResponseEntity.ok(studentPortalService.getMaterialsForStudent(auth.getName()));
+    }
+
+    @GetMapping("/materials/{materialId}/file")
+    public ResponseEntity<byte[]> downloadMaterialFile(
+            Authentication auth,
+            @PathVariable Long materialId) throws IOException {
+        byte[] bytes = studentPortalService.downloadMaterialFile(auth.getName(), materialId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(bytes);
     }
 }

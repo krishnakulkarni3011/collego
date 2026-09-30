@@ -7,9 +7,13 @@ import com.collego.exception.ResourceNotFoundException;
 import com.collego.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,6 +37,19 @@ public class FacultyPortalService {
     private final CourseRepository courseRepository;
     private final DepartmentRepository departmentRepository;
     private final QuestionPaperService questionPaperService;
+    private final S3StorageService s3StorageService;
+
+    @Value("${collego.aws.s3-bucket-assignments:collego-assignments-prod}")
+    private String assignmentBucket;
+
+    @Value("${collego.aws.s3-bucket-materials:collego-materials-prod}")
+    private String materialBucket;
+
+    /** Phase 8/9: URL of the AI microservice; blank = AI features disabled */
+    @Value("${collego.ai-service.url:http://collego-ai-service:8000}")
+    private String aiServiceUrl;
+
+    private final RestTemplate restTemplate = new RestTemplate();
 
     // ==================== Sections ====================
 
@@ -342,6 +359,52 @@ public class FacultyPortalService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Phase 8: Upload the actual file for an existing assignment to S3.
+     * S3 key: {sectionId}/{assignmentId}/{uuid}_{originalFilename}
+     */
+    @Transactional
+    public AssignmentResponse uploadAssignmentFile(String email, Long assignmentId, MultipartFile file) throws IOException {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
+        validateFacultyOwnsSection(faculty, assignment.getSection());
+
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("File must not be empty.");
+        }
+
+        String uniqueName = java.util.UUID.randomUUID() + "_" + sanitizeFilename(file.getOriginalFilename());
+        String s3Key = assignment.getSection().getId() + "/" + assignmentId + "/" + uniqueName;
+
+        // Replace existing file in S3 if one is already stored
+        if (assignment.getFilePath() != null && !assignment.getFilePath().isBlank()) {
+            s3StorageService.delete(assignmentBucket, assignment.getFilePath());
+        }
+
+        s3StorageService.upload(assignmentBucket, s3Key, file.getInputStream(),
+                file.getSize(), S3StorageService.detectContentType(file.getOriginalFilename()));
+
+        assignment.setFilePath(s3Key);
+        assignment.setFileName(file.getOriginalFilename() != null ? file.getOriginalFilename() : uniqueName);
+        assignmentRepository.save(assignment);
+
+        log.info("Faculty {} uploaded assignment file to S3: s3://{}/{}", email, assignmentBucket, s3Key);
+        return mapAssignmentToResponse(assignment);
+    }
+
+    /**
+     * Phase 8: Download the file for an assignment from S3.
+     */
+    public byte[] downloadAssignmentFile(String email, Long assignmentId) throws IOException {
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
+        if (assignment.getFilePath() == null || assignment.getFilePath().isBlank()) {
+            throw new BadRequestException("No file attached to this assignment.");
+        }
+        return s3StorageService.download(assignmentBucket, assignment.getFilePath());
+    }
+
     // ==================== Course Materials ====================
 
     @Transactional
@@ -379,6 +442,52 @@ public class FacultyPortalService {
                 .stream()
                 .map(this::mapMaterialToResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Phase 8: Upload the actual file for a course material to S3.
+     * S3 key: {sectionId}/{materialId}/{uuid}_{originalFilename}
+     */
+    @Transactional
+    public CourseMaterialResponse uploadMaterialFile(String email, Long materialId, MultipartFile file) throws IOException {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        CourseMaterial material = courseMaterialRepository.findById(materialId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course material not found: " + materialId));
+        validateFacultyOwnsSection(faculty, material.getSection());
+
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("File must not be empty.");
+        }
+
+        String uniqueName = java.util.UUID.randomUUID() + "_" + sanitizeFilename(file.getOriginalFilename());
+        String s3Key = material.getSection().getId() + "/" + materialId + "/" + uniqueName;
+
+        // Replace existing file in S3 if one is already stored
+        if (material.getFilePath() != null && !material.getFilePath().isBlank()) {
+            s3StorageService.delete(materialBucket, material.getFilePath());
+        }
+
+        s3StorageService.upload(materialBucket, s3Key, file.getInputStream(),
+                file.getSize(), S3StorageService.detectContentType(file.getOriginalFilename()));
+
+        material.setFilePath(s3Key);
+        material.setFileName(file.getOriginalFilename() != null ? file.getOriginalFilename() : uniqueName);
+        courseMaterialRepository.save(material);
+
+        log.info("Faculty {} uploaded course material to S3: s3://{}/{}", email, materialBucket, s3Key);
+        return mapMaterialToResponse(material);
+    }
+
+    /**
+     * Phase 8: Download the file for a course material from S3.
+     */
+    public byte[] downloadMaterialFile(String email, Long materialId) throws IOException {
+        CourseMaterial material = courseMaterialRepository.findById(materialId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course material not found: " + materialId));
+        if (material.getFilePath() == null || material.getFilePath().isBlank()) {
+            throw new BadRequestException("No file attached to this course material.");
+        }
+        return s3StorageService.download(materialBucket, material.getFilePath());
     }
 
     // ==================== Question Papers ====================
@@ -423,6 +532,32 @@ public class FacultyPortalService {
 
     @Transactional
     public Map<String, Object> draftNotice(String email, CreateNoticeRequest request) {
+
+        // Phase 8/9: AI Notice Enhancement
+        // When faculty sets enhance=true, call the ai-service to rewrite the notice
+        // professionally. Non-fatal: any failure falls back to the original text.
+        if (Boolean.TRUE.equals(request.getEnhance()) && aiServiceUrl != null && !aiServiceUrl.isBlank()) {
+            try {
+                Map<String, String> aiReq = Map.of(
+                        "prompt", request.getTitle() + ": " + request.getMessage(),
+                        "audience", "students"
+                );
+                @SuppressWarnings("unchecked")
+                Map<String, String> aiResp = restTemplate.postForObject(
+                        aiServiceUrl + "/generate-notice", aiReq, Map.class);
+                if (aiResp != null) {
+                    if (aiResp.containsKey("title") && aiResp.get("title") != null) {
+                        request.setTitle(aiResp.get("title"));
+                    }
+                    if (aiResp.containsKey("body") && aiResp.get("body") != null) {
+                        request.setMessage(aiResp.get("body"));
+                    }
+                    log.info("AI notice enhancement applied for faculty {}", email);
+                }
+            } catch (Exception e) {
+                log.warn("AI notice generation failed (using original text): {}", e.getMessage());
+            }
+        }
 
         NotificationType type;
         try {
@@ -599,6 +734,11 @@ public class FacultyPortalService {
         }
     }
 
+    private String sanitizeFilename(String name) {
+        if (name == null) return "file";
+        return name.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
     private AssignmentResponse mapAssignmentToResponse(Assignment a) {
         return AssignmentResponse.builder()
                 .id(a.getId())
@@ -609,6 +749,7 @@ public class FacultyPortalService {
                 .description(a.getDescription())
                 .dueDate(a.getDueDate())
                 .fileName(a.getFileName())
+                .hasFile(a.getFilePath() != null && !a.getFilePath().isBlank())
                 .createdAt(a.getCreatedAt())
                 .build();
     }
@@ -623,6 +764,7 @@ public class FacultyPortalService {
                 .description(m.getDescription())
                 .materialType(m.getMaterialType())
                 .fileName(m.getFileName())
+                .hasFile(m.getFilePath() != null && !m.getFilePath().isBlank())
                 .createdAt(m.getCreatedAt())
                 .build();
     }

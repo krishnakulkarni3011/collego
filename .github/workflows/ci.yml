@@ -15,6 +15,9 @@ on:
 #   JWT_SECRET
 #   ADMIN_EMAIL, ADMIN_PASSWORD
 #   VITE_API_URL  (e.g. https://api.collego.example.com)
+#   S3_BUCKET_NAME  (main bucket, kept for legacy; individual buckets below)
+#   EC2_INSTANCE_ID   (Phase 8: enables SSM pg_dump backup trigger)
+#   OPENROUTER_API_KEY  (Phase 9: LLM for AI notice generator — optional, stub used if blank)
 
 jobs:
   # ═══════════════════════════════════════════════════════════
@@ -230,6 +233,8 @@ jobs:
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+            EC2_INSTANCE_ID=${{ secrets.EC2_INSTANCE_ID }}
+            OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
             EOF
 
             # Login to ECR on the EC2 instance

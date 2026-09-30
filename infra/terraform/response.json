@@ -1,0 +1,1 @@
+{"statusCode": 200, "body": {"rds_snapshot": {"status": "INITIATED", "arn": "arn:aws:rds:ap-south-1:092963701762:snapshot:collego-auto-backup-2026-09-30-1435"}, "pg_dump": {"status": "SKIPPED", "reason": "EC2_INSTANCE_ID not set"}}}
