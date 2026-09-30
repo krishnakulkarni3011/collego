@@ -115,10 +115,23 @@ Timestamp: 2026-09-30
     * ECR Docker image builds & push (`collego-backend`, `collego-frontend`, `collego-ai-service`)
     * EC2 automated deployment via SSH, `docker compose up -d`, and Nginx reverse proxy
 
-10. NEXT STEPS TO COMPLETE PHASE 8 DEPLOYMENT RUNBOOK
+10. STEP 8: LIVE ENDPOINT VERIFICATION (COMPLETED)
 --------------------------------------------------------------------------------
-- Step 8: Verify live production endpoints.
-- Step 9: Confirm SNS email subscription for CloudWatch notifications.
-- Step 10: Verify Lambda automated DB backup trigger.
+- Live Backend Health Endpoint (`https://api-65-0-244-196.sslip.io/api/health`):
+    * Response: HTTP 200 OK — `{"status":"UP","service":"collego-backend"}`
+- Live AI Service Health Endpoint (`https://api-65-0-244-196.sslip.io/ai/health`):
+    * Response: HTTP 200 OK — `{"status":"UP","service":"collego-ai-service"}`
+- Live Frontend Web Application (`https://65-0-244-196.sslip.io`):
+    * Responsive UI served via Nginx Reverse Proxy with Let's Encrypt SSL
+- Database Seed: Active RDS PostgreSQL connection; bootstrap admin seeded (`admin@collego.com`)
 
+11. STEP 9 & 10: ALERTS & AUTOMATED BACKUP VERIFICATION (COMPLETED)
+--------------------------------------------------------------------------------
+- Step 9 SNS Alerts: Subscription created for `shreyasbewoor@gmail.com` on SNS topic `collego-alerts`.
+- Step 10 Lambda Automated Backup: Invocation tested successfully via AWS CLI.
+    * Created RDS Snapshot: `arn:aws:rds:ap-south-1:092963701762:snapshot:collego-auto-backup-2026-09-30-1435`
+    * Scheduled EventBridge Cron: `collego-db-backup-cron` (Daily at 02:00 UTC)
+
+================================================================================
+PHASE 8 AWS DEPLOYMENT & HARDENING IS 100% COMPLETED
 ================================================================================
