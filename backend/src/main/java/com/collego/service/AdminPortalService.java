@@ -8,6 +8,7 @@ import com.collego.exception.ResourceNotFoundException;
 import com.collego.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,14 @@ public class AdminPortalService {
     private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
     private final QuestionPaperService questionPaperService;
+
+    /** Phase 8 — S3 bucket name for DB backups (blank = local dev, skip S3 upload) */
+    @Value("${collego.aws.s3-backup-bucket:}")
+    private String s3BackupBucket;
+
+    /** Phase 8 — EC2 instance ID for SSM Run Command pg_dump (blank = skip) */
+    @Value("${collego.aws.ec2-instance-id:}")
+    private String ec2InstanceId;
 
     // ==================== User Edit ====================
 
@@ -457,24 +466,86 @@ public class AdminPortalService {
         return mapQpToResponse(qp);
     }
 
-    // ==================== Backup Trigger (Stub) ====================
+    // ==================== Backup Trigger ====================
 
+    /**
+     * Phase 8: Triggers a database backup.
+     *  - If collego.aws.ec2-instance-id is set: issues an AWS SSM Run Command on the EC2
+     *    instance to pg_dump → gzip → upload to S3.
+     *  - Otherwise (local dev): returns a stub response.
+     *
+     * The SSM command runs asynchronously; the response returns a commandId for tracking.
+     */
     public Map<String, Object> triggerBackup(String adminEmail, String ipAddress) {
-        // Stub — actual S3 integration comes in Phase 8
         String timestamp = LocalDateTime.now().toString();
-        String backupId = "backup-" + System.currentTimeMillis();
+        String backupId  = "backup-" + System.currentTimeMillis();
 
         auditService.log(null, adminEmail, "BACKUP_TRIGGERED", null, null,
                 "Database backup triggered: " + backupId, ipAddress);
-
         log.info("Admin {} triggered backup: {}", adminEmail, backupId);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("backupId", backupId);
-        result.put("status", "INITIATED");
         result.put("timestamp", timestamp);
-        result.put("message", "Backup initiated. S3 upload will be enabled in Phase 8.");
-        result.put("note", "Currently a stub — no actual dump performed. Wire to pg_dump + S3 in Phase 8.");
+
+        // ── Cloud path: SSM Run Command on EC2 ──────────────────────────────
+        if (ec2InstanceId != null && !ec2InstanceId.isBlank()
+                && s3BackupBucket != null && !s3BackupBucket.isBlank()) {
+
+            String dateStr  = LocalDateTime.now().toString().replace(":", "-").substring(0, 19);
+            String s3Key    = "pg_dumps/" + dateStr + "/collego_dump.sql.gz";
+            String s3Target = "s3://" + s3BackupBucket + "/" + s3Key;
+
+            // SSM shell command — runs inside the EC2 (pg_dump in Docker container)
+            String command = String.join(" && ",
+                "docker exec collego-postgres pg_dump -U $DB_USERNAME $DB_NAME | gzip > /tmp/collego_dump.sql.gz",
+                "aws s3 cp /tmp/collego_dump.sql.gz " + s3Target,
+                "rm -f /tmp/collego_dump.sql.gz"
+            );
+
+            try {
+                // Use AWS SDK v1 (already on classpath via spring-cloud-aws) or shell out to AWS CLI.
+                // We shell out to `aws ssm` CLI for minimal dependency footprint.
+                ProcessBuilder pb = new ProcessBuilder(
+                    "aws", "ssm", "send-command",
+                    "--instance-ids", ec2InstanceId,
+                    "--document-name", "AWS-RunShellScript",
+                    "--parameters", "commands=[\"" + command + "\"]",
+                    "--comment", "Collego pg_dump " + backupId
+                );
+                pb.redirectErrorStream(true);
+                Process proc = pb.start();
+                String output;
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
+                    output = br.lines().reduce("", (a, b) -> a + b + "\n");
+                }
+                int exitCode = proc.waitFor();
+
+                if (exitCode == 0) {
+                    result.put("status", "INITIATED");
+                    result.put("mode", "SSM_RUN_COMMAND");
+                    result.put("s3Target", s3Target);
+                    result.put("message", "pg_dump command dispatched via SSM. Check CloudWatch for progress.");
+                    log.info("SSM backup command sent for {}: {}", backupId, s3Target);
+                } else {
+                    result.put("status", "SSM_DISPATCH_FAILED");
+                    result.put("error", output.trim());
+                    log.error("SSM send-command failed (exit {}): {}", exitCode, output);
+                }
+
+            } catch (Exception e) {
+                log.error("Backup SSM dispatch error: {}", e.getMessage(), e);
+                result.put("status", "ERROR");
+                result.put("error", e.getMessage());
+            }
+
+        } else {
+            // ── Local dev stub ───────────────────────────────────────────────
+            result.put("status", "STUB");
+            result.put("message", "Local dev mode: no EC2_INSTANCE_ID or S3 bucket configured. Set collego.aws.ec2-instance-id and collego.aws.s3-backup-bucket for real backup.");
+            log.info("Backup stub executed (local dev) for {}", backupId);
+        }
+
         return result;
     }
 

@@ -20,5 +20,7 @@ public class SectionResponse {
     private String facultyName;
     private long enrolledCount;
     private Integer maxCapacity;
+    private String maleClassRep;
+    private String femaleClassRep;
     private LocalDateTime createdAt;
 }

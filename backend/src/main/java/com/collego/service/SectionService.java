@@ -94,6 +94,22 @@ public class SectionService {
                 .collect(Collectors.toList());
     }
 
+    public List<SectionResponse> getSectionsByDepartment(Long departmentId) {
+        return sectionRepository.findByCourseDepartmentId(departmentId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public SectionResponse updateClassReps(Long sectionId, String maleClassRep, String femaleClassRep) {
+        Section section = sectionRepository.findById(sectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Section not found with id: " + sectionId));
+        section.setMaleClassRep(maleClassRep);
+        section.setFemaleClassRep(femaleClassRep);
+        sectionRepository.save(section);
+        return mapToResponse(section);
+    }
+
     private SectionResponse mapToResponse(Section section) {
         long enrolledCount = enrollmentRepository.countBySectionId(section.getId());
         String facultyName = null;
@@ -117,6 +133,8 @@ public class SectionService {
                 .facultyName(facultyName)
                 .enrolledCount(enrolledCount)
                 .maxCapacity(section.getMaxCapacity())
+                .maleClassRep(section.getMaleClassRep())
+                .femaleClassRep(section.getFemaleClassRep())
                 .createdAt(section.getCreatedAt())
                 .build();
     }

@@ -11,5 +11,6 @@ public interface SectionRepository extends JpaRepository<Section, Long> {
     List<Section> findBySemesterId(Long semesterId);
     List<Section> findByFacultyId(Long facultyId);
     List<Section> findByCourseIdAndSemesterId(Long courseId, Long semesterId);
+    List<Section> findByCourseDepartmentId(Long departmentId);
     boolean existsByNameAndCourseIdAndSemesterId(String name, Long courseId, Long semesterId);
 }

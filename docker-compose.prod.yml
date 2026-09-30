@@ -1,0 +1,119 @@
+# docker-compose.prod.yml
+# Production stack — uses ECR images + RDS (no local postgres container)
+# All secrets injected via .env file on the EC2 instance
+
+services:
+
+  backend:
+    image: ${ECR_REGISTRY}/collego-backend:latest
+    container_name: collego-backend
+    restart: always
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # S3 / AWS
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      # Storage — use S3 paths in prod
+      QP_STORAGE_PATH: s3://${S3_BUCKET_NAME}/question-papers
+      ASSIGNMENT_STORAGE_PATH: s3://${S3_BUCKET_NAME}/assignments
+      MATERIAL_STORAGE_PATH: s3://${S3_BUCKET_NAME}/materials
+      RESUME_STORAGE_PATH: s3://${S3_BUCKET_NAME}/resumes
+      # Spring profile
+      SPRING_PROFILES_ACTIVE: prod
+    expose:
+      - "8080"
+    networks:
+      - collego-net
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /collego/backend
+        awslogs-region: ${AWS_REGION}
+        awslogs-stream: backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  frontend:
+    image: ${ECR_REGISTRY}/collego-frontend:latest
+    container_name: collego-frontend
+    restart: always
+    expose:
+      - "5173"
+    networks:
+      - collego-net
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /collego/frontend
+        awslogs-region: ${AWS_REGION}
+        awslogs-stream: frontend
+
+  ai-service:
+    image: ${ECR_REGISTRY}/collego-ai-service:latest
+    container_name: collego-ai-service
+    restart: always
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+    expose:
+      - "8000"
+    networks:
+      - collego-net
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /collego/ai-service
+        awslogs-region: ${AWS_REGION}
+        awslogs-stream: ai-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nginx:
+    image: nginx:alpine
+    container_name: collego-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - collego-net
+    depends_on:
+      - backend
+      - frontend
+      - ai-service
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /collego/nginx
+        awslogs-region: ${AWS_REGION}
+        awslogs-stream: nginx
+
+networks:
+  collego-net:
+    driver: bridge

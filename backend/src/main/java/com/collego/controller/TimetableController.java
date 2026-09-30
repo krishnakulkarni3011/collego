@@ -25,6 +25,13 @@ public class TimetableController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @DeleteMapping("/api/admin/timetable/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteSlot(@PathVariable Long id) {
+        timetableService.deleteSlot(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/api/timetable/section/{sectionId}")
     public ResponseEntity<List<TimetableSlotResponse>> getSlotsBySection(@PathVariable Long sectionId) {
         return ResponseEntity.ok(timetableService.getSlotsBySection(sectionId));
