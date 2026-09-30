@@ -29,6 +29,7 @@ services:
       RESUME_STORAGE_PATH: s3://${S3_BUCKET_NAME}/resumes
       # Spring profile
       SPRING_PROFILES_ACTIVE: prod
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
     expose:
       - "8080"
     networks:
@@ -40,7 +41,7 @@ services:
         awslogs-region: ${AWS_REGION}
         awslogs-stream: backend
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
