@@ -505,8 +505,8 @@ resource "aws_iam_role_policy" "lambda_backup_policy" {
       },
       {
         Effect   = "Allow"
-        Action   = ["rds:CreateDBSnapshot", "rds:DescribeDBSnapshots"]
-        Resource = aws_db_instance.postgres.arn
+        Action   = ["rds:CreateDBSnapshot", "rds:DescribeDBSnapshots", "rds:AddTagsToResource"]
+        Resource = "*"
       },
       {
         Effect   = "Allow"

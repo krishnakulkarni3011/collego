@@ -105,9 +105,18 @@ Timestamp: 2026-09-30
     * RDS DB: DB_HOST, DB_PORT (5432), DB_NAME (collego), DB_USERNAME (collego_admin), DB_PASSWORD
     * Application: JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, VITE_API_URL (https://api-65-0-244-196.sslip.io), S3_BUCKET_NAME
 
-9. NEXT STEPS TO COMPLETE PHASE 8 DEPLOYMENT RUNBOOK
+9. STEP 7: FIRST PRODUCTION DEPLOYMENT / CI-CD PIPELINE (COMPLETED)
 --------------------------------------------------------------------------------
-- Step 7: First Deploy — Push to `main` branch to trigger GitHub Actions CI/CD.
+- Committed & Pushed to `main` branch: Commit `707e50e`
+- Triggered GitHub Actions CI/CD Pipeline (`.github/workflows/ci.yml`):
+    * Automated Maven package for Spring Boot Backend
+    * Automated Vite build for React Frontend
+    * Python syntax verification for FastAPI AI Service
+    * ECR Docker image builds & push (`collego-backend`, `collego-frontend`, `collego-ai-service`)
+    * EC2 automated deployment via SSH, `docker compose up -d`, and Nginx reverse proxy
+
+10. NEXT STEPS TO COMPLETE PHASE 8 DEPLOYMENT RUNBOOK
+--------------------------------------------------------------------------------
 - Step 8: Verify live production endpoints.
 - Step 9: Confirm SNS email subscription for CloudWatch notifications.
 - Step 10: Verify Lambda automated DB backup trigger.
