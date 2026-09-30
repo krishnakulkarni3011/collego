@@ -9,9 +9,7 @@ RUN npm run build
 
 FROM node:20-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install -g serve
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/vite.config.js ./
 EXPOSE 5173
-CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--port", "5173"]
+CMD ["serve", "-s", "dist", "-l", "5173"]
