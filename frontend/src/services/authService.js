@@ -17,6 +17,9 @@ const getRoleFromToken = (token) => {
 export const authService = {
   login: async (email, password) => {
     const response = await api.post('/api/auth/login', { email, password })
+    if (typeof response.data === 'string' && response.data.trim().startsWith('<')) {
+      throw new Error('API server returned HTML instead of JSON. Ensure backend proxy is correctly configured.')
+    }
     const resData = response.data?.data || response.data
     const accessToken = resData?.accessToken || response.data?.accessToken
     const refreshToken = resData?.refreshToken || response.data?.refreshToken
@@ -35,8 +38,8 @@ export const authService = {
     if (userEmail) localStorage.setItem('userEmail', userEmail)
 
     return {
-      ...response.data,
-      role: role || response.data?.role
+      ...(typeof response.data === 'object' ? response.data : {}),
+      role: role
     }
   },
 
