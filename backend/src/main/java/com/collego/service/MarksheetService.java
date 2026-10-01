@@ -11,9 +11,11 @@ import com.lowagie.text.Font;
 import com.lowagie.text.pdf.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.awt.Color;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -27,6 +29,10 @@ public class MarksheetService {
     private final UserRepository userRepository;
     private final StudentProfileRepository studentProfileRepository;
     private final SemesterRepository semesterRepository;
+    private final S3StorageService s3StorageService;
+
+    @Value("${collego.aws.s3-bucket-marksheets:collego-marksheets-prod}")
+    private String marksheetBucket;
 
     // Font definitions
     private static final Font TITLE_FONT = new Font(Font.HELVETICA, 16, Font.BOLD, new Color(0, 51, 102));
@@ -77,7 +83,20 @@ public class MarksheetService {
             addFooter(document);
 
             document.close();
-            return baos.toByteArray();
+            byte[] pdfBytes = baos.toByteArray();
+
+            // Phase 8 (Task 10): Cache the marksheet PDF to S3 for future reuse.
+            // Non-blocking: if upload fails, we still return the PDF.
+            try {
+                String s3Key = "marksheets/" + student.getEnrollmentNumber() + "/sem" + semesterId + ".pdf";
+                s3StorageService.upload(marksheetBucket, s3Key,
+                        new ByteArrayInputStream(pdfBytes), pdfBytes.length, "application/pdf");
+                log.debug("Marksheet cached to S3: s3://{}/{}", marksheetBucket, s3Key);
+            } catch (Exception e) {
+                log.warn("Marksheet S3 cache upload failed (non-fatal): {}", e.getMessage());
+            }
+
+            return pdfBytes;
 
         } catch (Exception e) {
             log.error("Error generating marksheet PDF", e);

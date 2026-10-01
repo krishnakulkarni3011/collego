@@ -1,14 +1,46 @@
 import api from './api'
 
+const getRoleFromToken = (token) => {
+  try {
+    if (!token) return null
+    const payloadBase64 = token.split('.')[1]
+    if (!payloadBase64) return null
+    const payloadJson = atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/'))
+    const payload = JSON.parse(payloadJson)
+    const role = payload.role || (Array.isArray(payload.roles) ? payload.roles[0] : payload.roles) || payload.authorities?.[0]
+    return role ? String(role).toUpperCase().replace(/^ROLE_/, '') : null
+  } catch (e) {
+    return null
+  }
+}
+
 export const authService = {
   login: async (email, password) => {
     const response = await api.post('/api/auth/login', { email, password })
-    const { accessToken, refreshToken, role, email: userEmail } = response.data
-    localStorage.setItem('accessToken', accessToken)
-    localStorage.setItem('refreshToken', refreshToken)
-    localStorage.setItem('userRole', role)
-    localStorage.setItem('userEmail', userEmail)
-    return response.data
+    if (typeof response.data === 'string' && response.data.trim().startsWith('<')) {
+      throw new Error('API server returned HTML instead of JSON. Ensure backend proxy is correctly configured.')
+    }
+    const resData = response.data?.data || response.data
+    const accessToken = resData?.accessToken || response.data?.accessToken
+    const refreshToken = resData?.refreshToken || response.data?.refreshToken
+    const userEmail = resData?.email || response.data?.email
+    
+    let role = resData?.role || resData?.userRole || resData?.user?.role || response.data?.role
+    if (role) {
+      role = String(role).toUpperCase().replace(/^ROLE_/, '')
+    } else if (accessToken) {
+      role = getRoleFromToken(accessToken)
+    }
+
+    if (accessToken) localStorage.setItem('accessToken', accessToken)
+    if (refreshToken) localStorage.setItem('refreshToken', refreshToken)
+    if (role) localStorage.setItem('userRole', role)
+    if (userEmail) localStorage.setItem('userEmail', userEmail)
+
+    return {
+      ...(typeof response.data === 'object' ? response.data : {}),
+      role: role
+    }
   },
 
   logout: async () => {
@@ -42,10 +74,21 @@ export const authService = {
   },
 
   getRole: () => {
-    return localStorage.getItem('userRole')
+    let role = localStorage.getItem('userRole')
+    if (!role) {
+      const token = localStorage.getItem('accessToken')
+      if (token) {
+        role = getRoleFromToken(token)
+        if (role) {
+          localStorage.setItem('userRole', role)
+        }
+      }
+    }
+    return role ? String(role).toUpperCase().replace(/^ROLE_/, '') : null
   },
 
   getEmail: () => {
     return localStorage.getItem('userEmail')
   },
 }
+

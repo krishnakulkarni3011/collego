@@ -18,5 +18,7 @@ public class UserResponse {
     private String role;
     private boolean active;
     private String departmentName;
+    private Integer semester;
+    private String section;
     private LocalDateTime createdAt;
 }

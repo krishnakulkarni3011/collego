@@ -14,10 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -48,9 +44,10 @@ public class PlacementService {
     private final DepartmentRepository departmentRepository;
     private final UserRepository userRepository;
     private final SemesterMarksRepository semesterMarksRepository;
+    private final S3StorageService s3StorageService;
 
-    @Value("${collego.storage.resumes:${user.home}/collego-storage/resumes}")
-    private String resumeStoragePath;
+    @Value("${collego.aws.s3-bucket-resumes:collego-resumes-prod}")
+    private String resumeS3Bucket;
 
     // ============================================================
     // COMPANY MANAGEMENT (Admin)
@@ -277,7 +274,7 @@ public class PlacementService {
     // ============================================================
 
     /**
-     * Upload a new resume file for the student.
+     * Upload a new resume file for the student to S3.
      * If setActive=true, deactivates all previous resumes.
      */
     @Transactional
@@ -287,10 +284,12 @@ public class PlacementService {
         validateResumeFile(file);
 
         String uniqueName = UUID.randomUUID() + "_" + sanitizeFilename(file.getOriginalFilename());
-        String relativePath = student.getId() + "/" + uniqueName;
-        Path target = Paths.get(resumeStoragePath, relativePath);
-        Files.createDirectories(target.getParent());
-        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        String s3Key = student.getId() + "/" + uniqueName;
+        String contentType = S3StorageService.detectContentType(file.getOriginalFilename());
+
+        // Upload to S3
+        s3StorageService.upload(resumeS3Bucket, s3Key, file.getInputStream(),
+                file.getSize(), contentType);
 
         if (setActive) {
             // Deactivate previous active resume
@@ -301,13 +300,13 @@ public class PlacementService {
         Resume resume = Resume.builder()
                 .student(student)
                 .fileName(file.getOriginalFilename() != null ? file.getOriginalFilename() : uniqueName)
-                .filePath(relativePath)
+                .filePath(s3Key)
                 .versionLabel(versionLabel)
                 .active(setActive)
                 .build();
         resume = resumeRepository.save(resume);
 
-        log.info("Student {} uploaded resume: {}", email, relativePath);
+        log.info("Student {} uploaded resume to S3: s3://{}/{}", email, resumeS3Bucket, s3Key);
         return mapResumeToResponse(resume);
     }
 
@@ -342,13 +341,13 @@ public class PlacementService {
         if (!resume.getStudent().getId().equals(student.getId())) {
             throw new BadRequestException("Access denied to this resume.");
         }
-        return readFile(resumeStoragePath, resume.getFilePath());
+        return s3StorageService.download(resumeS3Bucket, resume.getFilePath());
     }
 
     public byte[] downloadResumeByAdmin(Long resumeId) throws IOException {
         Resume resume = resumeRepository.findById(resumeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Resume not found: " + resumeId));
-        return readFile(resumeStoragePath, resume.getFilePath());
+        return s3StorageService.download(resumeS3Bucket, resume.getFilePath());
     }
 
     // ============================================================
@@ -662,14 +661,6 @@ public class PlacementService {
     private String sanitizeFilename(String name) {
         if (name == null) return "resume";
         return name.replaceAll("[^a-zA-Z0-9._-]", "_");
-    }
-
-    private byte[] readFile(String basePath, String relativePath) throws IOException {
-        Path path = Paths.get(basePath, relativePath);
-        if (!Files.exists(path)) {
-            throw new ResourceNotFoundException("File not found: " + relativePath);
-        }
-        return Files.readAllBytes(path);
     }
 
     private CompanyResponse mapCompanyToResponse(Company c) {

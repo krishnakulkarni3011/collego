@@ -31,8 +31,11 @@ public class AuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request, String ipAddress) {
+        String cleanEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        String cleanPassword = request.getPassword() != null ? request.getPassword().trim() : "";
+
         // Check if user exists and is active
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmailIgnoreCase(cleanEmail)
                 .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
 
         if (!user.isActive()) {
@@ -41,7 +44,7 @@ public class AuthService {
 
         // Authenticate
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(user.getEmail(), cleanPassword)
         );
 
         // Generate tokens

@@ -1,0 +1,137 @@
+================================================================================
+COLLEGO — PHASE 8 DEPLOYMENT PROGRESS SUMMARY
+Timestamp: 2026-09-30
+================================================================================
+
+1. PREREQUISITES VERIFICATION (COMPLETED)
+--------------------------------------------------------------------------------
+- Terraform: Installed & verified (≥ 1.7)
+- AWS CLI: Installed & verified (v2)
+- Docker: Installed & verified (24+)
+
+2. AWS ACCOUNT & SECURITY CONFIGURATION (COMPLETED)
+--------------------------------------------------------------------------------
+- IAM Admin User created: `collego-admin` with AdministratorAccess policy.
+- AWS CLI configured with new Access Key ID and Secret Access Key.
+- Verified identity via `aws sts get-caller-identity`.
+
+3. AWS ONE-TIME INFRASTRUCTURE SETUP (COMPLETED)
+--------------------------------------------------------------------------------
+- Terraform State S3 Bucket created: `s3://collego-terraform-state` in region `ap-south-1`.
+- Versioning enabled on Terraform state bucket.
+- SSH Key Pair created: `collego-prod-key`
+- Private SSH Key saved locally at: `$HOME\.ssh\collego-prod-key.pem` (C:\Users\<User>\.ssh\collego-prod-key.pem).
+
+4. TERRAFORM CONFIGURATION & FIXES (COMPLETED)
+--------------------------------------------------------------------------------
+- Generated `d:\Collego\infra\terraform\terraform.tfvars`:
+    * Region: ap-south-1
+    * Environment: prod
+    * EC2 Instance Type: t3.micro (Free Tier eligible)
+    * EC2 Key Name: collego-prod-key
+    * Private SSH Key Path: $HOME\.ssh\collego-prod-key.pem
+    * RDS Instance Class: db.t3.micro (Free Tier eligible)
+    * DB Name: collego
+    * DB Username: collego_admin
+    * DB Password: CollegoProd2026Pass!
+    * Firewall SSH CIDR: 106.206.45.76/32
+    * Alert Email: shreyasbewoor@gmail.com
+- Resolved template rendering bug in `infra/terraform/user_data.sh`:
+    * Escaped bash variable `$${COMPOSE_VERSION}` for Terraform `templatefile()`.
+- Updated `infra/terraform/main.tf` for AWS Free Tier compatibility & provider standards:
+    * Added missing `filter {}` block to S3 lifecycle configuration.
+    * Adjusted RDS backup retention period to 1 day (Free Tier requirement).
+    * Set `monitoring_interval = 0` and `deletion_protection = false`.
+    * Updated PostgreSQL engine version to `16.12` (resolved RDS deprecation error for version 16.2).
+    * Removed reserved environment variable `AWS_REGION` from Lambda backup function configuration.
+
+5. INFRASTRUCTURE PROVISIONING STATUS (COMPLETED 100%)
+--------------------------------------------------------------------------------
+- EC2 Instance (`collego-app-server`): CREATED & RUNNING (ID: i-0c24aab04459130a2)
+- Elastic IP (`collego-eip`): 65.0.244.196 (ID: eipalloc-050108beb7064e647)
+- EC2 Public DNS: ec2-65-0-244-196.ap-south-1.compute.amazonaws.com
+- RDS PostgreSQL Database (`collego-postgres`): PROVISIONED & ACTIVE
+    * Endpoint: collego-postgres.cxwsiy8ke5kv.ap-south-1.rds.amazonaws.com:5432
+    * Engine: PostgreSQL 16.12
+    * DB Name: collego
+    * Username: collego_admin
+    * Password: CollegoProd2026Pass!
+- Lambda DB Backup Function (`collego-db-backup`): CREATED & ACTIVE
+    * ARN: arn:aws:lambda:ap-south-1:092963701762:function:collego-db-backup
+- EventBridge Automated Backup Trigger: CREATED
+    * Rule Name: collego-db-backup-cron (Daily at 02:00 UTC)
+- CloudWatch Alarms: CREATED
+    * EC2 High CPU Alarm: collego-ec2-high-cpu
+    * RDS High CPU Alarm: collego-rds-high-cpu
+    * RDS Low Storage Alarm: collego-rds-low-storage
+    * Backend 5xx Error Rate Alarm: collego-backend-error-rate
+- SNS Topic & Subscription: CREATED
+    * Topic ARN: arn:aws:sns:ap-south-1:092963701762:collego-alerts
+    * Email Endpoint: shreyasbewoor@gmail.com
+- S3 Production Buckets (6 Buckets): CREATED
+    * collego-question-papers-prod
+    * collego-assignments-prod
+    * collego-materials-prod
+    * collego-resumes-prod
+    * collego-marksheets-prod
+    * collego-db-backups-prod
+- ECR Container Repositories (3 Repos): CREATED
+    * 092963701762.dkr.ecr.ap-south-1.amazonaws.com/collego-backend
+    * 092963701762.dkr.ecr.ap-south-1.amazonaws.com/collego-frontend
+    * 092963701762.dkr.ecr.ap-south-1.amazonaws.com/collego-ai-service
+
+6. STEP 4: DNS SETUP (COMPLETED — SCENARIO B SSLIP.IO)
+--------------------------------------------------------------------------------
+- Elastic IP Target: 65.0.244.196
+- Selected & Verified Domains (sslip.io):
+    * Frontend Domain: 65-0-244-196.sslip.io (Verified → 65.0.244.196)
+    * API Subdomain: api-65-0-244-196.sslip.io (Verified → 65.0.244.196)
+- Verified via PowerShell `Resolve-DnsName 65-0-244-196.sslip.io` & `api-65-0-244-196.sslip.io`.
+
+7. STEP 5: FIRST-TIME EC2 SETUP & SSL CERTIFICATES (COMPLETED)
+--------------------------------------------------------------------------------
+- SSH Access verified: ec2-user@65.0.244.196
+- Certbot installed & Let's Encrypt SSL certificates successfully issued:
+    * Certificate Path: /etc/letsencrypt/live/65-0-244-196.sslip.io/fullchain.pem
+    * Key Path:         /etc/letsencrypt/live/65-0-244-196.sslip.io/privkey.pem
+    * Expiration Date:  2026-12-29 (Auto-renewal background task configured by Certbot)
+- Updated `infra/nginx/conf.d/collego.conf` with production SSL domain names & cert paths.
+
+8. STEP 6: GITHUB SECRETS CONFIGURATION (COMPLETED)
+--------------------------------------------------------------------------------
+- Configured 17 repository secrets in GitHub Actions:
+    * AWS: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION (ap-south-1), ECR_REGISTRY
+    * EC2: EC2_HOST (65.0.244.196), EC2_USER / EC2_USERNAME (ec2-user), EC2_SSH_KEY
+    * RDS DB: DB_HOST, DB_PORT (5432), DB_NAME (collego), DB_USERNAME (collego_admin), DB_PASSWORD
+    * Application: JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, VITE_API_URL (https://api-65-0-244-196.sslip.io), S3_BUCKET_NAME
+
+9. STEP 7: FIRST PRODUCTION DEPLOYMENT / CI-CD PIPELINE (COMPLETED)
+--------------------------------------------------------------------------------
+- Committed & Pushed to `main` branch: Commit `707e50e`
+- Triggered GitHub Actions CI/CD Pipeline (`.github/workflows/ci.yml`):
+    * Automated Maven package for Spring Boot Backend
+    * Automated Vite build for React Frontend
+    * Python syntax verification for FastAPI AI Service
+    * ECR Docker image builds & push (`collego-backend`, `collego-frontend`, `collego-ai-service`)
+    * EC2 automated deployment via SSH, `docker compose up -d`, and Nginx reverse proxy
+
+10. STEP 8: LIVE ENDPOINT VERIFICATION (COMPLETED)
+--------------------------------------------------------------------------------
+- Live Backend Health Endpoint (`https://api-65-0-244-196.sslip.io/api/health`):
+    * Response: HTTP 200 OK — `{"status":"UP","service":"collego-backend"}`
+- Live AI Service Health Endpoint (`https://api-65-0-244-196.sslip.io/ai/health`):
+    * Response: HTTP 200 OK — `{"status":"UP","service":"collego-ai-service"}`
+- Live Frontend Web Application (`https://65-0-244-196.sslip.io`):
+    * Responsive UI served via Nginx Reverse Proxy with Let's Encrypt SSL
+- Database Seed: Active RDS PostgreSQL connection; bootstrap admin seeded (`admin@collego.com`)
+
+11. STEP 9 & 10: ALERTS & AUTOMATED BACKUP VERIFICATION (COMPLETED)
+--------------------------------------------------------------------------------
+- Step 9 SNS Alerts: Subscription created for `shreyasbewoor@gmail.com` on SNS topic `collego-alerts`.
+- Step 10 Lambda Automated Backup: Invocation tested successfully via AWS CLI.
+    * Created RDS Snapshot: `arn:aws:rds:ap-south-1:092963701762:snapshot:collego-auto-backup-2026-09-30-1435`
+    * Scheduled EventBridge Cron: `collego-db-backup-cron` (Daily at 02:00 UTC)
+
+================================================================================
+PHASE 8 AWS DEPLOYMENT & HARDENING IS 100% COMPLETED
+================================================================================

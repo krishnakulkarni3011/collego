@@ -52,20 +52,7 @@ const NAV_SECTIONS = [
   {
     title: 'ACADEMICS',
     items: [
-      { id: 'students', label: 'Students', icon: '🎓' },
-      { id: 'faculty', label: 'Faculty', icon: '👨‍🏫' },
-      { id: 'departments', label: 'Departments', icon: '🏛️' },
-      { id: 'courses', label: 'Courses & Subjects', icon: '📚' },
-      { id: 'sections', label: 'Sections', icon: '🗂️' },
-      { id: 'timetable', label: 'Timetable', icon: '📅' },
-    ]
-  },
-  {
-    title: 'ACADEMIC OPERATIONS',
-    items: [
-      { id: 'attendance', label: 'Attendance', icon: '📋' },
-      { id: 'subjectReports', label: 'Marks & Results', icon: '📝' },
-      { id: 'backlogs', label: 'Backlogs', icon: '⚠️' },
+      { id: 'academics', label: 'Academics', icon: '🏛️' },
     ]
   },
   {
@@ -1143,6 +1130,851 @@ function ComingSoon({ label }) {
   )
 }
 
+// ─── People Edit Modal ────────────────────────────────────────────────────────
+function PeopleEditModal({ user, departments, onSave, onClose }) {
+  const [form, setForm] = useState({
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    email: user.email || '',
+    departmentId: '',
+  })
+
+  // pre-select current department by matching name → id
+  useEffect(() => {
+    if (user.departmentName && departments.length > 0) {
+      const match = departments.find(d => d.name === user.departmentName)
+      if (match) setForm(f => ({ ...f, departmentId: String(match.id) }))
+    }
+  }, [user.departmentName, departments])
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-semibold text-white">Edit User</h3>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-lg leading-none">✕</button>
+        </div>
+        <div className="space-y-3">
+          {[['First Name', 'firstName'], ['Last Name', 'lastName'], ['Email', 'email']].map(([label, key]) => (
+            <div key={key}>
+              <label className="text-xs text-slate-400 block mb-1">{label}</label>
+              <input
+                value={form[key]}
+                onChange={e => setForm({ ...form, [key]: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
+              />
+            </div>
+          ))}
+          <div>
+            <label className="text-xs text-slate-400 block mb-1">Department</label>
+            <select
+              value={form.departmentId}
+              onChange={e => setForm({ ...form, departmentId: e.target.value })}
+              className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
+            >
+              <option value="">— No Department —</option>
+              {departments.map(d => (
+                <option key={d.id} value={String(d.id)}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-3 mt-5">
+          <button
+            onClick={() => onSave({ ...form, departmentId: form.departmentId ? Number(form.departmentId) : null })}
+            className="flex-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 py-2 rounded-lg text-sm font-medium transition-all"
+          >
+            Save Changes
+          </button>
+          <button onClick={onClose} className="flex-1 bg-slate-800 hover:bg-slate-700 py-2 rounded-lg text-sm transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Dept People List (shared by Students & Faculty) ─────────────────────────
+function DeptPeopleList({ people, role, departments, onEdit, onDeactivate, onBack, deptName, loading }) {
+  const [search, setSearch] = useState('')
+  const filtered = people.filter(p => {
+    const q = search.toLowerCase()
+    return (
+      p.firstName?.toLowerCase().includes(q) ||
+      p.lastName?.toLowerCase().includes(q) ||
+      p.email?.toLowerCase().includes(q)
+    )
+  })
+
+  const roleColor = role === 'STUDENT'
+    ? { badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', accent: 'text-emerald-400' }
+    : { badge: 'bg-violet-500/20 text-violet-300 border-violet-500/30', accent: 'text-violet-400' }
+
+  return (
+    <div className="space-y-4">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm">
+        <button onClick={onBack} className="text-slate-400 hover:text-rose-400 transition-colors flex items-center gap-1">
+          <span>←</span>
+          <span>{role === 'STUDENT' ? 'Students' : 'Faculty'}</span>
+        </button>
+        <span className="text-slate-700">/</span>
+        <span className="text-white font-medium">{deptName}</span>
+      </div>
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-white">
+            {role === 'STUDENT' ? '🎓' : '👨‍🏫'} {deptName} — {role === 'STUDENT' ? 'Students' : 'Faculty'}
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">{filtered.length} {role === 'STUDENT' ? 'student' : 'faculty member'}{filtered.length !== 1 ? 's' : ''} found</p>
+        </div>
+        <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2">
+          <span className="text-slate-500 text-sm">🔍</span>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={`Search ${role === 'STUDENT' ? 'students' : 'faculty'}…`}
+            className="bg-transparent text-sm text-slate-300 placeholder-slate-500 outline-none w-48"
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      {loading ? <Spinner /> : (
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-900">
+              <tr className="text-slate-400 text-xs uppercase">
+                <th className="px-4 py-3 text-left">Name</th>
+                <th className="px-4 py-3 text-left">Email</th>
+                <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-center">Joined</th>
+                <th className="px-4 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {filtered.map(p => (
+                <tr key={p.id} className="hover:bg-slate-800/40 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                        role === 'STUDENT' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-violet-500/20 text-violet-300'
+                      }`}>
+                        {(p.firstName?.[0] || '?').toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-200">{p.firstName} {p.lastName}</p>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${roleColor.badge}`}>{p.role}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-400 text-xs">{p.email}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`px-2 py-1 rounded-full text-xs ${p.active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-700 text-slate-500'}`}>
+                      {p.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center text-xs text-slate-500">
+                    {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        onClick={() => onEdit(p)}
+                        className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={() => onDeactivate(p)}
+                        className={`text-xs font-medium transition-colors ${
+                          p.active ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 hover:text-emerald-300'
+                        }`}
+                      >
+                        {p.active ? '🚫 Remove' : '✅ Restore'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && (
+            <p className="p-8 text-slate-500 text-center text-sm">
+              {search ? 'No results match your search.' : `No ${role === 'STUDENT' ? 'students' : 'faculty'} in this department yet.`}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Dept Cards Grid (shared by Students & Faculty) ───────────────────────────
+function DeptCardsGrid({ departments, allPeople, role, onSelectDept, loading }) {
+  const DEPT_COLORS = [
+    { bg: 'from-emerald-600/20 to-teal-600/20', border: 'border-emerald-500/20', icon: 'bg-emerald-500/20 text-emerald-300', accent: 'text-emerald-400' },
+    { bg: 'from-violet-600/20 to-fuchsia-600/20', border: 'border-violet-500/20', icon: 'bg-violet-500/20 text-violet-300', accent: 'text-violet-400' },
+    { bg: 'from-blue-600/20 to-cyan-600/20', border: 'border-blue-500/20', icon: 'bg-blue-500/20 text-blue-300', accent: 'text-blue-400' },
+    { bg: 'from-amber-600/20 to-orange-600/20', border: 'border-amber-500/20', icon: 'bg-amber-500/20 text-amber-300', accent: 'text-amber-400' },
+    { bg: 'from-rose-600/20 to-pink-600/20', border: 'border-rose-500/20', icon: 'bg-rose-500/20 text-rose-300', accent: 'text-rose-400' },
+    { bg: 'from-teal-600/20 to-cyan-600/20', border: 'border-teal-500/20', icon: 'bg-teal-500/20 text-teal-300', accent: 'text-teal-400' },
+  ]
+
+  const isStudent = role === 'STUDENT'
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-lg font-semibold text-white">
+          {isStudent ? '🎓 Students' : '👨‍🏫 Faculty'} — Select a Department
+        </h2>
+        <p className="text-xs text-slate-500 mt-0.5">Click a department to view and manage its {isStudent ? 'students' : 'faculty members'}</p>
+      </div>
+
+      {loading ? <Spinner /> : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {departments.map((dept, i) => {
+            const color = DEPT_COLORS[i % DEPT_COLORS.length]
+            const count = allPeople.filter(p => p.departmentName === dept.name).length
+            const activeCount = allPeople.filter(p => p.departmentName === dept.name && p.active).length
+            return (
+              <button
+                key={dept.id}
+                onClick={() => onSelectDept(dept)}
+                className={`text-left bg-gradient-to-br ${color.bg} border ${color.border} rounded-2xl p-5 hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20 active:scale-[0.99] transition-all duration-200 group`}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${color.icon}`}>
+                    {isStudent ? '🎓' : '👨‍🏫'}
+                  </div>
+                  <span className="text-[10px] text-slate-500 bg-slate-800/60 px-2 py-1 rounded-lg">{dept.code}</span>
+                </div>
+                <h3 className="font-semibold text-slate-200 text-sm leading-snug mb-1 group-hover:text-white transition-colors">
+                  {dept.name}
+                </h3>
+                {dept.description && (
+                  <p className="text-[11px] text-slate-500 mb-3 line-clamp-2">{dept.description}</p>
+                )}
+                <div className="flex items-center gap-3 mt-2">
+                  <div>
+                    <p className={`text-2xl font-bold ${color.accent}`}>{count}</p>
+                    <p className="text-[10px] text-slate-500">{isStudent ? 'Students' : 'Faculty'}</p>
+                  </div>
+                  <div className="h-8 w-px bg-slate-700" />
+                  <div>
+                    <p className="text-2xl font-bold text-emerald-400">{activeCount}</p>
+                    <p className="text-[10px] text-slate-500">Active</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-1 text-[11px] text-slate-500 group-hover:text-slate-400 transition-colors">
+                  <span>View {isStudent ? 'students' : 'faculty'}</span>
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+              </button>
+            )
+          })}
+          {departments.length === 0 && (
+            <p className="col-span-full text-center text-slate-500 text-sm py-12">
+              No departments found. Create departments first.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Students Tab ─────────────────────────────────────────────────────────────
+function StudentsTab({ students, departments, loading, onEdit, onToggleActive }) {
+  const [selectedDept, setSelectedDept] = useState(null)
+
+  if (selectedDept) {
+    const deptStudents = students.filter(s => s.departmentName === selectedDept.name)
+    return (
+      <DeptPeopleList
+        people={deptStudents}
+        role="STUDENT"
+        departments={departments}
+        onEdit={onEdit}
+        onDeactivate={onToggleActive}
+        onBack={() => setSelectedDept(null)}
+        deptName={selectedDept.name}
+        loading={loading}
+      />
+    )
+  }
+
+  return (
+    <DeptCardsGrid
+      departments={departments}
+      allPeople={students}
+      role="STUDENT"
+      onSelectDept={setSelectedDept}
+      loading={loading}
+    />
+  )
+}
+
+// ─── Faculty Tab ──────────────────────────────────────────────────────────────
+function FacultyTab({ faculty, departments, loading, onEdit, onToggleActive }) {
+  const [selectedDept, setSelectedDept] = useState(null)
+
+  if (selectedDept) {
+    const deptFaculty = faculty.filter(f => f.departmentName === selectedDept.name)
+    return (
+      <DeptPeopleList
+        people={deptFaculty}
+        role="FACULTY"
+        departments={departments}
+        onEdit={onEdit}
+        onDeactivate={onToggleActive}
+        onBack={() => setSelectedDept(null)}
+        deptName={selectedDept.name}
+        loading={loading}
+      />
+    )
+  }
+
+  return (
+    <DeptCardsGrid
+      departments={departments}
+      allPeople={faculty}
+      role="FACULTY"
+      onSelectDept={setSelectedDept}
+      loading={loading}
+    />
+  )
+}
+
+// ─── Academics Tab (unified department-first navigation) ──────────────────────
+function AcademicsTab({
+  departments, students, faculty, attendanceSummary, subjectReports, backlogReport,
+  loading, onEdit, onToggleActive, onFetchStudents, onFetchFaculty,
+  onFetchAttendance, onFetchSubjectReports, onFetchBacklogs,
+}) {
+  const [view, setView] = useState('departments')
+  const [selectedDept, setSelectedDept] = useState(null)
+  const [selectedYear, setSelectedYear] = useState(null)
+  const [selectedSection, setSelectedSection] = useState(null)
+  const [sections, setSections] = useState([])
+  const [ttMeta, setTtMeta] = useState(null)          // { fileName, uploadedAt } or null
+  const [ttLoading, setTtLoading] = useState(false)
+  const [ttUploading, setTtUploading] = useState(false)
+  const [crForm, setCrForm] = useState({ maleClassRep: '', femaleClassRep: '' })
+  const [crEditing, setCrEditing] = useState(false)
+  const [sectionDetail, setSectionDetail] = useState(null)
+
+  const YEARS = [
+    { label: 'I Year',     semesters: [1, 2], color: 'from-emerald-600/20 to-teal-600/20', border: 'border-emerald-500/20', accent: 'text-emerald-400', icon: '1️⃣' },
+    { label: 'II Year',    semesters: [3, 4], color: 'from-violet-600/20 to-fuchsia-600/20', border: 'border-violet-500/20', accent: 'text-violet-400', icon: '2️⃣' },
+    { label: 'III Year',   semesters: [5, 6], color: 'from-blue-600/20 to-cyan-600/20', border: 'border-blue-500/20', accent: 'text-blue-400', icon: '3️⃣' },
+    { label: 'Final Year', semesters: [7, 8], color: 'from-rose-600/20 to-orange-600/20', border: 'border-rose-500/20', accent: 'text-rose-400', icon: '🎓' },
+  ]
+
+  const DEPT_COLORS = [
+    { bg: 'from-emerald-600/20 to-teal-600/20', border: 'border-emerald-500/20', icon: 'bg-emerald-500/20 text-emerald-300', accent: 'text-emerald-400' },
+    { bg: 'from-violet-600/20 to-fuchsia-600/20', border: 'border-violet-500/20', icon: 'bg-violet-500/20 text-violet-300', accent: 'text-violet-400' },
+    { bg: 'from-blue-600/20 to-cyan-600/20', border: 'border-blue-500/20', icon: 'bg-blue-500/20 text-blue-300', accent: 'text-blue-400' },
+    { bg: 'from-amber-600/20 to-orange-600/20', border: 'border-amber-500/20', icon: 'bg-amber-500/20 text-amber-300', accent: 'text-amber-400' },
+    { bg: 'from-rose-600/20 to-pink-600/20', border: 'border-rose-500/20', icon: 'bg-rose-500/20 text-rose-300', accent: 'text-rose-400' },
+    { bg: 'from-teal-600/20 to-cyan-600/20', border: 'border-teal-500/20', icon: 'bg-teal-500/20 text-teal-300', accent: 'text-teal-400' },
+  ]
+
+  const SUB_OPTIONS = [
+    { id: 'students',       label: 'Students',          icon: '🎓', color: 'from-emerald-600/20 to-teal-600/20', border: 'border-emerald-500/20', accent: 'text-emerald-400' },
+    { id: 'faculty',        label: 'Faculty',           icon: '👨‍🏫', color: 'from-violet-600/20 to-fuchsia-600/20', border: 'border-violet-500/20', accent: 'text-violet-400' },
+    { id: 'courses',        label: 'Courses & Subjects',icon: '📚', color: 'from-blue-600/20 to-cyan-600/20', border: 'border-blue-500/20', accent: 'text-blue-400' },
+    { id: 'sections',       label: 'Sections',          icon: '🗂️', color: 'from-amber-600/20 to-orange-600/20', border: 'border-amber-500/20', accent: 'text-amber-400' },
+    { id: 'attendance',     label: 'Attendance',        icon: '📋', color: 'from-teal-600/20 to-cyan-600/20', border: 'border-teal-500/20', accent: 'text-teal-400' },
+    { id: 'subjectReports', label: 'Marks & Results',   icon: '📝', color: 'from-indigo-600/20 to-violet-600/20', border: 'border-indigo-500/20', accent: 'text-indigo-400' },
+    { id: 'backlogs',       label: 'Backlogs',          icon: '⚠️', color: 'from-red-600/20 to-rose-600/20', border: 'border-red-500/20', accent: 'text-red-400' },
+  ]
+
+  const handleSelectDept = (dept) => { setSelectedDept(dept); setView('dept-home') }
+  const goToDepts   = () => { setView('departments'); setSelectedDept(null); setSelectedYear(null); setSelectedSection(null) }
+  const goToDeptHome = () => { setView('dept-home'); setSelectedYear(null); setSelectedSection(null) }
+  const goToYearPicker = () => { setView('students'); setSelectedYear(null) }
+  const goToSectionPicker = () => { setView('sections'); setSelectedSection(null); setSectionDetail(null) }
+
+  const handleSelectSubView = async (subId) => {
+    setView(subId)
+    setSelectedYear(null)
+    setSelectedSection(null)
+    if (subId === 'students') onFetchStudents()
+    if (subId === 'faculty') onFetchFaculty()
+    if (subId === 'attendance') onFetchAttendance()
+    if (subId === 'subjectReports') onFetchSubjectReports()
+    if (subId === 'backlogs') onFetchBacklogs()
+    if (subId === 'sections' && selectedDept) {
+      try {
+        const r = await api.get(`/api/sections?departmentId=${selectedDept.id}`)
+        setSections(r.data)
+      } catch (e) { console.error(e) }
+    }
+  }
+
+  const handleSelectSection = async (sectionName) => {
+    setSelectedSection(sectionName)
+    // find all section objects matching this name in this dept
+    const matched = sections.filter(s => s.name === sectionName)
+    setSectionDetail(matched[0] || null)
+    if (matched[0]) {
+      setCrForm({ maleClassRep: matched[0].maleClassRep || '', femaleClassRep: matched[0].femaleClassRep || '' })
+    }
+    setTtMeta(null)
+    // load timetable PDF meta for this section
+    setTtLoading(true)
+    try {
+      const r = await api.get(`/api/sections/${matched[0]?.id}/timetable/meta`)
+      setTtMeta(r.data || null)
+    } catch (e) {
+      setTtMeta(null) // 204 = no timetable
+    } finally { setTtLoading(false) }
+  }
+
+  const handleUploadPdf = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file || !sectionDetail) return
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Only PDF files are allowed.')
+      return
+    }
+    setTtUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const r = await api.post(`/api/admin/sections/${sectionDetail.id}/timetable`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      setTtMeta(r.data)
+    } catch (err) { alert(err.response?.data?.message || 'Upload failed') }
+    finally { setTtUploading(false) }
+  }
+
+  const handleDeletePdf = async () => {
+    if (!sectionDetail) return
+    if (!confirm('Delete the timetable for this section?')) return
+    try {
+      await api.delete(`/api/admin/sections/${sectionDetail.id}/timetable`)
+      setTtMeta(null)
+    } catch (err) { alert('Failed to delete timetable') }
+  }
+
+  const handleViewPdf = async () => {
+    if (!sectionDetail) return
+    try {
+      const r = await api.get(`/api/sections/${sectionDetail.id}/timetable`, { responseType: 'blob' })
+      const url = URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' }))
+      window.open(url, '_blank')
+      // revoke after a short delay to allow the tab to load
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+    } catch (err) { alert('Failed to open timetable') }
+  }
+
+  const handleSaveCR = async () => {
+    if (!sectionDetail) return
+    // Save for all sections with same name in this dept
+    const matched = sections.filter(s => s.name === selectedSection)
+    try {
+      for (const sec of matched) {
+        await api.put(`/api/admin/sections/${sec.id}/class-reps`, crForm)
+      }
+      setSectionDetail(prev => prev ? { ...prev, ...crForm } : prev)
+      setCrEditing(false)
+    } catch (err) { alert('Failed to update CR') }
+  }
+
+  // ── Breadcrumb ──
+  const Breadcrumb = () => {
+    const subLabel = SUB_OPTIONS.find(o => o.id === view)?.label
+    return (
+      <div className="flex items-center gap-2 text-sm mb-5 flex-wrap">
+        <button onClick={goToDepts} className="text-slate-400 hover:text-rose-400 transition-colors">Academics</button>
+        {selectedDept && (
+          <>
+            <span className="text-slate-700">/</span>
+            <button onClick={goToDeptHome} className={`${view === 'dept-home' ? 'text-white font-medium' : 'text-slate-400 hover:text-rose-400 transition-colors'}`}>{selectedDept.name}</button>
+          </>
+        )}
+        {view !== 'departments' && view !== 'dept-home' && subLabel && (
+          <>
+            <span className="text-slate-700">/</span>
+            <button
+              onClick={view === 'students' ? goToYearPicker : view === 'sections' ? goToSectionPicker : undefined}
+              className={`${(selectedYear || selectedSection) ? 'text-slate-400 hover:text-rose-400 transition-colors' : 'text-white font-medium'}`}
+            >
+              {subLabel}
+            </button>
+          </>
+        )}
+        {selectedYear && (
+          <>
+            <span className="text-slate-700">/</span>
+            <span className="text-white font-medium">{selectedYear.label}</span>
+          </>
+        )}
+        {selectedSection && (
+          <>
+            <span className="text-slate-700">/</span>
+            <span className="text-white font-medium">Section {selectedSection}</span>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  // ── Department grid ──
+  if (view === 'departments') {
+    return (
+      <div className="space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold text-white">🏛️ Academics — Select a Department</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Choose a department to manage its students, faculty, courses, attendance and more</p>
+        </div>
+        {loading ? <Spinner /> : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {departments.map((dept, i) => {
+              const color = DEPT_COLORS[i % DEPT_COLORS.length]
+              const studentCount = students.filter(s => s.departmentName === dept.name).length
+              const facultyCount = faculty.filter(f => f.departmentName === dept.name).length
+              return (
+                <button key={dept.id} onClick={() => handleSelectDept(dept)}
+                  className={`text-left bg-gradient-to-br ${color.bg} border ${color.border} rounded-2xl p-5 hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20 active:scale-[0.99] transition-all duration-200 group`}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${color.icon}`}>🏛️</div>
+                    <span className="text-[10px] text-slate-500 bg-slate-800/60 px-2 py-1 rounded-lg">{dept.code}</span>
+                  </div>
+                  <h3 className="font-semibold text-slate-200 text-sm leading-snug mb-1 group-hover:text-white transition-colors">{dept.name}</h3>
+                  {dept.description && <p className="text-[11px] text-slate-500 mb-3 line-clamp-2">{dept.description}</p>}
+                  <div className="flex items-center gap-4 mt-3">
+                    <div><p className={`text-xl font-bold ${color.accent}`}>{studentCount}</p><p className="text-[10px] text-slate-500">Students</p></div>
+                    <div className="h-8 w-px bg-slate-700" />
+                    <div><p className={`text-xl font-bold ${color.accent}`}>{facultyCount}</p><p className="text-[10px] text-slate-500">Faculty</p></div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-1 text-[11px] text-slate-500 group-hover:text-slate-400 transition-colors">
+                    <span>Open Department</span><span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </div>
+                </button>
+              )
+            })}
+            {departments.length === 0 && <p className="col-span-full text-center text-slate-500 text-sm py-12">No departments found.</p>}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Department sub-options home ──
+  if (view === 'dept-home') {
+    return (
+      <div className="space-y-5">
+        <Breadcrumb />
+        <div>
+          <h2 className="text-lg font-semibold text-white">🏛️ {selectedDept?.name}</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Select a section to manage</p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {SUB_OPTIONS.map(opt => (
+            <button key={opt.id} onClick={() => handleSelectSubView(opt.id)}
+              className={`text-left bg-gradient-to-br ${opt.color} border ${opt.border} rounded-2xl p-5 hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20 active:scale-[0.99] transition-all duration-200 group flex flex-col items-start gap-3`}
+            >
+              <span className="text-3xl">{opt.icon}</span>
+              <div>
+                <p className={`font-semibold text-sm ${opt.accent} group-hover:text-white transition-colors`}>{opt.label}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5 group-hover:text-slate-400 transition-colors">Manage →</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  const deptStudents      = students.filter(s => s.departmentName === selectedDept?.name)
+  const deptFaculty       = faculty.filter(f => f.departmentName === selectedDept?.name)
+  const deptAttendance    = attendanceSummary.filter(a => a.departmentName === selectedDept?.name)
+
+  return (
+    <div className="space-y-4">
+      <Breadcrumb />
+
+      {/* ─── STUDENTS: Year Picker ─── */}
+      {view === 'students' && !selectedYear && (
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-lg font-semibold text-white">🎓 {selectedDept?.name} — Select Year</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Choose a year to view students</p>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {YEARS.map(yr => {
+              const count = deptStudents.filter(s => yr.semesters.includes(s.semester)).length
+              return (
+                <button key={yr.label} onClick={() => setSelectedYear(yr)}
+                  className={`text-left bg-gradient-to-br ${yr.color} border ${yr.border} rounded-2xl p-6 hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20 active:scale-[0.99] transition-all duration-200 group flex flex-col items-start gap-4`}
+                >
+                  <span className="text-4xl">{yr.icon}</span>
+                  <div>
+                    <p className={`font-bold text-base ${yr.accent} group-hover:text-white transition-colors`}>{yr.label}</p>
+                    <p className="text-xs text-slate-500 mt-1">Sem {yr.semesters.join(' & ')}</p>
+                    <p className={`text-2xl font-bold mt-2 ${yr.accent}`}>{count}</p>
+                    <p className="text-[10px] text-slate-500">Students enrolled</p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─── STUDENTS: Year filtered list ─── */}
+      {view === 'students' && selectedYear && (
+        <DeptPeopleList
+          people={deptStudents.filter(s => selectedYear.semesters.includes(s.semester))}
+          role="STUDENT"
+          departments={departments}
+          onEdit={onEdit}
+          onDeactivate={onToggleActive}
+          onBack={goToYearPicker}
+          deptName={`${selectedDept?.name} — ${selectedYear.label}`}
+          loading={loading}
+        />
+      )}
+
+      {/* ─── FACULTY ─── */}
+      {view === 'faculty' && (
+        <DeptPeopleList people={deptFaculty} role="FACULTY" departments={departments}
+          onEdit={onEdit} onDeactivate={onToggleActive} onBack={goToDeptHome} deptName={selectedDept?.name} loading={loading} />
+      )}
+
+      {/* ─── ATTENDANCE ─── */}
+      {view === 'attendance' && (
+        deptAttendance.length > 0
+          ? <AttendanceSummaryTab attendanceSummary={deptAttendance} />
+          : <p className="py-12 text-center text-slate-500 text-sm">No attendance data for {selectedDept?.name}.</p>
+      )}
+
+      {view === 'subjectReports' && <SubjectReportsTab subjectReports={subjectReports} />}
+      {view === 'backlogs'       && <BacklogsTab backlogReport={backlogReport} />}
+      {view === 'courses'        && <ComingSoon label="Courses & Subjects" />}
+
+      {/* ─── SECTIONS: Section A/B picker ─── */}
+      {view === 'sections' && !selectedSection && (
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-lg font-semibold text-white">🗂️ {selectedDept?.name} — Sections</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Select a section to view timetable and students</p>
+          </div>
+          {/* Unique section names in this dept (from enrolled students) */}
+          {(() => {
+            const sectionNames = [...new Set([
+              ...deptStudents.map(s => s.section).filter(Boolean),
+              ...sections.map(s => s.name).filter(Boolean),
+            ])].sort()
+            const displaySections = sectionNames.length > 0 ? sectionNames : ['A', 'B']
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {displaySections.map((name, i) => {
+                  const secStudents = deptStudents.filter(s => s.section === name)
+                  const colors = [
+                    { bg: 'from-amber-600/20 to-orange-600/20', border: 'border-amber-500/20', accent: 'text-amber-400' },
+                    { bg: 'from-cyan-600/20 to-blue-600/20',   border: 'border-cyan-500/20',  accent: 'text-cyan-400' },
+                    { bg: 'from-pink-600/20 to-rose-600/20',   border: 'border-pink-500/20',  accent: 'text-pink-400' },
+                    { bg: 'from-teal-600/20 to-emerald-600/20',border: 'border-teal-500/20',  accent: 'text-teal-400' },
+                  ]
+                  const c = colors[i % colors.length]
+                  return (
+                    <button key={name} onClick={() => handleSelectSection(name)}
+                      className={`text-left bg-gradient-to-br ${c.bg} border ${c.border} rounded-2xl p-6 hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20 active:scale-[0.99] transition-all duration-200 group flex flex-col items-start gap-4`}
+                    >
+                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-3xl font-bold ${c.accent} bg-slate-800/60`}>{name}</div>
+                      <div>
+                        <p className={`font-bold text-base ${c.accent} group-hover:text-white transition-colors`}>Section {name}</p>
+                        <p className={`text-2xl font-bold mt-2 ${c.accent}`}>{secStudents.length}</p>
+                        <p className="text-[10px] text-slate-500">Students</p>
+                      </div>
+                      <p className="text-[11px] text-slate-500 group-hover:text-slate-400 transition-colors">View details →</p>
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* ─── SECTIONS: Section detail (timetable + student list + CR) ─── */}
+      {view === 'sections' && selectedSection && (
+        <div className="space-y-6">
+          <h2 className="text-lg font-semibold text-white">🗂️ {selectedDept?.name} — Section {selectedSection}</h2>
+
+          {/* Class Representatives */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">🏅 Class Representatives</h3>
+              <button onClick={() => setCrEditing(e => !e)} className="text-xs text-rose-400 hover:text-rose-300">
+                {crEditing ? 'Cancel' : 'Edit CRs'}
+              </button>
+            </div>
+            {crEditing ? (
+              <div className="flex gap-3 flex-wrap">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="text-xs text-slate-400 mb-1 block">👨 Male CR Name</label>
+                  <input value={crForm.maleClassRep} onChange={e => setCrForm(f => ({...f, maleClassRep: e.target.value}))}
+                    placeholder="e.g. Arjun Sharma"
+                    className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-rose-500" />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="text-xs text-slate-400 mb-1 block">👩 Female CR Name</label>
+                  <input value={crForm.femaleClassRep} onChange={e => setCrForm(f => ({...f, femaleClassRep: e.target.value}))}
+                    placeholder="e.g. Priya Patel"
+                    className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-rose-500" />
+                </div>
+                <div className="flex items-end">
+                  <button onClick={handleSaveCR} className="bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 px-4 py-2 rounded-lg text-sm font-medium transition-all">Save</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-6">
+                <div className="flex items-center gap-3 bg-slate-800/50 rounded-xl px-4 py-3">
+                  <span className="text-2xl">👨</span>
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">Male CR</p>
+                    <p className="text-sm font-semibold text-emerald-300">{sectionDetail?.maleClassRep || crForm.maleClassRep || '— Not set —'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 bg-slate-800/50 rounded-xl px-4 py-3">
+                  <span className="text-2xl">👩</span>
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">Female CR</p>
+                    <p className="text-sm font-semibold text-violet-300">{sectionDetail?.femaleClassRep || crForm.femaleClassRep || '— Not set —'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Timetable PDF */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-5">
+              <span className="text-2xl">📅</span>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Timetable — Section {selectedSection}</h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">One PDF timetable per section. Upload to add or replace.</p>
+              </div>
+            </div>
+
+            {ttLoading ? <Spinner /> : ttMeta ? (
+              /* ── Timetable exists ── */
+              <div className="flex items-center gap-4 bg-slate-800/60 border border-slate-700 rounded-xl px-5 py-4">
+                <span className="text-3xl shrink-0">📄</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-200 truncate">{ttMeta.fileName}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Uploaded {new Date(ttMeta.uploadedAt).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={handleViewPdf}
+                    className="flex items-center gap-1.5 bg-blue-500/15 text-blue-300 border border-blue-500/30 px-3 py-1.5 rounded-lg text-xs hover:bg-blue-500/25 transition-colors">
+                    👁️ View
+                  </button>
+                  <label className="flex items-center gap-1.5 bg-amber-500/15 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs hover:bg-amber-500/25 transition-colors cursor-pointer">
+                    {ttUploading ? '⏳ Uploading…' : '🔄 Replace'}
+                    <input type="file" accept=".pdf" className="hidden" onChange={handleUploadPdf} disabled={ttUploading} />
+                  </label>
+                  <button onClick={handleDeletePdf}
+                    className="flex items-center gap-1.5 bg-red-500/15 text-red-300 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs hover:bg-red-500/25 transition-colors">
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ── No timetable yet ── */
+              <label className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-slate-700 hover:border-rose-500/50 rounded-xl p-10 cursor-pointer transition-colors group">
+                <span className="text-5xl group-hover:scale-110 transition-transform">📤</span>
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-slate-300 group-hover:text-white transition-colors">
+                    {ttUploading ? 'Uploading…' : 'Upload Timetable PDF'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">Click to select a PDF file from your device</p>
+                  <p className="text-[10px] text-slate-600 mt-1">Only PDF files · One per section</p>
+                </div>
+                <input type="file" accept=".pdf" className="hidden" onChange={handleUploadPdf} disabled={ttUploading} />
+              </label>
+            )}
+          </div>
+
+          {/* Students in this section */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">🎓 Students — Section {selectedSection}</h3>
+            {(() => {
+              const secStudents = deptStudents.filter(s => s.section === selectedSection)
+              const maleCR   = sectionDetail?.maleClassRep   || crForm.maleClassRep
+              const femaleCR = sectionDetail?.femaleClassRep  || crForm.femaleClassRep
+              const crStudents = secStudents.filter(s => {
+                const full = `${s.firstName} ${s.lastName}`.toLowerCase()
+                return (maleCR && full.includes(maleCR.toLowerCase().split(' ')[0]?.toLowerCase())) ||
+                       (femaleCR && full.includes(femaleCR.toLowerCase().split(' ')[0]?.toLowerCase()))
+              })
+              const otherStudents = secStudents.filter(s => !crStudents.includes(s))
+
+              return secStudents.length === 0 ? (
+                <p className="text-slate-500 text-sm text-center py-8">No students found in Section {selectedSection}.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {/* CR students pinned on top */}
+                  {maleCR && (
+                    <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2.5">
+                      <span className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-xs font-bold shrink-0">♂</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-emerald-300">{maleCR}</p>
+                        <p className="text-[10px] text-slate-500">Male Class Representative</p>
+                      </div>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">CR</span>
+                    </div>
+                  )}
+                  {femaleCR && (
+                    <div className="flex items-center gap-3 bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-2.5">
+                      <span className="w-8 h-8 rounded-full bg-violet-500/20 text-violet-300 flex items-center justify-center text-xs font-bold shrink-0">♀</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-violet-300">{femaleCR}</p>
+                        <p className="text-[10px] text-slate-500">Female Class Representative</p>
+                      </div>
+                      <span className="text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full">CR</span>
+                    </div>
+                  )}
+                  {(maleCR || femaleCR) && otherStudents.length > 0 && (
+                    <div className="h-px bg-slate-800 my-2" />
+                  )}
+                  {/* Remaining students */}
+                  {otherStudents.map(s => (
+                    <div key={s.id} className="flex items-center gap-3 bg-slate-800/40 border border-slate-700/50 rounded-xl px-4 py-2.5 hover:bg-slate-800/70 transition-colors">
+                      <div className="w-8 h-8 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold shrink-0">
+                        {(s.firstName?.[0] || '?').toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-200">{s.firstName} {s.lastName}</p>
+                        <p className="text-[10px] text-slate-500">{s.email}</p>
+                      </div>
+                      <span className="text-[10px] text-slate-500">Sem {s.semester || '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 function AdminDashboard() {
   const navigate = useNavigate()
@@ -1155,6 +1987,8 @@ function AdminDashboard() {
   // Data state
   const [overview, setOverview] = useState(null)
   const [users, setUsers] = useState([])
+  const [students, setStudents] = useState([])
+  const [faculty, setFaculty] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
   const [deptReports, setDeptReports] = useState([])
   const [subjectReports, setSubjectReports] = useState([])
@@ -1164,6 +1998,9 @@ function AdminDashboard() {
   const [allQPs, setAllQPs] = useState([])
   const [departments, setDepartments] = useState([])
   const [placementStats, setPlacementStats] = useState(null)
+
+  // Inline edit modal state (used by Students & Faculty tabs)
+  const [editingPerson, setEditingPerson] = useState(null)
 
   // User form state
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -1181,6 +2018,8 @@ function AdminDashboard() {
   // Fetch functions
   const fetchOverview     = async () => { try { const r = await api.get('/api/admin/overview'); setOverview(r.data) } catch (e) { console.error(e) } }
   const fetchUsers        = async () => { try { const r = await api.get('/api/admin/users'); setUsers(r.data) } catch (e) { console.error(e) } }
+  const fetchStudents     = async () => { try { const r = await api.get('/api/admin/users?role=STUDENT'); setStudents(r.data) } catch (e) { console.error(e) } }
+  const fetchFaculty      = async () => { try { const r = await api.get('/api/admin/users?role=FACULTY'); setFaculty(r.data) } catch (e) { console.error(e) } }
   const fetchDepartments  = async () => { try { const r = await api.get('/api/departments'); setDepartments(r.data) } catch (e) { console.error(e) } }
   const fetchAuditLogs    = async () => { try { const r = await api.get('/api/admin/audit-logs'); setAuditLogs(r.data) } catch (e) { console.error(e) } }
   const fetchDeptReports  = async () => { try { const r = await api.get('/api/admin/reports/departments'); setDeptReports(r.data) } catch (e) { console.error(e) } }
@@ -1206,15 +2045,36 @@ function AdminDashboard() {
 
   const handleTabChange = (tab) => {
     setActiveTab(tab)
+    if (tab === 'academics') { fetchStudents(); fetchFaculty() }  // pre-load counts for dept cards
     if (tab === 'users') fetchUsers()
     if (tab === 'audit') fetchAuditLogs()
     if (tab === 'deptReports') fetchDeptReports()
-    if (tab === 'subjectReports') fetchSubjectReports()
-    if (tab === 'backlogs') fetchBacklogs()
-    if (tab === 'attendance') fetchAttendanceSummary()
     if (tab === 'questionPapers') { fetchPendingQPs(); fetchAllQPs() }
     if (tab === 'placementAnalytics') fetchPlacementStats()
     if (tab === 'overview') { fetchOverview(); fetchAttendanceSummary(); fetchPendingQPs(); fetchAuditLogs(); fetchDeptReports(); fetchPlacementStats() }
+  }
+
+  // Shared edit handler for Students & Faculty tabs
+  const handlePersonEdit = async (payload) => {
+    if (!editingPerson) return
+    try {
+      await api.put(`/api/admin/users/${editingPerson.id}`, payload)
+      showMsg('User updated successfully')
+      setEditingPerson(null)
+      // Refresh whichever list is active
+      if (activeTab === 'students') fetchStudents()
+      if (activeTab === 'faculty') fetchFaculty()
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to update user', 'error') }
+  }
+
+  const handlePersonToggleActive = async (person) => {
+    try {
+      if (person.active) { await api.put(`/api/admin/users/${person.id}/deactivate`) }
+      else { await api.put(`/api/admin/users/${person.id}/activate`) }
+      showMsg(person.active ? 'User deactivated' : 'User restored')
+      if (activeTab === 'students') fetchStudents()
+      if (activeTab === 'faculty') fetchFaculty()
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed', 'error') }
   }
 
   const handleLogout = async () => { await authService.logout(); navigate('/login') }
@@ -1344,16 +2204,42 @@ function AdminDashboard() {
           )}
 
           {activeTab === 'deptReports' && <DeptReportsTab deptReports={deptReports} />}
-          {activeTab === 'subjectReports' && <SubjectReportsTab subjectReports={subjectReports} />}
-          {activeTab === 'backlogs' && <BacklogsTab backlogReport={backlogReport} />}
-          {activeTab === 'attendance' && <AttendanceSummaryTab attendanceSummary={attendanceSummary} />}
           {activeTab === 'questionPapers' && <QuestionPapersTab pendingQPs={pendingQPs} allQPs={allQPs} onApprove={handleApproveQP} onReject={handleRejectQP} />}
           {activeTab === 'audit' && <AuditLogsTab auditLogs={auditLogs} />}
           {activeTab === 'backup' && <BackupTab onBackup={handleBackup} loading={loading} />}
           {activeTab === 'placementAnalytics' && <PlacementAnalyticsTab placementStats={placementStats} />}
 
+          {activeTab === 'academics' && (
+            <AcademicsTab
+              departments={departments}
+              students={students}
+              faculty={faculty}
+              attendanceSummary={attendanceSummary}
+              subjectReports={subjectReports}
+              backlogReport={backlogReport}
+              loading={loading}
+              onEdit={setEditingPerson}
+              onToggleActive={handlePersonToggleActive}
+              onFetchStudents={fetchStudents}
+              onFetchFaculty={fetchFaculty}
+              onFetchAttendance={fetchAttendanceSummary}
+              onFetchSubjectReports={fetchSubjectReports}
+              onFetchBacklogs={fetchBacklogs}
+            />
+          )}
+
+          {/* Edit modal rendered at root level so it floats above everything */}
+          {editingPerson && (
+            <PeopleEditModal
+              user={editingPerson}
+              departments={departments}
+              onSave={handlePersonEdit}
+              onClose={() => setEditingPerson(null)}
+            />
+          )}
+
           {/* Coming soon stubs for sidebar items without dedicated views yet */}
-          {['students', 'faculty', 'departments', 'courses', 'sections', 'timetable', 'documents', 'companies', 'jobOpportunities', 'applications', 'announcements', 'academicRisk', 'attendanceRisk', 'aiAssistant'].includes(activeTab) && (
+          {['documents', 'companies', 'jobOpportunities', 'applications', 'announcements', 'academicRisk', 'attendanceRisk', 'aiAssistant'].includes(activeTab) && (
             <ComingSoon label={NAV_SECTIONS.flatMap(s => s.items).find(i => i.id === activeTab)?.label || activeTab} />
           )}
         </div>

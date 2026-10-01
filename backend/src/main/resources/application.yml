@@ -43,12 +43,28 @@ collego:
     first-name: System
     last-name: Admin
 
-  # Phase 6 & 7: Local storage (swap to S3 bucket paths in Phase 8)
+  # Phase 6 & 7: Local storage paths (used when use-s3=false)
   storage:
     question-papers: ${QP_STORAGE_PATH:${user.home}/collego-storage/question-papers}
     assignments: ${ASSIGNMENT_STORAGE_PATH:${user.home}/collego-storage/assignments}
     materials: ${MATERIAL_STORAGE_PATH:${user.home}/collego-storage/materials}
     resumes: ${RESUME_STORAGE_PATH:${user.home}/collego-storage/resumes}
+
+  # Phase 8: AWS configuration
+  aws:
+    region: ${AWS_REGION:ap-south-1}
+    use-s3: ${USE_S3:false}               # Set to true in prod (docker-compose.prod.yml)
+    s3-bucket-question-papers: ${QP_S3_BUCKET:collego-question-papers-prod}
+    s3-bucket-assignments: ${ASSIGNMENT_S3_BUCKET:collego-assignments-prod}
+    s3-bucket-materials: ${MATERIAL_S3_BUCKET:collego-materials-prod}
+    s3-bucket-resumes: ${RESUME_S3_BUCKET:collego-resumes-prod}
+    s3-bucket-marksheets: ${MARKSHEET_S3_BUCKET:collego-marksheets-prod}
+    s3-backup-bucket: ${BACKUP_S3_BUCKET:collego-db-backups-prod}
+    ec2-instance-id: ${EC2_INSTANCE_ID:}  # blank = local dev stub for backup
+
+  # Phase 8/9: AI microservice URL
+  ai-service:
+    url: ${AI_SERVICE_URL:http://collego-ai-service:8000}
 
 logging:
   level:

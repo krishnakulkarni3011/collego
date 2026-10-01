@@ -66,6 +66,14 @@ public class TimetableService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public void deleteSlot(Long id) {
+        if (!timetableSlotRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Timetable slot not found with id: " + id);
+        }
+        timetableSlotRepository.deleteById(id);
+    }
+
     public List<TimetableSlotResponse> getSlotsBySections(List<Long> sectionIds) {
         return timetableSlotRepository.findBySectionIdInOrderByDayOfWeekAscStartTimeAsc(sectionIds).stream()
                 .map(this::mapToResponse)

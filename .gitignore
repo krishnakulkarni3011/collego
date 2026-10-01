@@ -37,3 +37,17 @@ postgres_data/
 
 # Logs
 *.log
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+tfplan
+
+# Binary Tools & Zips
+infra/apache-maven-*/
+*.zip
+*.pptx
+*.pdf
+
+

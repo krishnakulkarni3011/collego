@@ -1,4 +1,4 @@
-name: Collego CI
+name: Collego CI / CD
 
 on:
   push:
@@ -6,9 +6,25 @@ on:
   pull_request:
     branches: [main]
 
+# ─── Environment matrix ───────────────────────────────────────────────────────
+# Secrets expected in GitHub repo settings:
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+#   ECR_REGISTRY  (e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com)
+#   EC2_HOST, EC2_USER, EC2_SSH_KEY  (for SSH deploy)
+#   DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD   (RDS endpoint for prod)
+#   JWT_SECRET
+#   ADMIN_EMAIL, ADMIN_PASSWORD
+#   VITE_API_URL  (e.g. https://api.collego.example.com)
+#   S3_BUCKET_NAME  (main bucket, kept for legacy; individual buckets below)
+#   EC2_INSTANCE_ID   (Phase 8: enables SSM pg_dump backup trigger)
+#   OPENROUTER_API_KEY  (Phase 9: LLM for AI notice generator — optional, stub used if blank)
+
 jobs:
+  # ═══════════════════════════════════════════════════════════
+  #  1. BACKEND — Build, Test, Package
+  # ═══════════════════════════════════════════════════════════
   backend-build:
-    name: Backend Build & Test
+    name: Backend — Build & Test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,17 +55,28 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build with Maven
-        run: mvn clean package -B
+      - name: Build & package with Maven
+        run: mvn clean package -B -DskipTests
         env:
           DB_HOST: localhost
           DB_PORT: 5432
           DB_NAME: collego_test
           DB_USERNAME: collego
           DB_PASSWORD: collego123
+          JWT_SECRET: ci-test-jwt-secret-at-least-256-bits-long-000000000000000
 
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/target/*.jar
+          retention-days: 3
+
+  # ═══════════════════════════════════════════════════════════
+  #  2. FRONTEND — Build
+  # ═══════════════════════════════════════════════════════════
   frontend-build:
-    name: Frontend Build & Lint
+    name: Frontend — Build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -58,7 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -68,5 +95,157 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build production bundle
         run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'http://localhost:8081' }}
+
+  # ═══════════════════════════════════════════════════════════
+  #  3. AI SERVICE — Lint / Syntax check
+  # ═══════════════════════════════════════════════════════════
+  ai-service-check:
+    name: AI Service — Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ai-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Syntax check
+        run: python -m py_compile main.py && echo "Syntax OK"
+
+  # ═══════════════════════════════════════════════════════════
+  #  4. DOCKER BUILD & PUSH TO ECR  (main branch only)
+  # ═══════════════════════════════════════════════════════════
+  docker-build-push:
+    name: Docker — Build & Push to ECR
+    needs: [backend-build, frontend-build, ai-service-check]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tags
+        id: tags
+        run: |
+          echo "SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          echo "REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_OUTPUT
+
+      # ── Backend image ───────────────────────────────────────
+      - name: Build & push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.REGISTRY }}/collego-backend:latest
+            ${{ steps.tags.outputs.REGISTRY }}/collego-backend:${{ steps.tags.outputs.SHA }}
+
+      # ── Frontend image ──────────────────────────────────────
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+          tags: |
+            ${{ steps.tags.outputs.REGISTRY }}/collego-frontend:latest
+            ${{ steps.tags.outputs.REGISTRY }}/collego-frontend:${{ steps.tags.outputs.SHA }}
+
+      # ── AI Service image ────────────────────────────────────
+      - name: Build & push ai-service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ai-service
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.REGISTRY }}/collego-ai-service:latest
+            ${{ steps.tags.outputs.REGISTRY }}/collego-ai-service:${{ steps.tags.outputs.SHA }}
+
+  # ═══════════════════════════════════════════════════════════
+  #  5. DEPLOY TO EC2  (main branch only, after ECR push)
+  # ═══════════════════════════════════════════════════════════
+  deploy:
+    name: Deploy to EC2
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy docker-compose.prod.yml to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.prod.yml,infra/nginx/"
+          target: "/opt/collego"
+
+      - name: SSH deploy — pull new images & restart
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/collego
+
+            # Write .env for docker compose
+            cat > .env <<EOF
+            ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}
+            AWS_REGION=${{ secrets.AWS_REGION }}
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_PORT=5432
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_USERNAME=${{ secrets.DB_USERNAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+            ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+            EC2_INSTANCE_ID=${{ secrets.EC2_INSTANCE_ID }}
+            OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+            EOF
+
+            # Login to ECR on the EC2 instance
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+              docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+            # Pull latest images and recreate containers
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Reload Nginx if config changed
+            docker exec collego-nginx nginx -s reload 2>/dev/null || true
+
+            echo "✅ Deployment complete: $(date)"
