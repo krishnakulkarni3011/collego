@@ -17,5 +17,6 @@ public class AssignmentResponse {
     private String description;
     private LocalDate dueDate;
     private String fileName;
+    private Boolean hasFile; // true if a file is uploaded to S3 and downloadable
     private LocalDateTime createdAt;
 }

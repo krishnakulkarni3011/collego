@@ -13,22 +13,19 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * Phase 6 — Question Paper Repository Service.
+ * Phase 8 Update: File storage migrated from local disk to AWS S3.
  *
  * Responsibilities:
  *  - Search/filter published (APPROVED) question papers
- *  - Handle actual file upload to local storage (S3-ready path structure)
+ *  - Handle actual file upload to S3 (collego-question-papers-prod bucket)
  *  - Track download counts
- *  - Serve file bytes for download
+ *  - Serve file bytes from S3 for download
  */
 @Service
 @RequiredArgsConstructor
@@ -36,9 +33,10 @@ import java.util.stream.Collectors;
 public class QuestionPaperService {
 
     private final QuestionPaperRepository questionPaperRepository;
+    private final S3StorageService s3StorageService;
 
-    @Value("${collego.storage.question-papers:${user.home}/collego-storage/question-papers}")
-    private String storageBasePath;
+    @Value("${collego.aws.s3-bucket-question-papers:collego-question-papers-prod}")
+    private String qpBucket;
 
     // ==================== Phase 6: Search ====================
 
@@ -79,14 +77,14 @@ public class QuestionPaperService {
         return mapToResponse(qp);
     }
 
-    // ==================== Phase 6: File Upload ====================
+    // ==================== Phase 6 + 8: File Upload to S3 ====================
 
     /**
-     * Store the uploaded file on local disk under an organized path:
-     *   <storageBasePath>/<deptId>/<semNumber>/<courseId>/<uuid>_<originalFilename>
+     * Store the uploaded file in S3 under an organized key:
+     *   {deptId}/{semNumber}/{courseId}/{uuid}_{originalFilename}
      *
-     * This mirrors the S3 key structure that will be used in Phase 8.
-     * Returns the stored relative file path to be persisted in QuestionPaper.filePath.
+     * The S3 key is persisted in QuestionPaper.filePath so download can retrieve it.
+     * Returns the S3 key (stored as filePath).
      */
     @Transactional
     public String storeFile(MultipartFile file, Long qpId) throws IOException {
@@ -96,24 +94,24 @@ public class QuestionPaperService {
         validateFileType(file);
 
         String uniqueName = UUID.randomUUID() + "_" + sanitizeFilename(file.getOriginalFilename());
-        String relativePath = buildRelativePath(qp, uniqueName);
+        String s3Key = buildS3Key(qp, uniqueName);
+        String contentType = S3StorageService.detectContentType(file.getOriginalFilename());
 
-        Path targetPath = Paths.get(storageBasePath, relativePath);
-        Files.createDirectories(targetPath.getParent());
-        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+        s3StorageService.upload(qpBucket, s3Key, file.getInputStream(),
+                file.getSize(), contentType);
 
-        qp.setFilePath(relativePath);
+        qp.setFilePath(s3Key);
         qp.setFileName(file.getOriginalFilename() != null ? file.getOriginalFilename() : uniqueName);
         questionPaperRepository.save(qp);
 
-        log.info("Stored question paper file: {}", relativePath);
-        return relativePath;
+        log.info("Stored question paper file in S3: s3://{}/{}", qpBucket, s3Key);
+        return s3Key;
     }
 
-    // ==================== Phase 6: Download ====================
+    // ==================== Phase 6 + 8: Download from S3 ====================
 
     /**
-     * Serve file bytes for download, incrementing the download counter.
+     * Serve file bytes for download from S3, incrementing the download counter.
      * Only APPROVED papers are downloadable.
      */
     @Transactional
@@ -129,16 +127,14 @@ public class QuestionPaperService {
             throw new BadRequestException("No file has been attached to this question paper yet.");
         }
 
-        Path filePath = Paths.get(storageBasePath, qp.getFilePath());
-        if (!Files.exists(filePath)) {
-            throw new ResourceNotFoundException("File not found on storage for question paper: " + qpId);
-        }
+        // Download from S3
+        byte[] fileBytes = s3StorageService.download(qpBucket, qp.getFilePath());
 
         // Increment download count
         questionPaperRepository.incrementDownloadCount(qpId);
 
-        log.info("Question paper {} downloaded (total downloads: {})", qpId, qp.getDownloadCount() + 1);
-        return Files.readAllBytes(filePath);
+        log.info("Question paper {} downloaded from S3 (total downloads: {})", qpId, qp.getDownloadCount() + 1);
+        return fileBytes;
     }
 
     // ==================== Phase 6: Upload file for Faculty (with QP metadata) ====================
@@ -156,7 +152,7 @@ public class QuestionPaperService {
 
     // ==================== Helpers ====================
 
-    private String buildRelativePath(QuestionPaper qp, String filename) {
+    private String buildS3Key(QuestionPaper qp, String filename) {
         return qp.getDepartment().getId()
                 + "/" + qp.getSemesterNumber()
                 + "/" + qp.getCourse().getId()

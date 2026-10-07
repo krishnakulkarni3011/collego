@@ -38,6 +38,10 @@ public class Section {
     @Column(nullable = false)
     private Integer maxCapacity = 60;
 
+    private String maleClassRep;
+
+    private String femaleClassRep;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

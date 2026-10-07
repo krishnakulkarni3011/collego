@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Collego — Feature Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface-2: #1a1a24;
+      --border: #252530;
+      --text: #e4e4ed;
+      --text-dim: #6e6e80;
+      --accent: #8b5cf6;
+      --accent-2: #d946ef;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --blue: #3b82f6;
+      --red: #ef4444;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Hero */
+    .hero {
+      position: relative;
+      padding: 80px 40px 60px;
+      text-align: center;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -120px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(ellipse, rgba(139,92,246,0.15) 0%, rgba(217,70,239,0.08) 40%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(139,92,246,0.1);
+      border: 1px solid rgba(139,92,246,0.25);
+      color: var(--accent);
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      background: linear-gradient(135deg, #fff 0%, #c084fc 50%, #d946ef 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+    }
+    .hero p {
+      font-size: 16px;
+      color: var(--text-dim);
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    /* Quick access bar */
+    .quick-access {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 32px;
+    }
+    .quick-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: 1px solid var(--border);
+    }
+    .quick-btn:hover { transform: translateY(-2px); }
+    .quick-btn.admin { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #fca5a5; }
+    .quick-btn.admin:hover { background: rgba(239,68,68,0.2); box-shadow: 0 8px 30px rgba(239,68,68,0.15); }
+    .quick-btn.faculty { background: rgba(139,92,246,0.1); border-color: rgba(139,92,246,0.3); color: #c4b5fd; }
+    .quick-btn.faculty:hover { background: rgba(139,92,246,0.2); box-shadow: 0 8px 30px rgba(139,92,246,0.15); }
+    .quick-btn.student { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: #86efac; }
+    .quick-btn.student:hover { background: rgba(34,197,94,0.2); box-shadow: 0 8px 30px rgba(34,197,94,0.15); }
+    .quick-btn.login { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: none; }
+    .quick-btn.login:hover { box-shadow: 0 8px 30px rgba(139,92,246,0.3); }
+
+    /* Container */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* Stats bar */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      padding: 40px 0;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .stat-label { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+
+    /* Phase section */
+    .phase {
+      margin-bottom: 32px;
+    }
+    .phase-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .phase-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .phase-num.p0 { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    .phase-num.p1 { background: rgba(245,158,11,0.15); color: #fcd34d; }
+    .phase-num.p2 { background: rgba(34,197,94,0.15); color: #86efac; }
+    .phase-num.p3 { background: rgba(6,182,212,0.15); color: #67e8f9; }
+    .phase-num.p4 { background: rgba(139,92,246,0.15); color: #c4b5fd; }
+    .phase-num.p5 { background: rgba(239,68,68,0.15); color: #fca5a5; }
+    .phase-title { font-size: 18px; font-weight: 700; }
+    .phase-status {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: rgba(34,197,94,0.12);
+      color: #86efac;
+      border: 1px solid rgba(34,197,94,0.25);
+    }
+
+    /* Feature grid */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 12px;
+    }
+    .feature {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      transition: all 0.2s;
+    }
+    .feature:hover {
+      border-color: rgba(139,92,246,0.3);
+      background: var(--surface-2);
+    }
+    .feature-icon { font-size: 18px; margin-bottom: 8px; }
+    .feature-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .feature-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+    .feature-endpoint {
+      margin-top: 8px;
+      font-size: 11px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: var(--accent);
+      background: rgba(139,92,246,0.08);
+      padding: 4px 8px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+
+    /* API section */
+    .api-section { margin-top: 48px; padding-bottom: 60px; }
+    .api-section h2 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .api-group { margin-bottom: 24px; }
+    .api-group-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      padding-left: 4px;
+    }
+    .api-list { display: flex; flex-direction: column; gap: 4px; }
+    .api-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      transition: background 0.15s;
+    }
+    .api-item:hover { background: var(--surface-2); }
+    .api-method {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      min-width: 48px;
+      text-align: center;
+    }
+    .api-method.get { background: rgba(34,197,94,0.15); color: #86efac; }
+    .api-method.post { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    .api-method.put { background: rgba(245,158,11,0.15); color: #fcd34d; }
+    .api-path { font-family: 'SF Mono', 'Fira Code', monospace; color: var(--text); font-size: 12px; }
+    .api-desc { color: var(--text-dim); font-size: 12px; margin-left: auto; }
+
+    /* Credentials card */
+    .creds {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin: 32px auto;
+      max-width: 600px;
+    }
+    .creds h3 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+    .creds table { width: 100%; border-collapse: collapse; }
+    .creds td { padding: 6px 8px; font-size: 13px; }
+    .creds td:first-child { color: var(--text-dim); width: 100px; }
+    .creds td:last-child { font-family: monospace; color: var(--accent); }
+    .creds tr { border-bottom: 1px solid var(--border); }
+    .creds tr:last-child { border: none; }
+
+    .section-divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--border), transparent);
+      margin: 48px 0;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 32px;
+      color: var(--text-dim);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 32px; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .features { grid-template-columns: 1fr; }
+      .quick-access { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-badge">✅ Phases 0–5 Complete</div>
+    <h1>Collego ERP</h1>
+    <p>AI-Powered Cloud-Based College ERP — Demo of all implemented features from foundation to the Admin Portal.</p>
+
+    <div class="quick-access">
+      <a href="http://localhost:5173/login" class="quick-btn login" target="_blank">🔐 Login Page</a>
+      <a href="http://localhost:5173/admin" class="quick-btn admin" target="_blank">🛡️ Admin Dashboard</a>
+      <a href="http://localhost:5173/faculty" class="quick-btn faculty" target="_blank">👨‍🏫 Faculty Dashboard</a>
+      <a href="http://localhost:5173/student" class="quick-btn student" target="_blank">🎓 Student Dashboard</a>
+    </div>
+  </section>
+
+  <div class="container">
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">6</div>
+        <div class="stat-label">Phases Completed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">143</div>
+        <div class="stat-label">Java Source Files</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">55+</div>
+        <div class="stat-label">REST API Endpoints</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">3</div>
+        <div class="stat-label">Role-Based Portals</div>
+      </div>
+    </div>
+
+    <!-- Default Credentials -->
+    <div class="creds">
+      <h3>🔑 Default Login Credentials</h3>
+      <table>
+        <tr><td>Admin</td><td>admin@collego.edu / Admin@123</td></tr>
+        <tr><td>Faculty</td><td>Created via Admin panel</td></tr>
+        <tr><td>Student</td><td>Created via Admin panel</td></tr>
+      </table>
+      <p style="font-size: 12px; color: var(--text-dim); margin-top: 12px;">
+        ⚡ Start backend: <code style="color: var(--accent);">cd backend && java -cp ".mvn\wrapper\maven-wrapper.jar" -Dmaven.multiModuleProjectDirectory=. org.apache.maven.wrapper.MavenWrapperMain spring-boot:run -Dspring-boot.run.profiles=h2</code><br>
+        ⚡ Start frontend: <code style="color: var(--accent);">cd frontend && npm run dev</code>
+      </p>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- Phase 0 -->
+    <div class="phase">
+      <div class="phase-header">
+        <div class="phase-num p0">0</div>
+        <div class="phase-title">Foundation & Project Scaffolding</div>
+        <div class="phase-status">✅ Complete</div>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">🏗️</div>
+          <div class="feature-name">Monorepo Structure</div>
+          <div class="feature-desc">Organized as frontend/, backend/, ai-service/, infra/ with Docker Compose for local dev.</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">☕</div>
+          <div class="feature-name">Spring Boot Backend</div>
+          <div class="feature-desc">Java 17, Maven, organized packages: controller, service, repository, entity, dto, config, security.</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⚛️</div>
+          <div class="feature-name">React + Tailwind Frontend</div>
+          <div class="feature-desc">Vite-powered React app with Tailwind CSS v4, Axios HTTP client, and react-router-dom.</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🐍</div>
+          <div class="feature-name">FastAPI AI Service</div>
+          <div class="feature-desc">Python FastAPI skeleton with health-check endpoint at /health.</div>
+          <div class="feature-endpoint">GET /api/health → 200</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🐳</div>
+          <div class="feature-name">Docker Compose</div>
+          <div class="feature-desc">All services (backend, frontend, ai-service, postgres) containerized for one-command startup.</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🚨</div>
+          <div class="feature-name">Global Error Handling</div>
+          <div class="feature-desc">Consistent API error format via GlobalExceptionHandler — BadRequest, NotFound, Conflict, Unauthorized.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 1 -->
+    <div class="phase">
+      <div class="phase-header">
+        <div class="phase-num p1">1</div>
+        <div class="phase-title">Authentication, Users & RBAC</div>
+        <div class="phase-status">✅ Complete</div>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">🔐</div>
+          <div class="feature-name">JWT Authentication</div>
+          <div class="feature-desc">Login, token refresh, logout. BCrypt password hashing. 15-min access tokens, 7-day refresh.</div>
+          <div class="feature-endpoint">POST /api/auth/login</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🔑</div>
+          <div class="feature-name">Password Reset</div>
+          <div class="feature-desc">Forgot password → reset token → new password flow.</div>
+          <div class="feature-endpoint">POST /api/auth/forgot-password</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🛡️</div>
+          <div class="feature-name">RBAC (3 Roles)</div>
+          <div class="feature-desc">Student, Faculty, Admin — route-level and method-level access control via @PreAuthorize.</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">👤</div>
+          <div class="feature-name">Admin User Management</div>
+          <div class="feature-desc">Create, list, activate/deactivate student & faculty accounts. Assign departments & roles.</div>
+          <div class="feature-endpoint">POST /api/admin/users</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📋</div>
+          <div class="feature-name">Audit Logging</div>
+          <div class="feature-desc">Tracks who did what, when — viewable in Admin portal.</div>
+          <div class="feature-endpoint">GET /api/admin/audit-logs</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🖥️</div>
+          <div class="feature-name">Role-Based Dashboards</div>
+          <div class="feature-desc">Login redirects to /student, /faculty, or /admin based on role. Token-gated access.</div>
+          <a href="http://localhost:5173/login" class="feature-endpoint" target="_blank">→ Login Page</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="phase">
+      <div class="phase-header">
+        <div class="phase-num p2">2</div>
+        <div class="phase-title">Core Academic Data Model</div>
+        <div class="phase-status">✅ Complete</div>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">🏛️</div>
+          <div class="feature-name">Departments & Courses</div>
+          <div class="feature-desc">Department → Course → Semester → Section hierarchy. Full CRUD via Admin APIs.</div>
+          <div class="feature-endpoint">GET /api/departments</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📅</div>
+          <div class="feature-name">Semesters & Sections</div>
+          <div class="feature-desc">Semesters with academic year, sections with faculty assignment and max capacity.</div>
+          <div class="feature-endpoint">POST /api/admin/semesters</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">👨‍🏫</div>
+          <div class="feature-name">Faculty-Course Mapping</div>
+          <div class="feature-desc">Assign faculty to sections — determines which courses they teach.</div>
+          <div class="feature-endpoint">POST /api/admin/sections/{id}/assign-faculty</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📝</div>
+          <div class="feature-name">Student Enrollment</div>
+          <div class="feature-desc">Enroll students into sections. Supports bulk enrollment operations.</div>
+          <div class="feature-endpoint">POST /api/admin/enrollments</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🕐</div>
+          <div class="feature-name">Timetable Management</div>
+          <div class="feature-desc">Timetable slots with day, start/end time, room number per section.</div>
+          <div class="feature-endpoint">POST /api/admin/timetable</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🌱</div>
+          <div class="feature-name">Academic Data Seeder</div>
+          <div class="feature-desc">Auto-seeds realistic test data — departments, courses, students, enrollment, attendance, marks.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="phase">
+      <div class="phase-header">
+        <div class="phase-num p3">3</div>
+        <div class="phase-title">Student Portal (Feature Logic)</div>
+        <div class="phase-status">✅ Complete</div>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">📊</div>
+          <div class="feature-name">Attendance (Subject-wise + Overall)</div>
+          <div class="feature-desc">Per-subject attendance percentage and overall aggregation across all enrolled sections.</div>
+          <div class="feature-endpoint">GET /api/student/attendance</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📝</div>
+          <div class="feature-name">Internal + Semester Marks</div>
+          <div class="feature-desc">View IA-1, IA-2 internal marks and semester exam results per course.</div>
+          <div class="feature-endpoint">GET /api/student/marks/internal</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🎓</div>
+          <div class="feature-name">SGPA / CGPA Calculator</div>
+          <div class="feature-desc">Backend-computed SGPA per semester and cumulative CGPA using 10-point grading scale.</div>
+          <div class="feature-endpoint">GET /api/student/cgpa</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📅</div>
+          <div class="feature-name">Timetable View</div>
+          <div class="feature-desc">Weekly schedule organized by day with course, faculty, room, and timing details.</div>
+          <div class="feature-endpoint">GET /api/student/timetable</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">💰</div>
+          <div class="feature-name">Fee Status</div>
+          <div class="feature-desc">Semester-wise fees with itemized breakdown, paid/pending status, and due dates.</div>
+          <div class="feature-endpoint">GET /api/student/fees</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">💼</div>
+          <div class="feature-name">Placement Notices</div>
+          <div class="feature-desc">Active placement opportunities filtered by department.</div>
+          <div class="feature-endpoint">GET /api/student/placements</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🔔</div>
+          <div class="feature-name">Notifications</div>
+          <div class="feature-desc">Notification feed with read/unread tracking and unread count badge.</div>
+          <div class="feature-endpoint">GET /api/student/notifications</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📄</div>
+          <div class="feature-name">Marksheet & Transcript PDF</div>
+          <div class="feature-desc">Downloadable PDF generation for semester marksheets and full academic transcript.</div>
+          <div class="feature-endpoint">GET /api/student/marksheet/{semId}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="phase">
+      <div class="phase-header">
+        <div class="phase-num p4">4</div>
+        <div class="phase-title">Faculty Portal (Feature Logic)</div>
+        <div class="phase-status">✅ Complete</div>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">📋</div>
+          <div class="feature-name">Bulk Attendance Marking</div>
+          <div class="feature-desc">Mark attendance for entire section in one request. Upsert — update if already marked for that date.</div>
+          <div class="feature-endpoint">POST /api/faculty/attendance</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📝</div>
+          <div class="feature-name">Internal Marks Upload</div>
+          <div class="feature-desc">Bulk entry of IA-1, IA-2 marks per section. Validates max marks and enrollment.</div>
+          <div class="feature-endpoint">POST /api/faculty/marks/internal</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🎓</div>
+          <div class="feature-name">Semester Marks Upload</div>
+          <div class="feature-desc">Upload semester exam marks — auto-calculates grade (O/A+/A/B+/B/C/P/F) and grade points.</div>
+          <div class="feature-endpoint">POST /api/faculty/marks/semester</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📚</div>
+          <div class="feature-name">Assignments</div>
+          <div class="feature-desc">Create assignments with title, description, and due date for sections. File upload placeholder.</div>
+          <div class="feature-endpoint">POST /api/faculty/assignments</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📂</div>
+          <div class="feature-name">Course Material Management</div>
+          <div class="feature-desc">Upload syllabus, notes, references, and other materials per section.</div>
+          <div class="feature-endpoint">POST /api/faculty/materials</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📄</div>
+          <div class="feature-name">Question Paper Upload</div>
+          <div class="feature-desc">Upload previous year papers → goes to PENDING status for admin approval. Feeds Phase 6 repository.</div>
+          <div class="feature-endpoint">POST /api/faculty/question-papers</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📢</div>
+          <div class="feature-name">Notice Drafting</div>
+          <div class="feature-desc">Plain-text notices broadcast to all students or department-specific. AI generation in Phase 9.</div>
+          <div class="feature-endpoint">POST /api/faculty/notices</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📊</div>
+          <div class="feature-name">Performance Analytics</div>
+          <div class="feature-desc">Non-AI analytics: avg attendance, marks averages, pass %, grade distribution per section.</div>
+          <div class="feature-endpoint">GET /api/faculty/analytics/{sectionId}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 5 -->
+    <div class="phase">
+      <div class="phase-header">
+        <div class="phase-num p5">5</div>
+        <div class="phase-title">Admin Portal (Feature Logic)</div>
+        <div class="phase-status">✅ Complete</div>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">📤</div>
+          <div class="feature-name">CSV Bulk Import</div>
+          <div class="feature-desc">Import students/faculty from CSV files. Reports per-row success/failure with detailed error messages.</div>
+          <div class="feature-endpoint">POST /api/admin/users/import</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">✏️</div>
+          <div class="feature-name">User Edit</div>
+          <div class="feature-desc">Update user name, email, department. Partial update — only non-null fields applied.</div>
+          <div class="feature-endpoint">PUT /api/admin/users/{id}</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📊</div>
+          <div class="feature-name">System Overview</div>
+          <div class="feature-desc">Dashboard summary: total students, faculty, departments, courses, enrollments, avg attendance, pass rate.</div>
+          <div class="feature-endpoint">GET /api/admin/overview</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🏛️</div>
+          <div class="feature-name">Department Reports</div>
+          <div class="feature-desc">Per-department analytics: student/faculty counts, courses, avg attendance, pass percentage.</div>
+          <div class="feature-endpoint">GET /api/admin/reports/departments</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📝</div>
+          <div class="feature-name">Subject-wise Pass %</div>
+          <div class="feature-desc">Per-section performance: enrolled, passed, failed, avg marks, attendance. Filterable by department.</div>
+          <div class="feature-endpoint">GET /api/admin/reports/subjects</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⚠️</div>
+          <div class="feature-name">Backlog Analysis</div>
+          <div class="feature-desc">Students with F grades: backlog count, failed courses, sorted by severity. Filterable by department.</div>
+          <div class="feature-endpoint">GET /api/admin/reports/backlogs</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📋</div>
+          <div class="feature-name">Attendance Summary</div>
+          <div class="feature-desc">Department-wise attendance: avg %, students above/below 75%, students below 50%.</div>
+          <div class="feature-endpoint">GET /api/admin/reports/attendance</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">✅</div>
+          <div class="feature-name">QP Approval Workflow</div>
+          <div class="feature-desc">Approve/reject faculty-uploaded question papers. PENDING → APPROVED/REJECTED status flow.</div>
+          <div class="feature-endpoint">PUT /api/admin/question-papers/{id}/approve</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">💾</div>
+          <div class="feature-name">Backup Trigger (Stub)</div>
+          <div class="feature-desc">DB backup endpoint — returns backup ID. S3 upload integration deferred to Phase 8.</div>
+          <div class="feature-endpoint">POST /api/admin/backup</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- Full API Reference -->
+    <div class="api-section">
+      <h2>Complete API Reference</h2>
+
+      <div class="api-group">
+        <div class="api-group-title">🔐 Authentication</div>
+        <div class="api-list">
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/auth/login</span><span class="api-desc">Login with email & password</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/auth/refresh</span><span class="api-desc">Refresh JWT tokens</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/auth/logout</span><span class="api-desc">Invalidate refresh token</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/auth/forgot-password</span><span class="api-desc">Request password reset</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/auth/reset-password</span><span class="api-desc">Reset with token</span></div>
+        </div>
+      </div>
+
+      <div class="api-group">
+        <div class="api-group-title">🛡️ Admin (Phase 1 + Phase 5)</div>
+        <div class="api-list">
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/admin/users</span><span class="api-desc">Create user account</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/admin/users</span><span class="api-desc">List all users</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/admin/users/{id}</span><span class="api-desc">Get user details</span></div>
+          <div class="api-item"><span class="api-method put">PUT</span><span class="api-path">/api/admin/users/{id}</span><span class="api-desc">Edit user details</span></div>
+          <div class="api-item"><span class="api-method put">PUT</span><span class="api-path">/api/admin/users/{id}/deactivate</span><span class="api-desc">Deactivate user</span></div>
+          <div class="api-item"><span class="api-method put">PUT</span><span class="api-path">/api/admin/users/{id}/activate</span><span class="api-desc">Activate user</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/admin/users/import</span><span class="api-desc">CSV bulk import users</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/admin/audit-logs</span><span class="api-desc">View audit trail</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/admin/departments</span><span class="api-desc">Create department</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/admin/overview</span><span class="api-desc">System overview stats</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/admin/reports/departments</span><span class="api-desc">Department reports</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/admin/reports/subjects</span><span class="api-desc">Subject pass % reports</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/admin/reports/backlogs</span><span class="api-desc">Backlog analysis</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/admin/reports/attendance</span><span class="api-desc">Attendance summary</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/admin/question-papers</span><span class="api-desc">All question papers</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/admin/question-papers/pending</span><span class="api-desc">Pending approvals</span></div>
+          <div class="api-item"><span class="api-method put">PUT</span><span class="api-path">/api/admin/question-papers/{id}/approve</span><span class="api-desc">Approve QP</span></div>
+          <div class="api-item"><span class="api-method put">PUT</span><span class="api-path">/api/admin/question-papers/{id}/reject</span><span class="api-desc">Reject QP</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/admin/backup</span><span class="api-desc">Trigger DB backup (stub)</span></div>
+        </div>
+      </div>
+
+      <div class="api-group">
+        <div class="api-group-title">🎓 Student Portal</div>
+        <div class="api-list">
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/profile</span><span class="api-desc">Student profile</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/attendance</span><span class="api-desc">Subject-wise attendance</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/attendance/overall</span><span class="api-desc">Overall attendance</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/marks/internal</span><span class="api-desc">Internal marks</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/marks/semester/{semId}</span><span class="api-desc">Semester marks</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/cgpa</span><span class="api-desc">CGPA calculation</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/timetable</span><span class="api-desc">Weekly timetable</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/fees</span><span class="api-desc">Fee status</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/placements</span><span class="api-desc">Placement notices</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/notifications</span><span class="api-desc">Notifications</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/marksheet/{semId}</span><span class="api-desc">Download marksheet PDF</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/student/transcript</span><span class="api-desc">Download transcript PDF</span></div>
+        </div>
+      </div>
+
+      <div class="api-group">
+        <div class="api-group-title">👨‍🏫 Faculty Portal</div>
+        <div class="api-list">
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/faculty/sections</span><span class="api-desc">Assigned sections</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/faculty/attendance</span><span class="api-desc">Bulk mark attendance</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/faculty/attendance/{sectionId}</span><span class="api-desc">View section attendance</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/faculty/marks/internal</span><span class="api-desc">Upload internal marks</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/faculty/marks/internal/{sectionId}</span><span class="api-desc">View section marks</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/faculty/marks/semester</span><span class="api-desc">Upload semester marks</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/faculty/assignments</span><span class="api-desc">Create assignment</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/faculty/assignments/{sectionId}</span><span class="api-desc">List assignments</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/faculty/materials</span><span class="api-desc">Add course material</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/faculty/materials/{sectionId}</span><span class="api-desc">List materials</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/faculty/question-papers</span><span class="api-desc">Upload question paper</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/faculty/question-papers</span><span class="api-desc">My uploads</span></div>
+          <div class="api-item"><span class="api-method post">POST</span><span class="api-path">/api/faculty/notices</span><span class="api-desc">Draft notice</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/faculty/analytics/{sectionId}</span><span class="api-desc">Section analytics</span></div>
+        </div>
+      </div>
+
+      <div class="api-group">
+        <div class="api-group-title">⚙️ Infrastructure</div>
+        <div class="api-list">
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/health</span><span class="api-desc">Backend health check</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/departments</span><span class="api-desc">List departments</span></div>
+          <div class="api-item"><span class="api-method get">GET</span><span class="api-path">/api/courses</span><span class="api-desc">List courses</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    Collego ERP · Phases 0–5 Feature Demo · Built with Spring Boot, React, PostgreSQL
+  </footer>
+
+</body>
+</html>

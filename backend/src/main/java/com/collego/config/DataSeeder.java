@@ -37,15 +37,18 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        // Only seed if no admin exists
-        if (!userRepository.existsByRole(Role.ADMIN)) {
-            log.info("No admin account found. Seeding bootstrap admin...");
+        String targetEmail = (adminEmail != null && !adminEmail.isBlank()) ? adminEmail.trim().toLowerCase() : "admin@collego.edu";
+        String targetPassword = (adminPassword != null && !adminPassword.isBlank()) ? adminPassword.trim() : "Admin@123";
 
-            User admin = User.builder()
-                    .email(adminEmail)
-                    .passwordHash(passwordEncoder.encode(adminPassword))
-                    .firstName(adminFirstName)
-                    .lastName(adminLastName)
+        User admin = userRepository.findByEmailIgnoreCase(targetEmail).orElse(null);
+
+        if (admin == null) {
+            log.info("No admin account found. Seeding bootstrap admin: {}", targetEmail);
+            admin = User.builder()
+                    .email(targetEmail)
+                    .passwordHash(passwordEncoder.encode(targetPassword))
+                    .firstName(adminFirstName != null ? adminFirstName : "System")
+                    .lastName(adminLastName != null ? adminLastName : "Admin")
                     .role(Role.ADMIN)
                     .isActive(true)
                     .build();
@@ -58,9 +61,13 @@ public class DataSeeder implements CommandLineRunner {
                     .build();
             adminProfileRepository.save(profile);
 
-            log.info("Bootstrap admin created: {} / {}", adminEmail, adminPassword);
+            log.info("Bootstrap admin created: {} / {}", targetEmail, targetPassword);
         } else {
-            log.info("Admin account already exists. Skipping seed.");
+            // Ensure admin credentials match active configuration
+            admin.setPasswordHash(passwordEncoder.encode(targetPassword));
+            admin.setActive(true);
+            userRepository.save(admin);
+            log.info("Admin account verified/updated: {} / {}", targetEmail, targetPassword);
         }
     }
 }

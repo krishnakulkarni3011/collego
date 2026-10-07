@@ -2,13 +2,16 @@ package com.collego.service;
 
 import com.collego.dto.*;
 import com.collego.entity.*;
+import com.collego.exception.BadRequestException;
 import com.collego.exception.ResourceNotFoundException;
 import com.collego.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,6 +31,15 @@ public class StudentPortalService {
     private final FeeRepository feeRepository;
     private final PlacementNoticeRepository placementNoticeRepository;
     private final NotificationRepository notificationRepository;
+    private final AssignmentRepository assignmentRepository;
+    private final CourseMaterialRepository courseMaterialRepository;
+    private final S3StorageService s3StorageService;
+
+    @Value("${collego.aws.s3-bucket-assignments:collego-assignments-prod}")
+    private String assignmentBucket;
+
+    @Value("${collego.aws.s3-bucket-materials:collego-materials-prod}")
+    private String materialBucket;
 
     // ==================== Profile ====================
 
@@ -402,6 +414,114 @@ public class StudentPortalService {
     public CgpaResponse getAcademicHistory(String email) {
         // Academic history is the same as CGPA - includes all semesters
         return calculateCgpa(email);
+    }
+
+    // ==================== Assignments (Phase 4 + 8) ====================
+
+    /**
+     * Returns all assignments for sections the student is actively enrolled in.
+     * The hasFile flag indicates whether a downloadable file exists in S3.
+     */
+    public List<AssignmentResponse> getAssignmentsForStudent(String email) {
+        StudentProfile student = getStudentByEmail(email);
+        List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatus(
+                student.getId(), EnrollmentStatus.ACTIVE);
+
+        List<AssignmentResponse> results = new ArrayList<>();
+        for (Enrollment enrollment : enrollments) {
+            List<Assignment> assignments = assignmentRepository
+                    .findBySectionIdOrderByCreatedAtDesc(enrollment.getSection().getId());
+            for (Assignment a : assignments) {
+                results.add(AssignmentResponse.builder()
+                        .id(a.getId())
+                        .sectionId(a.getSection().getId())
+                        .courseName(a.getSection().getCourse().getName())
+                        .courseCode(a.getSection().getCourse().getCode())
+                        .title(a.getTitle())
+                        .description(a.getDescription())
+                        .dueDate(a.getDueDate())
+                        .fileName(a.getFileName())
+                        .hasFile(a.getFilePath() != null && !a.getFilePath().isBlank())
+                        .createdAt(a.getCreatedAt())
+                        .build());
+            }
+        }
+        return results;
+    }
+
+    /**
+     * Download the file for an assignment from S3.
+     * Student must be enrolled in the assignment's section.
+     */
+    public byte[] downloadAssignmentFile(String email, Long assignmentId) throws IOException {
+        StudentProfile student = getStudentByEmail(email);
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
+
+        // Verify enrollment
+        boolean enrolled = enrollmentRepository.existsByStudentIdAndSectionId(
+                student.getId(), assignment.getSection().getId());
+        if (!enrolled) {
+            throw new BadRequestException("You are not enrolled in this assignment's course.");
+        }
+
+        if (assignment.getFilePath() == null || assignment.getFilePath().isBlank()) {
+            throw new BadRequestException("No file attached to this assignment.");
+        }
+        return s3StorageService.download(assignmentBucket, assignment.getFilePath());
+    }
+
+    // ==================== Course Materials (Phase 4 + 8) ====================
+
+    /**
+     * Returns all course materials for sections the student is actively enrolled in.
+     */
+    public List<CourseMaterialResponse> getMaterialsForStudent(String email) {
+        StudentProfile student = getStudentByEmail(email);
+        List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatus(
+                student.getId(), EnrollmentStatus.ACTIVE);
+
+        List<CourseMaterialResponse> results = new ArrayList<>();
+        for (Enrollment enrollment : enrollments) {
+            List<CourseMaterial> materials = courseMaterialRepository
+                    .findBySectionIdOrderByCreatedAtDesc(enrollment.getSection().getId());
+            for (CourseMaterial m : materials) {
+                results.add(CourseMaterialResponse.builder()
+                        .id(m.getId())
+                        .sectionId(m.getSection().getId())
+                        .courseName(m.getSection().getCourse().getName())
+                        .courseCode(m.getSection().getCourse().getCode())
+                        .title(m.getTitle())
+                        .description(m.getDescription())
+                        .materialType(m.getMaterialType())
+                        .fileName(m.getFileName())
+                        .hasFile(m.getFilePath() != null && !m.getFilePath().isBlank())
+                        .createdAt(m.getCreatedAt())
+                        .build());
+            }
+        }
+        return results;
+    }
+
+    /**
+     * Download a course material file from S3.
+     * Student must be enrolled in the material's section.
+     */
+    public byte[] downloadMaterialFile(String email, Long materialId) throws IOException {
+        StudentProfile student = getStudentByEmail(email);
+        CourseMaterial material = courseMaterialRepository.findById(materialId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course material not found: " + materialId));
+
+        boolean enrolled = enrollmentRepository.existsByStudentIdAndSectionId(
+                student.getId(), material.getSection().getId());
+        if (!enrolled) {
+            throw new BadRequestException("You are not enrolled in this material's course.");
+        }
+
+        if (material.getFilePath() == null || material.getFilePath().isBlank()) {
+            throw new BadRequestException("No file attached to this course material.");
+        }
+        return s3StorageService.download(materialBucket, material.getFilePath());
     }
 
     // ==================== Helpers ====================

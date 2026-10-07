@@ -69,20 +69,16 @@ export default function Login() {
 
     try {
       const data = await authService.login(email, password)
-      const returnedRole = data.role // e.g. 'STUDENT', 'FACULTY', 'ADMIN'
+      
+      const rawRole = data?.role || data?.data?.role || data?.userRole || data?.user?.role || authService.getRole() || ''
+      const returnedRole = String(rawRole).toUpperCase().replace(/^ROLE_/, '')
+      const normalizedSelectedRole = String(selectedRole || '').toUpperCase().replace(/^ROLE_/, '')
 
-      // Role enforcement: the returned role must match what the user selected
-      // (ADMIN can log in regardless of selection for safety, handled separately)
-      if (returnedRole === 'ADMIN') {
-        navigate('/admin')
-        return
-      }
-
-      if (returnedRole !== selectedRole) {
-        // Account exists but for a different role — deny access
+      // Strict role enforcement: the returned role must match what the user selected.
+      if (returnedRole && normalizedSelectedRole && returnedRole !== normalizedSelectedRole) {
         authService.clearTokens()  // clear tokens client-side only
-        const selectedLabel  = ROLES.find(r => r.id === selectedRole)?.label  || selectedRole
-        const returnedLabel  = ROLES.find(r => r.id === returnedRole)?.label  || returnedRole
+        const selectedLabel = ROLES.find(r => r.id === normalizedSelectedRole)?.label || normalizedSelectedRole
+        const returnedLabel = ROLES.find(r => r.id === returnedRole)?.label || returnedRole || 'another role'
         setError(
           `This account is registered as a ${returnedLabel}, not a ${selectedLabel}. ` +
           `Please go back and select the correct role.`
@@ -90,8 +86,10 @@ export default function Login() {
         return
       }
 
-      if (returnedRole === 'STUDENT') navigate('/student')
-      else if (returnedRole === 'FACULTY') navigate('/faculty')
+      const activeRole = returnedRole || normalizedSelectedRole
+      if (activeRole === 'STUDENT') navigate('/student')
+      else if (activeRole === 'FACULTY') navigate('/faculty')
+      else if (activeRole === 'ADMIN') navigate('/admin')
       else navigate('/')
     } catch (err) {
       const message = err.response?.data?.message || 'Invalid email or password.'

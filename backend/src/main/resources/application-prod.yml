@@ -1,0 +1,83 @@
+# application-prod.yml
+# Production Spring profile — activated when SPRING_PROFILES_ACTIVE=prod
+# All sensitive values come from environment variables injected by docker compose
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: update            # Auto-create tables on fresh RDS database
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 55MB
+
+server:
+  port: 8080
+  error:
+    include-message: never      # don't leak stack traces in prod
+    include-stacktrace: never
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain
+    min-response-size: 2048
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 900000    # 15 minutes
+  refresh-token-expiration: 604800000 # 7 days
+
+collego:
+  admin:
+    email: ${ADMIN_EMAIL}
+    password: ${ADMIN_PASSWORD}
+    first-name: System
+    last-name: Admin
+  storage:
+    # In prod, storage paths are S3 URIs — handled by S3StorageService
+    question-papers: s3://collego-question-papers-prod/question-papers
+    assignments: s3://collego-assignments-prod/assignments
+    materials: s3://collego-materials-prod/materials
+    resumes: s3://collego-resumes-prod/resumes
+  aws:
+    region: ${AWS_REGION:ap-south-1}
+    use-s3: true                                             # Phase 8: all file ops go to S3
+    s3-bucket-question-papers: ${QP_S3_BUCKET:collego-question-papers-prod}
+    s3-bucket-assignments: ${ASSIGNMENT_S3_BUCKET:collego-assignments-prod}
+    s3-bucket-materials: ${MATERIAL_S3_BUCKET:collego-materials-prod}
+    s3-bucket-resumes: ${RESUME_S3_BUCKET:collego-resumes-prod}
+    s3-bucket-marksheets: ${MARKSHEET_S3_BUCKET:collego-marksheets-prod}
+    s3-backup-bucket: ${BACKUP_S3_BUCKET:collego-db-backups-prod}
+    ec2-instance-id: ${EC2_INSTANCE_ID:}                    # Phase 8: enables SSM backup
+  ai-service:
+    url: ${AI_SERVICE_URL:http://collego-ai-service:8000}
+
+logging:
+  level:
+    com.collego: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

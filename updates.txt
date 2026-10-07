@@ -1,0 +1,4 @@
+Changes to be made
+in Admin portal:
+1.on clicking academics tab ,and upon clicking departments ,and on clicking "students" , dont just display all the students , give an option to select "select year", options must include I year , II year , III year and Final year , then upon selecting the year , students belonging to that year should be diplayed
+2.on clicking academics tab ,and upon clicking departments ,and on clicking "section",give an option to select the section(A & B in all departments) and  give an option to add ,delete and view the timetable(only one time table can exist for a section) on clicking a particular section , also list of students belonging to that section must be displayed with name of both male and female Class representatives on top 
