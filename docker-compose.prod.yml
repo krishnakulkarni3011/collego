@@ -51,10 +51,10 @@ services:
         awslogs-stream: backend
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
 
   frontend:
     image: ${ECR_REGISTRY}/collego-frontend:latest
@@ -65,8 +65,7 @@ services:
     networks:
       - collego-net
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     logging:
       driver: awslogs
       options:
