@@ -55,6 +55,10 @@ collego:
     password: ${ADMIN_PASSWORD}
     first-name: System
     last-name: Admin
+
+# CORS — override in prod via ALLOWED_ORIGINS env var (comma-separated)
+cors:
+  allowed-origins: ${ALLOWED_ORIGINS:https://65-0-244-196.sslip.io,https://api-65-0-244-196.sslip.io}
   storage:
     # In prod, storage paths are S3 URIs — handled by S3StorageService
     question-papers: s3://collego-question-papers-prod/question-papers

@@ -41,7 +41,7 @@ public class SecurityConfig {
      * Dev default: localhost ports. Override in prod via ALLOWED_ORIGINS env var.
      * Example: https://collego.example.com,https://api.collego.example.com
      */
-    @Value("${collego.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://localhost:9090,http://frontend:5173}")
+    @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://localhost:9090,http://frontend:5173,https://65-0-244-196.sslip.io,https://api-65-0-244-196.sslip.io}")
     private String allowedOrigins;
 
     @Bean
