@@ -25,7 +25,7 @@ public class Department {
 
     private String description;
 
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

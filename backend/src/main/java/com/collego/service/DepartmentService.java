@@ -49,7 +49,7 @@ public class DepartmentService {
                 .name(department.getName())
                 .code(department.getCode())
                 .description(department.getDescription())
-                .createdAt(department.getCreatedAt())
+                .createdAt(department.getCreatedAt() != null ? department.getCreatedAt() : java.time.LocalDateTime.now())
                 .build();
     }
 }

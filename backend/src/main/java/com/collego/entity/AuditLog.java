@@ -33,7 +33,7 @@ public class AuditLog {
 
     private String ipAddress;
 
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
     private LocalDateTime timestamp;
 
     @PrePersist

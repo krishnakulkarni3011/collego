@@ -127,7 +127,7 @@ public class AdminController {
                         .entityId(log.getEntityId())
                         .details(log.getDetails())
                         .ipAddress(log.getIpAddress())
-                        .timestamp(log.getTimestamp())
+                        .timestamp(log.getTimestamp() != null ? log.getTimestamp() : java.time.LocalDateTime.now())
                         .build())
                 .collect(Collectors.toList());
         return ResponseEntity.ok(logs);
