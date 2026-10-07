@@ -43,10 +43,9 @@ public class User {
 
     private LocalDateTime passwordResetTokenExpiry;
 
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
     private LocalDateTime updatedAt;
 
     @PrePersist

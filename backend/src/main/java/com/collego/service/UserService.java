@@ -161,7 +161,7 @@ public class UserService {
                 .role(user.getRole().name())
                 .active(user.isActive())
                 .departmentName(department != null ? department.getName() : null)
-                .createdAt(user.getCreatedAt())
+                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now())
                 .build();
     }
 
@@ -176,7 +176,7 @@ public class UserService {
                 .departmentName(extra.departmentName())
                 .semester(extra.semester())
                 .section(extra.section())
-                .createdAt(user.getCreatedAt())
+                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now())
                 .build();
     }
 }
