@@ -330,9 +330,10 @@ public class AcademicDataSeeder implements CommandLineRunner {
     }
 
     private StudentProfile createStudent(Department department, String deptCode, int globalIndex, String section) {
+        int localIndex = ((globalIndex - 1) % 30) + 1;
         String firstName = FIRST_NAMES[globalIndex % FIRST_NAMES.length];
         String lastName = LAST_NAMES[globalIndex % LAST_NAMES.length];
-        String email = "student" + globalIndex + "." + deptCode.toLowerCase() + "@collego.edu";
+        String email = "student" + localIndex + "." + deptCode.toLowerCase() + "@collego.edu";
 
         User user = User.builder()
                 .email(email)
