@@ -56,6 +56,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/student/**").hasRole("STUDENT")
                 .requestMatchers("/api/faculty/**").hasRole("FACULTY")
+                .requestMatchers("/api/ai/**").authenticated()  // Phase 9: AI features — role guards at method level
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex

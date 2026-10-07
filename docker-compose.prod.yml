@@ -83,8 +83,10 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
-      # Phase 9: LLM API key for AI notice generation (leave blank to use stub mode)
+      # Phase 9: LLM API key for AI features (leave blank to use stub mode)
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # Phase 9: LLM model to use (default: openai/gpt-4o-mini, cost-effective)
+      AI_MODEL: ${AI_MODEL:-openai/gpt-4o-mini}
     expose:
       - "8000"
     networks:

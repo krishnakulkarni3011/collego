@@ -644,6 +644,323 @@ function DocumentsTab({ semesters, cgpa, showMessage }) {
   )
 }
 
+// ─── TAB: AI ASSISTANT (Phase 9 Feature 1 + Smart Search) ───────────────────
+function AiAssistantTab({ attendance, cgpa, fees }) {
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: 'Hi! I\'m Collego Assistant 🤖 Ask me anything about your attendance, marks, fees, placements, timetable, and more!' }
+  ])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const messagesEndRef = useState(null)
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return
+    const userMsg = { role: 'user', content: input }
+    const newMessages = [...messages, userMsg]
+    setMessages(newMessages)
+    setInput('')
+    setLoading(true)
+    try {
+      const res = await api.post('/api/ai/chat', {
+        message: input,
+        history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+        context: { attendance, cgpa, fees }
+      })
+      setMessages(prev => [...prev, { role: 'assistant', content: res.data.reply || 'I couldn\'t process that. Please try again.' }])
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'AI service is temporarily offline. Please try again later.' }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="flex items-center gap-3">
+        <h2 className="text-lg font-semibold">🤖 AI College Assistant</h2>
+        <span className="text-xs bg-violet-500/15 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full">Phase 9</span>
+      </div>
+      <p className="text-sm text-slate-500">Ask me anything about your college data — attendance, marks, fees, placements, timetable, and more. I have access to your live data.</p>
+
+      {/* Chat window */}
+      <div className="flex-1 bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden flex flex-col" style={{minHeight: '420px'}}>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{maxHeight: '400px'}}>
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm ${
+                msg.role === 'user'
+                  ? 'bg-violet-600/40 text-violet-100 rounded-br-sm'
+                  : 'bg-slate-800 text-slate-200 rounded-bl-sm border border-slate-700'
+              }`}>
+                {msg.role === 'assistant' && (
+                  <div className="text-xs text-violet-400 font-semibold mb-1">🤖 Collego AI</div>
+                )}
+                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-slate-800 border border-slate-700 px-4 py-3 rounded-2xl rounded-bl-sm">
+                <div className="flex gap-1">
+                  {[0,1,2].map(i => <div key={i} className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{animationDelay: `${i*0.15}s`}} />)}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input */}
+        <div className="border-t border-slate-800 p-3 flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+            placeholder="Ask about attendance, marks, fees, placements..."
+            className="flex-1 bg-slate-800 border border-slate-700 text-white px-4 py-2 rounded-xl text-sm focus:outline-none focus:border-violet-500 placeholder-slate-600"
+          />
+          <button
+            onClick={sendMessage}
+            disabled={loading || !input.trim()}
+            className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+
+      {/* Quick prompts */}
+      <div>
+        <p className="text-xs text-slate-500 mb-2">Quick prompts:</p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            'What is my current attendance?',
+            'Show my CGPA',
+            'Do I have any pending fees?',
+            'What placements are available?',
+            'Show my timetable'
+          ].map(prompt => (
+            <button
+              key={prompt}
+              onClick={() => { setInput(prompt); }}
+              className="text-xs bg-slate-800/60 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── TAB: AI PERFORMANCE PREDICTION (Phase 9 Feature 3) ─────────────────────
+function AiPredictionTab() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      try {
+        const res = await api.get('/api/ai/performance-prediction')
+        setData(res.data)
+      } catch (e) {
+        setError(e.response?.data?.message || 'AI prediction service unavailable.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const TREND_CONFIG = {
+    improving: { color: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: '📈' },
+    declining: { color: 'text-red-300', bg: 'bg-red-500/10 border-red-500/30', icon: '📉' },
+    stable: { color: 'text-blue-300', bg: 'bg-blue-500/10 border-blue-500/30', icon: '➡️' },
+  }
+  const RISK_CONFIG = {
+    LOW: { color: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/30', label: '🟢 Low Risk' },
+    MEDIUM: { color: 'text-amber-300', bg: 'bg-amber-500/10 border-amber-500/30', label: '🟡 Medium Risk' },
+    HIGH: { color: 'text-red-300', bg: 'bg-red-500/10 border-red-500/30', label: '🔴 High Risk' },
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <h2 className="text-lg font-semibold">🎯 AI Performance Prediction</h2>
+        <span className="text-xs bg-violet-500/15 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full">Phase 9</span>
+      </div>
+      <p className="text-sm text-slate-500">AI-powered CGPA/SGPA projection based on your academic history using linear regression trend analysis.</p>
+
+      {loading && <Spinner />}
+      {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm">{error}</div>}
+
+      {data && !loading && (
+        <div className="space-y-5">
+          {/* Prediction Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard label="Predicted SGPA" value={fmtNum(data.predictedSgpa)} sub="Next semester" accent="violet" />
+            <StatCard label="Projected CGPA" value={fmtNum(data.predictedCgpa)} sub="With predicted" accent="blue" />
+            <div className={`border rounded-xl p-5 ${(TREND_CONFIG[data.trend] || TREND_CONFIG.stable).bg}`}>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Trend</p>
+              <p className={`text-2xl font-bold ${(TREND_CONFIG[data.trend] || TREND_CONFIG.stable).color}`}>
+                {(TREND_CONFIG[data.trend] || TREND_CONFIG.stable).icon}
+              </p>
+              <p className={`text-sm font-semibold mt-1 capitalize ${(TREND_CONFIG[data.trend] || TREND_CONFIG.stable).color}`}>{data.trend}</p>
+            </div>
+            <div className={`border rounded-xl p-5 ${(RISK_CONFIG[data.riskLevel] || RISK_CONFIG.LOW).bg}`}>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Risk Level</p>
+              <p className={`text-sm font-bold mt-2 ${(RISK_CONFIG[data.riskLevel] || RISK_CONFIG.LOW).color}`}>
+                {(RISK_CONFIG[data.riskLevel] || RISK_CONFIG.LOW).label}
+              </p>
+              <p className="text-xs text-slate-600 mt-1">Confidence: {Math.round((data.confidenceScore || 0) * 100)}%</p>
+            </div>
+          </div>
+
+          {/* AI Insights */}
+          {data.insights && data.insights.length > 0 && (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">💡 AI Insights</h3>
+              <div className="space-y-2">
+                {data.insights.map((insight, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="text-violet-400 mt-0.5 shrink-0">•</span>
+                    <p className="text-sm text-slate-300">{insight}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!data && !loading && !error && (
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center text-slate-600 text-sm">
+          No academic history data available for prediction. Complete at least one semester.
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── TAB: AI ATTENDANCE RISK (Phase 9 Feature 4) ────────────────────────────
+function AiAttendanceRiskTab() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      try {
+        const res = await api.get('/api/ai/attendance-risk')
+        setData(res.data)
+      } catch (e) {
+        setError(e.response?.data?.message || 'AI attendance risk service unavailable.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const RISK_COLORS = {
+    SAFE: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+    WARNING: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
+    CRITICAL: 'bg-red-500/10 border-red-500/30 text-red-300',
+    DEFAULTER: 'bg-red-900/20 border-red-700/50 text-red-200',
+  }
+  const OVERALL_RISK_COLORS = {
+    LOW: 'from-emerald-500/10 to-teal-500/10 border-emerald-500/20',
+    MEDIUM: 'from-amber-500/10 to-orange-500/10 border-amber-500/20',
+    HIGH: 'from-red-500/10 to-rose-500/10 border-red-500/20',
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <h2 className="text-lg font-semibold">⚠️ Attendance Risk Analysis</h2>
+        <span className="text-xs bg-violet-500/15 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full">Phase 9</span>
+      </div>
+      <p className="text-sm text-slate-500">AI early-warning system analyzing your attendance trends and predicting examination eligibility risk.</p>
+
+      {loading && <Spinner />}
+      {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm">{error}</div>}
+
+      {data && !loading && (
+        <div className="space-y-5">
+          {/* Overall Risk Banner */}
+          <div className={`bg-gradient-to-r ${(OVERALL_RISK_COLORS[data.overallRisk] || OVERALL_RISK_COLORS.LOW)} border rounded-2xl p-5`}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Overall Risk Status</p>
+                <p className={`text-2xl font-bold ${
+                  data.overallRisk === 'HIGH' ? 'text-red-300' : data.overallRisk === 'MEDIUM' ? 'text-amber-300' : 'text-emerald-300'
+                }`}>
+                  {data.overallRisk === 'HIGH' ? '🔴 High Risk' : data.overallRisk === 'MEDIUM' ? '🟡 Medium Risk' : '🟢 Low Risk'}
+                </p>
+              </div>
+              <p className="text-sm text-slate-400 max-w-sm text-right">{data.summary}</p>
+            </div>
+          </div>
+
+          {/* Subject Risk Cards */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-400">Subject-wise Risk Assessment</h3>
+            {data.riskItems && data.riskItems.map((item, i) => (
+              <div key={i} className={`border rounded-xl p-4 ${RISK_COLORS[item.riskLevel] || RISK_COLORS.SAFE}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-slate-200">{item.courseName}</span>
+                      <span className="font-mono text-xs text-slate-500">{item.courseCode}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${RISK_COLORS[item.riskLevel]}`}>{item.riskLevel}</span>
+                    </div>
+                    <p className="text-sm mt-1">{item.message}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-2xl font-bold ${
+                      item.currentPercentage >= 75 ? 'text-emerald-300' :
+                      item.currentPercentage >= 65 ? 'text-amber-300' : 'text-red-300'
+                    }`}>{item.currentPercentage}%</p>
+                    {item.classesNeededToReach75 > 0 && (
+                      <p className="text-xs text-slate-500 mt-0.5">Need {item.classesNeededToReach75} more</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Recommendations */}
+          {data.recommendations && data.recommendations.length > 0 && (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">💡 Recommendations</h3>
+              <div className="space-y-2">
+                {data.recommendations.map((rec, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="text-amber-400 mt-0.5 shrink-0">→</span>
+                    <p className="text-sm text-slate-300">{rec}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!data && !loading && !error && (
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center text-slate-600 text-sm">
+          No attendance data available for risk analysis.
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 const TABS = [
   { id: 'overview',       label: '🏠 Overview' },
@@ -654,6 +971,9 @@ const TABS = [
   { id: 'placements',     label: '🏢 Placements' },
   { id: 'notifications',  label: '🔔 Notifications' },
   { id: 'documents',      label: '📄 Documents' },
+  { id: 'ai-assistant',   label: '🤖 AI Assistant' },
+  { id: 'ai-prediction',  label: '🎯 AI Insights' },
+  { id: 'ai-risk',        label: '⚠️ Risk Alert' },
 ]
 
 export default function StudentDashboard() {
@@ -872,6 +1192,11 @@ export default function StudentDashboard() {
               showMessage={showMessage}
             />
           )}
+          {activeTab === 'ai-assistant' && (
+            <AiAssistantTab attendance={attendance} cgpa={cgpa} fees={fees} />
+          )}
+          {activeTab === 'ai-prediction' && <AiPredictionTab />}
+          {activeTab === 'ai-risk' && <AiAttendanceRiskTab />}
         </main>
       </div>
     </div>

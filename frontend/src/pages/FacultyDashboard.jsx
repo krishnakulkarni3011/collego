@@ -85,6 +85,7 @@ const GLOBAL_TABS = [
   { id: 'overview', label: '🏠 Overview' },
   { id: 'questionPapers', label: '📄 Question Papers' },
   { id: 'notices', label: '📢 Notices' },
+  { id: 'ai-notice-gen', label: '🤖 AI Notice Gen' },
 ]
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
@@ -150,6 +151,13 @@ function FacultyDashboard() {
 
   // Analytics state
   const [analytics, setAnalytics] = useState(null)
+
+  // AI Notice Generator state (Phase 9 Feature 9)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiAudience, setAiAudience] = useState('students')
+  const [aiNoticeType, setAiNoticeType] = useState('GENERAL')
+  const [aiResult, setAiResult] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
 
   // ─── Init ────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -494,6 +502,35 @@ function FacultyDashboard() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // ─── AI Notice Generator (Phase 9) ──────────────────────────────────────────
+  const handleAiGenerateNotice = async () => {
+    if (!aiPrompt.trim()) { showMessage('Enter a prompt for the notice', 'error'); return }
+    try {
+      setAiLoading(true)
+      setAiResult(null)
+      const res = await api.post('/api/ai/generate-notice', {
+        prompt: aiPrompt,
+        audience: aiAudience,
+        noticeType: aiNoticeType,
+      })
+      setAiResult(res.data)
+      showMessage('AI notice generated! Review and use the content below.')
+    } catch (err) {
+      showMessage(err.response?.data?.message || 'AI notice generation failed', 'error')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const useAiNotice = () => {
+    if (!aiResult) return
+    setNoticeTitle(aiResult.title || '')
+    setNoticeMessage(aiResult.body || '')
+    setActiveTab('notices')
+    setSelectedSection(null)
+    showMessage('AI-generated notice copied to Notice form!')
   }
 
   // ─── Analytics ───────────────────────────────────────────────────────────────
@@ -1603,7 +1640,9 @@ function FacultyDashboard() {
                   >
                     {loading ? 'Sending...' : '📢 Send Notice'}
                   </button>
-                  <p className="text-xs text-slate-600">AI-generated notice templates coming in Phase 9.</p>
+                  <p className="text-xs text-slate-500 flex items-center gap-2">
+                    ✨ Use the <button onClick={() => setActiveTab('ai-notice-gen')} className="text-violet-400 hover:underline font-medium">🤖 AI Notice Generator</button> to draft notices with AI!
+                  </p>
                 </div>
 
                 {/* Sent notices history */}
@@ -1629,6 +1668,133 @@ function FacultyDashboard() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===== AI NOTICE GENERATOR (Phase 9 Feature 9) ===== */}
+          {activeTab === 'ai-notice-gen' && !selectedSection && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold text-white">🤖 AI Notice Generator</h2>
+                <span className="text-xs bg-violet-500/15 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full">Phase 9</span>
+              </div>
+              <p className="text-slate-400 text-sm">Describe your notice in plain language, and the AI will generate a professionally formatted notice for you. Review and send it via the Notices tab.</p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Input Panel */}
+                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 space-y-4">
+                  <h3 className="font-semibold text-slate-200">✍️ Your Prompt</h3>
+
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Describe the notice in plain language</label>
+                    <textarea
+                      value={aiPrompt}
+                      onChange={e => setAiPrompt(e.target.value)}
+                      placeholder="e.g. Remind students that the internal exam IA-2 is scheduled for next Monday at 10 AM in Room 204. Attendance is mandatory."
+                      rows={4}
+                      className="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-violet-500 placeholder-slate-600 resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Audience</label>
+                      <select
+                        value={aiAudience}
+                        onChange={e => setAiAudience(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
+                      >
+                        <option value="students">Students</option>
+                        <option value="faculty">Faculty</option>
+                        <option value="all">All</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Notice Type</label>
+                      <select
+                        value={aiNoticeType}
+                        onChange={e => setAiNoticeType(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
+                      >
+                        <option value="GENERAL">General</option>
+                        <option value="ACADEMIC">Academic</option>
+                        <option value="PLACEMENT">Placement</option>
+                        <option value="FEE">Fee</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleAiGenerateNotice}
+                    disabled={aiLoading || !aiPrompt.trim()}
+                    className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-5 py-3 rounded-xl text-sm font-medium transition-all disabled:opacity-50 shadow-lg shadow-violet-500/20"
+                  >
+                    {aiLoading ? '🤖 Generating...' : '✨ Generate with AI'}
+                  </button>
+
+                  {/* Example prompts */}
+                  <div>
+                    <p className="text-xs text-slate-500 mb-2">Example prompts:</p>
+                    <div className="space-y-1.5">
+                      {[
+                        'IA-2 exam scheduled next Monday 10 AM Room 204, attendance mandatory',
+                        'Assignment submission deadline extended to next Friday for all students',
+                        'Guest lecture on AI/ML this Thursday by industry expert from Google'
+                      ].map(p => (
+                        <button key={p} onClick={() => setAiPrompt(p)}
+                          className="w-full text-left text-xs bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 text-slate-500 hover:text-slate-300 px-3 py-2 rounded-lg transition-colors">
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Output Panel */}
+                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 space-y-4">
+                  <h3 className="font-semibold text-slate-200">📋 AI Generated Notice</h3>
+
+                  {aiLoading && (
+                    <div className="flex items-center justify-center h-48">
+                      <div className="text-center">
+                        <div className="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                        <p className="text-sm text-slate-400">AI is drafting your notice...</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!aiResult && !aiLoading && (
+                    <div className="flex items-center justify-center h-48 border-2 border-dashed border-slate-700 rounded-xl">
+                      <p className="text-slate-600 text-sm">Generated notice will appear here</p>
+                    </div>
+                  )}
+
+                  {aiResult && !aiLoading && (
+                    <div className="space-y-4">
+                      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                        <p className="text-xs text-slate-500 mb-1">Title</p>
+                        <p className="text-slate-200 font-semibold">{aiResult.title}</p>
+                      </div>
+                      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                        <p className="text-xs text-slate-500 mb-1">Notice Body</p>
+                        <p className="text-slate-300 text-sm whitespace-pre-wrap">{aiResult.body}</p>
+                      </div>
+                      {aiResult.summary && (
+                        <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg p-3">
+                          <p className="text-xs text-violet-400 font-semibold mb-1">Summary</p>
+                          <p className="text-sm text-violet-300">{aiResult.summary}</p>
+                        </div>
+                      )}
+                      <button
+                        onClick={useAiNotice}
+                        className="w-full bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                      >
+                        ✓ Use This Notice → Send to Students
+                      </button>
                     </div>
                   )}
                 </div>
