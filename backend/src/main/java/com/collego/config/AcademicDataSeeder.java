@@ -134,7 +134,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (courseRepository.count() > 0) {
+        if (departmentRepository.count() > 0) {
             log.info("Academic data already exists. Skipping seed.");
             return;
         }
