@@ -1,6 +1,5 @@
 package com.collego.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -20,10 +19,5 @@ public class AiServiceConfig {
         factory.setConnectTimeout(5_000);   // 5 seconds connect timeout
         factory.setReadTimeout(60_000);     // 60 seconds read timeout (LLM calls can be slow)
         return new RestTemplate(factory);
-    }
-
-    @Bean
-    public ObjectMapper objectMapper() {
-        return new ObjectMapper();
     }
 }
