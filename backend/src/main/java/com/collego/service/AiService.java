@@ -25,6 +25,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@SuppressWarnings("null")
 public class AiService {
 
     private final RestTemplate restTemplate;
