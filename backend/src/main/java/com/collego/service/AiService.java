@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -107,7 +108,6 @@ public class AiService {
 
     // ── HTTP helpers ──────────────────────────────────────────────────────────
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> post(String path, Object body) {
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -117,7 +117,7 @@ public class AiService {
                     aiServiceUrl + path,
                     HttpMethod.POST,
                     entity,
-                    Map.class
+                    new ParameterizedTypeReference<Map<String, Object>>() {}
             );
             return response.getBody() != null ? response.getBody() : Map.of("error", "Empty response");
         } catch (RestClientException e) {
@@ -127,10 +127,14 @@ public class AiService {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> get(String path) {
         try {
-            ResponseEntity<Map<String, Object>> response = restTemplate.getForEntity(aiServiceUrl + path, Map.class);
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    aiServiceUrl + path,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<Map<String, Object>>() {}
+            );
             return response.getBody() != null ? response.getBody() : Map.of("error", "Empty response");
         } catch (RestClientException e) {
             log.warn("AI service GET {} failed: {}", path, e.getMessage());
