@@ -98,7 +98,8 @@ jobs:
       - name: Build production bundle
         run: npm run build
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL || 'http://localhost:8081' }}
+          # Empty = same-origin; Nginx on EC2 proxies /api/* → backend:8080
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
   # ═══════════════════════════════════════════════════════════
   #  3. AI SERVICE — Lint / Syntax check
@@ -171,6 +172,7 @@ jobs:
           context: ./frontend
           push: true
           build-args: |
+            # Empty VITE_API_URL = same-origin; Nginx routes /api/* to backend
             VITE_API_URL=${{ secrets.VITE_API_URL }}
           tags: |
             ${{ steps.tags.outputs.REGISTRY }}/collego-frontend:latest

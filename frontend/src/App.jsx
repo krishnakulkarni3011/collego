@@ -7,37 +7,35 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/student"
-          element={
-            <ProtectedRoute allowedRoles={['STUDENT']}>
-              <StudentDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/faculty"
-          element={
-            <ProtectedRoute allowedRoles={['FACULTY']}>
-              <FacultyDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/*"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </div>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="/student/*"
+        element={
+          <ProtectedRoute allowedRoles={['STUDENT']}>
+            <StudentDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/faculty/*"
+        element={
+          <ProtectedRoute allowedRoles={['FACULTY']}>
+            <FacultyDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/*"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   )
 }
 

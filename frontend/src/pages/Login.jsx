@@ -1,372 +1,494 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  GraduationCap, ChevronRight, ChevronLeft, Eye, EyeOff,
+  Mail, Lock, AlertCircle, CheckCircle2, Sparkles,
+  Shield, BookOpen, Users, BarChart3, Zap
+} from 'lucide-react'
 import { authService } from '../services/authService'
+import { cn } from '../lib/utils'
 
-// ── small helpers ────────────────────────────────────────────────────────────
 const ROLES = [
   {
     id: 'STUDENT',
     label: 'Student',
-    description: 'Access your academic portal',
-    icon: '🎓',
+    description: 'Access academic portal',
+    icon: GraduationCap,
     gradient: 'from-emerald-500 to-teal-500',
-    activeBg: 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300',
-    inactiveBg: 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-300',
-    accent: 'emerald',
+    glow: 'shadow-emerald-500/25',
+    activeBorder: 'border-emerald-500/60',
+    activeBg: 'bg-emerald-500/8',
+    activeText: 'text-emerald-300',
+    iconBg: 'bg-emerald-500/15',
+    iconColor: 'text-emerald-400',
+    badgeColor: 'bg-emerald-500',
   },
   {
     id: 'FACULTY',
     label: 'Faculty',
-    description: 'Access your faculty portal',
-    icon: '🏫',
+    description: 'Manage courses & students',
+    icon: BookOpen,
     gradient: 'from-violet-500 to-fuchsia-500',
-    activeBg: 'bg-violet-500/15 border-violet-500/50 text-violet-300',
-    inactiveBg: 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-300',
-    accent: 'violet',
+    glow: 'shadow-violet-500/25',
+    activeBorder: 'border-violet-500/60',
+    activeBg: 'bg-violet-500/8',
+    activeText: 'text-violet-300',
+    iconBg: 'bg-violet-500/15',
+    iconColor: 'text-violet-400',
+    badgeColor: 'bg-violet-500',
   },
   {
     id: 'ADMIN',
     label: 'Admin',
     description: 'System administration',
-    icon: '🛡️',
-    gradient: 'from-rose-500 to-orange-500',
-    activeBg: 'bg-rose-500/15 border-rose-500/50 text-rose-300',
-    inactiveBg: 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-300',
-    accent: 'rose',
+    icon: Shield,
+    gradient: 'from-indigo-500 to-blue-500',
+    glow: 'shadow-indigo-500/25',
+    activeBorder: 'border-indigo-500/60',
+    activeBg: 'bg-indigo-500/8',
+    activeText: 'text-indigo-300',
+    iconBg: 'bg-indigo-500/15',
+    iconColor: 'text-indigo-400',
+    badgeColor: 'bg-indigo-500',
   },
 ]
 
-// ── main component ────────────────────────────────────────────────────────────
+// ─── Floating particles for ambient effect ────────────────────────────────────
+function Particles() {
+  const particles = Array.from({ length: 20 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: Math.random() * 3 + 1,
+    duration: Math.random() * 8 + 6,
+    delay: Math.random() * 4,
+  }))
+
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden">
+      {particles.map(p => (
+        <motion.div
+          key={p.id}
+          className="absolute rounded-full bg-indigo-400/20"
+          style={{ left: `${p.x}%`, top: `${p.y}%`, width: p.size, height: p.size }}
+          animate={{ y: [-20, 20, -20], opacity: [0.1, 0.4, 0.1] }}
+          transition={{ duration: p.duration, delay: p.delay, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function Login() {
-  const [step, setStep]         = useState('role')   // 'role' | 'credentials'
+  const [step, setStep] = useState('role')
   const [selectedRole, setSelectedRole] = useState(null)
-  const [email, setEmail]       = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  const activeRoleConfig = ROLES.find(r => r.id === selectedRole)
-
-  // ── step 1: pick role ──
-  const handleRoleSelect = (roleId) => {
-    setSelectedRole(roleId)
-    setError('')
-  }
+  const activeRole = ROLES.find(r => r.id === selectedRole)
 
   const handleRoleContinue = () => {
-    if (!selectedRole) { setError('Please select a role to continue.'); return }
+    if (!selectedRole) { setError('Please select your role to continue.'); return }
     setError('')
     setStep('credentials')
   }
 
-  // ── step 2: login ──
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     try {
       const data = await authService.login(email, password)
-      
       const rawRole = data?.role || data?.data?.role || data?.userRole || data?.user?.role || authService.getRole() || ''
       const returnedRole = String(rawRole).toUpperCase().replace(/^ROLE_/, '')
-      const normalizedSelectedRole = String(selectedRole || '').toUpperCase().replace(/^ROLE_/, '')
+      const normalizedSelected = String(selectedRole || '').toUpperCase().replace(/^ROLE_/, '')
 
-      // Strict role enforcement: the returned role must match what the user selected.
-      if (returnedRole && normalizedSelectedRole && returnedRole !== normalizedSelectedRole) {
-        authService.clearTokens()  // clear tokens client-side only
-        const selectedLabel = ROLES.find(r => r.id === normalizedSelectedRole)?.label || normalizedSelectedRole
+      if (returnedRole && normalizedSelected && returnedRole !== normalizedSelected) {
+        authService.clearTokens()
+        const selectedLabel = ROLES.find(r => r.id === normalizedSelected)?.label || normalizedSelected
         const returnedLabel = ROLES.find(r => r.id === returnedRole)?.label || returnedRole || 'another role'
-        setError(
-          `This account is registered as a ${returnedLabel}, not a ${selectedLabel}. ` +
-          `Please go back and select the correct role.`
-        )
+        setError(`This account is registered as a ${returnedLabel}, not a ${selectedLabel}. Please go back and select the correct role.`)
         return
       }
 
-      const activeRole = returnedRole || normalizedSelectedRole
+      const activeRole = returnedRole || normalizedSelected
       if (activeRole === 'STUDENT') navigate('/student')
       else if (activeRole === 'FACULTY') navigate('/faculty')
       else if (activeRole === 'ADMIN') navigate('/admin')
       else navigate('/')
     } catch (err) {
-      const message = err.response?.data?.message || 'Invalid email or password.'
-      setError(message)
+      setError(err.response?.data?.message || 'Invalid email or password.')
     } finally {
       setLoading(false)
     }
   }
 
-  // ── Google sign-in placeholder ──
   const handleGoogleSignIn = () => {
-    // TODO: Replace with real Google OAuth flow using your Client ID
     alert('Google Sign-In is not yet configured. Add your Google OAuth Client ID to enable this.')
   }
 
-  // ── shared error box ──
-  const ErrorBox = () =>
-    error ? (
-      <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl text-sm">
-        <span className="mt-0.5 shrink-0">⚠</span>
-        <p>{error}</p>
-      </div>
-    ) : null
+  // Progress: step 1 = 50%, step 2 = 100%
+  const progress = step === 'role' ? 50 : 100
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+    <div className="min-h-screen flex" style={{ background: 'rgb(7, 7, 10)' }}>
+      <Particles />
 
-      {/* Background glow effects */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+      {/* ── Left Panel (feature showcase) ── */}
+      <div className="hidden lg:flex lg:w-[45%] xl:w-1/2 flex-col relative overflow-hidden">
+        {/* Gradient background */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.1) 50%, rgba(6,182,212,0.08) 100%)' }} />
+        <div className="absolute inset-0 bg-mesh" />
+
+        {/* Top glow */}
+        <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
+
+        <div className="relative z-10 flex flex-col h-full p-12">
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-16">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <GraduationCap size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="text-base font-bold text-white tracking-wide">COLLEGO</p>
+              <p className="text-[10px] text-zinc-500 tracking-widest uppercase">College ERP</p>
+            </div>
+          </div>
+
+          {/* Headline */}
+          <div className="flex-1 flex flex-col justify-center max-w-md">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.6 }}
+            >
+              <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-4">
+                The future of{' '}
+                <span style={{ background: 'linear-gradient(135deg, #818cf8, #a78bfa, #38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  college management
+                </span>
+              </h1>
+              <p className="text-zinc-400 text-base leading-relaxed mb-10">
+                AI-powered ERP system for modern educational institutions. From attendance to placement — everything in one place.
+              </p>
+            </motion.div>
+
+            {/* Feature cards */}
+            <div className="space-y-3">
+              {[
+                { icon: Sparkles, title: 'AI-Powered Insights', desc: 'Performance prediction, risk detection, smart search', color: 'text-violet-400', bg: 'bg-violet-500/8' },
+                { icon: BarChart3, title: 'Real-time Analytics', desc: 'Attendance, marks, placements — all visualized', color: 'text-indigo-400', bg: 'bg-indigo-500/8' },
+                { icon: Zap, title: 'Instant Operations', desc: 'Bulk uploads, PDF generation, AI notice drafting', color: 'text-amber-400', bg: 'bg-amber-500/8' },
+                { icon: Shield, title: 'Secure Role-Based Access', desc: 'Granular RBAC for students, faculty and admins', color: 'text-emerald-400', bg: 'bg-emerald-500/8' },
+              ].map((f, i) => {
+                const Icon = f.icon
+                return (
+                  <motion.div
+                    key={f.title}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 + i * 0.1, duration: 0.5 }}
+                    className={cn('flex items-start gap-3.5 p-3.5 rounded-xl border border-zinc-800/40', f.bg)}
+                  >
+                    <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', f.bg, 'border border-zinc-700/40')}>
+                      <Icon size={16} className={f.color} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-200">{f.title}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">{f.desc}</p>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-10">
+            <p className="text-xs text-zinc-700">© {new Date().getFullYear()} Collego · AI-Powered College ERP · Built with ❤️</p>
+          </div>
+        </div>
       </div>
 
-      <div className="relative w-full max-w-md">
+      {/* ── Right Panel (login form) ── */}
+      <div className="flex-1 flex items-center justify-center p-6 relative z-10">
+        <div className="w-full max-w-[420px]">
 
-        {/* ── Logo / Header ── */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl mb-4 shadow-lg shadow-violet-500/25">
-            <span className="text-2xl font-bold">C</span>
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-            Collego
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">AI-Powered College ERP</p>
-        </div>
-
-        {/* ── Card ── */}
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-
-          {/* Progress bar */}
-          <div className="h-0.5 bg-slate-800">
-            <div
-              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-500"
-              style={{ width: step === 'role' ? '50%' : '100%' }}
-            />
+          {/* Mobile logo */}
+          <div className="flex lg:hidden items-center gap-3 justify-center mb-8">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <GraduationCap size={20} className="text-white" />
+            </div>
+            <p className="text-xl font-bold text-white">COLLEGO</p>
           </div>
 
-          <div className="p-8">
+          {/* Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="relative rounded-2xl overflow-hidden"
+            style={{ background: 'rgba(15, 15, 20, 0.9)', border: '1px solid rgba(63, 63, 70, 0.6)', backdropFilter: 'blur(24px)', boxShadow: '0 25px 60px rgba(0,0,0,0.5)' }}
+          >
+            {/* Progress bar */}
+            <div className="h-0.5 bg-zinc-800/60">
+              <motion.div
+                className="h-full"
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.5, ease: 'easeInOut' }}
+                style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }}
+              />
+            </div>
 
-            {/* ── STEP 1: Role Selection ── */}
-            {step === 'role' && (
-              <div>
-                <div className="mb-6">
-                  <h2 className="text-xl font-semibold text-white">Who are you?</h2>
-                  <p className="text-slate-500 text-sm mt-1">Select your role to continue</p>
-                </div>
+            <div className="p-8">
+              <AnimatePresence mode="wait">
 
-                <div className="grid grid-cols-3 gap-3 mb-6">
-                  {ROLES.map(role => (
-                    <button
-                      key={role.id}
-                      id={`role-${role.id.toLowerCase()}`}
-                      onClick={() => handleRoleSelect(role.id)}
-                      className={`relative flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all duration-200 focus:outline-none ${
-                        selectedRole === role.id ? role.activeBg : role.inactiveBg
-                      }`}
-                    >
-                      {selectedRole === role.id && (
-                        <span className="absolute top-2.5 right-2.5 w-5 h-5 bg-current rounded-full flex items-center justify-center">
-                          <svg className="w-3 h-3 text-slate-950" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </span>
-                      )}
-                      <span className="text-3xl">{role.icon}</span>
-                      <div className="text-center">
-                        <p className="font-semibold text-sm">{role.label}</p>
-                        <p className="text-xs mt-0.5 opacity-70">{role.description}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-
-                <ErrorBox />
-
-                <button
-                  id="btn-continue-role"
-                  onClick={handleRoleContinue}
-                  className="w-full mt-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-violet-500/20 active:scale-[0.98]"
-                >
-                  Continue →
-                </button>
-
-                {/* Divider */}
-                <div className="flex items-center gap-3 my-5">
-                  <div className="flex-1 h-px bg-slate-800" />
-                  <span className="text-slate-600 text-xs">or</span>
-                  <div className="flex-1 h-px bg-slate-800" />
-                </div>
-
-                {/* Google Sign-In */}
-                <button
-                  id="btn-google-signin"
-                  onClick={handleGoogleSignIn}
-                  className="w-full flex items-center justify-center gap-3 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 hover:border-slate-600 py-3 rounded-xl text-sm font-medium text-slate-300 hover:text-white transition-all active:scale-[0.98]"
-                >
-                  {/* Google icon */}
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Continue with Google
-                </button>
-              </div>
-            )}
-
-            {/* ── STEP 2: Credentials ── */}
-            {step === 'credentials' && (
-              <div>
-                {/* Back button + role badge */}
-                <div className="flex items-center gap-3 mb-6">
-                  <button
-                    id="btn-back-to-role"
-                    onClick={() => { setStep('role'); setError(''); setEmail(''); setPassword('') }}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                    aria-label="Go back"
+                {/* ── STEP 1: Role Selection ── */}
+                {step === 'role' && (
+                  <motion.div
+                    key="role"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.25 }}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${activeRoleConfig?.activeBg}`}>
-                    <span>{activeRoleConfig?.icon}</span>
-                    <span>Signing in as {activeRoleConfig?.label}</span>
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <h2 className="text-xl font-semibold text-white">Welcome back</h2>
-                  <p className="text-slate-500 text-sm mt-1">Enter your credentials to sign in</p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Email */}
-                  <div>
-                    <label htmlFor="login-email" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                      </span>
-                      <input
-                        id="login-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-slate-700 focus:border-violet-500 rounded-xl px-4 py-3 pl-10 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition-all"
-                        placeholder="you@college.edu"
-                        required
-                        autoFocus
-                      />
+                    <div className="mb-7">
+                      <h2 className="text-2xl font-bold text-white mb-1">Welcome back</h2>
+                      <p className="text-zinc-500 text-sm">Select your role to sign in to Collego</p>
                     </div>
-                  </div>
 
-                  {/* Password */}
-                  <div>
-                    <label htmlFor="login-password" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                      </span>
-                      <input
-                        id="login-password"
-                        type={showPass ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-slate-800/80 border border-slate-700 focus:border-violet-500 rounded-xl px-4 py-3 pl-10 pr-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition-all"
-                        placeholder="Enter your password"
-                        required
-                      />
-                      <button
-                        type="button"
-                        id="btn-toggle-password"
-                        onClick={() => setShowPass(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors p-1"
-                        aria-label={showPass ? 'Hide password' : 'Show password'}
+                    <div className="grid grid-cols-3 gap-3 mb-6">
+                      {ROLES.map(role => {
+                        const Icon = role.icon
+                        const isActive = selectedRole === role.id
+                        return (
+                          <button
+                            key={role.id}
+                            id={`role-${role.id.toLowerCase()}`}
+                            onClick={() => { setSelectedRole(role.id); setError('') }}
+                            className={cn(
+                              'relative flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all duration-200 focus:outline-none group',
+                              isActive
+                                ? `${role.activeBorder} ${role.activeBg}`
+                                : 'border-zinc-800/80 hover:border-zinc-700 bg-zinc-900/40 hover:bg-zinc-900/60'
+                            )}
+                          >
+                            {isActive && (
+                              <motion.div
+                                layoutId="roleCheck"
+                                className={cn('absolute top-2.5 right-2.5 w-4 h-4 rounded-full flex items-center justify-center', role.badgeColor)}
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                              >
+                                <CheckCircle2 size={10} className="text-white" />
+                              </motion.div>
+                            )}
+                            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-all', isActive ? role.iconBg : 'bg-zinc-800/60 group-hover:bg-zinc-800')}>
+                              <Icon size={20} className={isActive ? role.iconColor : 'text-zinc-500 group-hover:text-zinc-400'} />
+                            </div>
+                            <div className="text-center">
+                              <p className={cn('text-sm font-semibold', isActive ? role.activeText : 'text-zinc-400 group-hover:text-zinc-300')}>{role.label}</p>
+                              <p className="text-[10px] text-zinc-600 mt-0.5 leading-tight">{role.description}</p>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-2.5 bg-red-500/8 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm mb-4"
                       >
-                        {showPass ? (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
+                        <AlertCircle size={14} className="shrink-0" />
+                        {error}
+                      </motion.div>
+                    )}
+
+                    <button
+                      id="btn-continue-role"
+                      onClick={handleRoleContinue}
+                      className="w-full py-3 rounded-xl font-semibold text-white transition-all active:scale-[0.98] mb-4"
+                      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.3)' }}
+                    >
+                      Continue
+                      <ChevronRight size={16} className="inline ml-1" />
+                    </button>
+
+                    <div className="relative flex items-center gap-3 my-4">
+                      <div className="flex-1 h-px bg-zinc-800" />
+                      <span className="text-xs text-zinc-600">or</span>
+                      <div className="flex-1 h-px bg-zinc-800" />
                     </div>
-                  </div>
 
-                  <ErrorBox />
+                    <button
+                      id="btn-google-signin"
+                      onClick={handleGoogleSignIn}
+                      className="w-full flex items-center justify-center gap-3 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-700 py-3 rounded-xl text-sm font-medium text-zinc-300 hover:text-white transition-all active:scale-[0.98]"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
+                      Continue with Google
+                    </button>
+                  </motion.div>
+                )}
 
-                  {/* Submit */}
-                  <button
-                    id="btn-login-submit"
-                    type="submit"
-                    disabled={loading}
-                    className={`w-full py-3 rounded-xl font-semibold text-white transition-all shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed ${
-                      selectedRole === 'STUDENT'
-                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-500/20'
-                        : selectedRole === 'ADMIN'
-                        ? 'bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 shadow-rose-500/20'
-                        : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 shadow-violet-500/20'
-                    }`}
+                {/* ── STEP 2: Credentials ── */}
+                {step === 'credentials' && (
+                  <motion.div
+                    key="credentials"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.25 }}
                   >
-                    {loading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                        </svg>
-                        Signing in…
-                      </span>
-                    ) : `Sign In as ${activeRoleConfig?.label}`}
-                  </button>
-                </form>
+                    {/* Back + role badge */}
+                    <div className="flex items-center gap-3 mb-6">
+                      <button
+                        id="btn-back-to-role"
+                        onClick={() => { setStep('role'); setError(''); setEmail(''); setPassword('') }}
+                        className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-all"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      {activeRole && (
+                        <div className={cn(
+                          'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border',
+                          activeRole.activeBg, activeRole.activeBorder, activeRole.activeText
+                        )}>
+                          <activeRole.icon size={12} />
+                          Signing in as {activeRole.label}
+                        </div>
+                      )}
+                    </div>
 
-                {/* Divider */}
-                <div className="flex items-center gap-3 my-5">
-                  <div className="flex-1 h-px bg-slate-800" />
-                  <span className="text-slate-600 text-xs">or</span>
-                  <div className="flex-1 h-px bg-slate-800" />
-                </div>
+                    <div className="mb-6">
+                      <h2 className="text-2xl font-bold text-white mb-1">Sign in</h2>
+                      <p className="text-zinc-500 text-sm">Enter your credentials to access your portal</p>
+                    </div>
 
-                {/* Google Sign-In */}
-                <button
-                  id="btn-google-signin-step2"
-                  onClick={handleGoogleSignIn}
-                  className="w-full flex items-center justify-center gap-3 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 hover:border-slate-600 py-3 rounded-xl text-sm font-medium text-slate-300 hover:text-white transition-all active:scale-[0.98]"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Continue with Google
-                </button>
-              </div>
-            )}
-          </div>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                      {/* Email */}
+                      <div>
+                        <label htmlFor="login-email" className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Email Address</label>
+                        <div className="relative">
+                          <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-600" />
+                          <input
+                            id="login-email"
+                            type="email"
+                            value={email}
+                            onChange={e => setEmail(e.target.value)}
+                            className="collego-input pl-9"
+                            placeholder="you@college.edu"
+                            required
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+
+                      {/* Password */}
+                      <div>
+                        <label htmlFor="login-password" className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Password</label>
+                        <div className="relative">
+                          <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-600" />
+                          <input
+                            id="login-password"
+                            type={showPass ? 'text' : 'password'}
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            className="collego-input pl-9 pr-10"
+                            placeholder="Enter your password"
+                            required
+                          />
+                          <button
+                            type="button"
+                            id="btn-toggle-password"
+                            onClick={() => setShowPass(v => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400 transition-colors p-0.5"
+                          >
+                            {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {error && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-start gap-2.5 bg-red-500/8 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm"
+                        >
+                          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                          <p>{error}</p>
+                        </motion.div>
+                      )}
+
+                      <button
+                        id="btn-login-submit"
+                        type="submit"
+                        disabled={loading}
+                        className={cn(
+                          'w-full py-3 rounded-xl font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed mt-2',
+                        )}
+                        style={{
+                          background: activeRole
+                            ? `linear-gradient(135deg, ${activeRole.id === 'STUDENT' ? '#10b981, #0d9488' : activeRole.id === 'FACULTY' ? '#8b5cf6, #d946ef' : '#6366f1, #3b82f6'})`
+                            : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                          boxShadow: `0 4px 20px ${activeRole?.id === 'STUDENT' ? 'rgba(16,185,129,0.3)' : activeRole?.id === 'FACULTY' ? 'rgba(139,92,246,0.3)' : 'rgba(99,102,241,0.3)'}`
+                        }}
+                      >
+                        {loading ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Signing in…
+                          </span>
+                        ) : `Sign In as ${activeRole?.label}`}
+                      </button>
+                    </form>
+
+                    <div className="relative flex items-center gap-3 my-5">
+                      <div className="flex-1 h-px bg-zinc-800" />
+                      <span className="text-xs text-zinc-600">or</span>
+                      <div className="flex-1 h-px bg-zinc-800" />
+                    </div>
+
+                    <button
+                      id="btn-google-signin-step2"
+                      onClick={handleGoogleSignIn}
+                      className="w-full flex items-center justify-center gap-3 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-700 py-3 rounded-xl text-sm font-medium text-zinc-300 hover:text-white transition-all active:scale-[0.98]"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
+                      Continue with Google
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+
+          {/* Footer text */}
+          <p className="text-center text-zinc-700 text-xs mt-6">
+            © {new Date().getFullYear()} Collego · AI-Powered College ERP
+          </p>
         </div>
-
-        {/* Footer */}
-        <p className="text-center text-slate-600 text-xs mt-6">
-          © {new Date().getFullYear()} Collego · AI-Powered College ERP
-        </p>
       </div>
     </div>
   )

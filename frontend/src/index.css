@@ -1,1 +1,403 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
+
+
+/* ─── CSS Variables / Design Tokens ─────────────────────────────────────────── */
+:root {
+  /* Brand colors */
+  --brand-primary: 99 102 241;      /* indigo-500 */
+  --brand-secondary: 168 85 247;   /* purple-500 */
+  --brand-accent: 6 182 212;       /* cyan-500 */
+
+  /* Surfaces */
+  --bg-base: 2 6 23;
+  --bg-surface: 10 15 40;
+  --bg-elevated: 15 23 42;
+  --bg-card: 17 24 39;
+  --bg-card-hover: 23 34 54;
+
+  /* Borders */
+  --border-subtle: rgba(99, 102, 241, 0.1);
+  --border-default: rgba(71, 85, 105, 0.5);
+  --border-strong: rgba(99, 102, 241, 0.3);
+
+  /* Sidebar */
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 68px;
+  --topbar-height: 64px;
+}
+
+/* ─── Base Styles ─────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: rgb(var(--bg-base));
+  color: #e2e8f0;
+  line-height: 1.5;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6);
+}
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Glassmorphism ────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.glass-card {
+  background: rgba(17, 24, 39, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(71, 85, 105, 0.4);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* ─── Gradient Text ────────────────────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #818cf8 0%, #a78bfa 50%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-brand {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Glow Effects ─────────────────────────────────────────────────────────── */
+.glow-indigo {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3), 0 0 60px rgba(99, 102, 241, 0.1);
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), 0 0 60px rgba(168, 85, 247, 0.1);
+}
+
+/* ─── Sidebar ─────────────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-width);
+  min-height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  background: rgba(9, 9, 11, 0.95);
+  border-right: 1px solid rgba(63, 63, 70, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+/* ─── Topbar ──────────────────────────────────────────────────────────────── */
+.topbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: var(--topbar-height);
+  z-index: 40;
+  background: rgba(9, 9, 11, 0.9);
+  border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+}
+
+/* ─── Main content ────────────────────────────────────────────────────────── */
+.main-content {
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 100vh;
+  padding-top: var(--topbar-height);
+}
+
+/* ─── Stat Card ─────────────────────────────────────────────────────────────── */
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  padding: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  opacity: 0.15;
+  transform: translate(20px, -20px);
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+
+/* ─── Micro-animations ────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.35s ease forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease forwards;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ─── Sidebar nav active ─────────────────────────────────────────────────── */
+.nav-item-active {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 0%, transparent 100%);
+  border-right: 2px solid #6366f1;
+  color: #a5b4fc;
+}
+
+/* ─── Input styles ────────────────────────────────────────────────────────── */
+.collego-input {
+  background: rgba(23, 23, 26, 0.8);
+  border: 1px solid rgba(63, 63, 70, 0.6);
+  border-radius: 10px;
+  color: #e2e8f0;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  outline: none;
+  width: 100%;
+}
+.collego-input:focus {
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+.collego-input::placeholder {
+  color: rgba(148, 163, 184, 0.4);
+}
+
+/* ─── Table ─────────────────────────────────────────────────────────────── */
+.collego-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.collego-table th {
+  background: rgba(15, 23, 42, 0.8);
+  color: rgba(148, 163, 184, 0.8);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+.collego-table th:first-child { border-radius: 8px 0 0 0; }
+.collego-table th:last-child { border-radius: 0 8px 0 0; }
+.collego-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+  font-size: 0.875rem;
+  color: #cbd5e1;
+}
+.collego-table tr:hover td {
+  background: rgba(99, 102, 241, 0.04);
+}
+.collego-table tr:last-child td { border-bottom: none; }
+
+/* ─── Chart containers ────────────────────────────────────────────────────── */
+.recharts-tooltip-wrapper {
+  z-index: 100;
+}
+.recharts-default-tooltip {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+}
+.recharts-tooltip-label {
+  color: #e2e8f0 !important;
+  font-weight: 600 !important;
+}
+
+/* ─── Background mesh ─────────────────────────────────────────────────────── */
+.bg-mesh {
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(168, 85, 247, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(6, 182, 212, 0.04) 0%, transparent 50%);
+}
+
+/* ─── Notifications dot ──────────────────────────────────────────────────── */
+.notification-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid rgba(9, 9, 11, 0.95);
+}
+.notification-dot::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0.4;
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+/* ─── Progress bar ────────────────────────────────────────────────────────── */
+.progress-bar {
+  height: 6px;
+  background: rgba(51, 65, 85, 0.5);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Avatar ─────────────────────────────────────────────────────────────── */
+.avatar-ring {
+  padding: 2px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 50%;
+}
+
+/* ─── Quick action button ─────────────────────────────────────────────────── */
+.quick-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(63, 63, 70, 0.4);
+  background: rgba(17, 24, 39, 0.6);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.quick-action::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.quick-action:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2), 0 0 0 1px rgba(99, 102, 241, 0.1);
+}
+.quick-action:hover::before {
+  opacity: 1;
+}
+.quick-action:active {
+  transform: translateY(0);
+}
+
+/* ─── Event timeline item ────────────────────────────────────────────────── */
+.event-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.event-item:hover {
+  background: rgba(99, 102, 241, 0.05);
+}
+
+/* ─── Performer item ─────────────────────────────────────────────────────── */
+.performer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  transition: background 0.2s;
+}
+.performer-item:hover {
+  background: rgba(99, 102, 241, 0.05);
+}
+
+/* ─── Staggered animation ────────────────────────────────────────────────── */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }

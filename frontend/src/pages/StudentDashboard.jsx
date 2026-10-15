@@ -1,165 +1,404 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  LayoutDashboard, ClipboardCheck, BookMarked, Calendar,
+  DollarSign, Briefcase, Bell, Sparkles, Trophy, Target,
+  ChevronRight, ChevronLeft, LogOut, Search, TrendingUp,
+  TrendingDown, Download, Send, BookOpen, FileText,
+  GraduationCap, Activity, AlertCircle, CheckCircle2,
+  X, ArrowUpRight, ArrowDownRight, Bot, User, Clock,
+  Zap, Star, BarChart3, AlertTriangle, Grid3X3
+} from 'lucide-react'
+import {
+  AreaChart, Area, RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie
+} from 'recharts'
 import { authService } from '../services/authService'
 import api from '../services/api'
+import { cn } from '../lib/utils'
+import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 
-// ─── helpers ────────────────────────────────────────────────────────────────
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
-const fmtNum  = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
+const fmtNum = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
 
-const GRADE_COLOR = {
-  O: 'text-emerald-300', 'A+': 'text-emerald-400', A: 'text-teal-300',
-  'B+': 'text-blue-300', B: 'text-blue-400', C: 'text-yellow-300',
-  P: 'text-yellow-400', F: 'text-red-400',
+const GRADE_COLORS = { O: '#10b981', 'A+': '#34d399', A: '#06b6d4', 'B+': '#60a5fa', B: '#818cf8', C: '#fbbf24', P: '#f59e0b', F: '#ef4444' }
+
+const NAV_ITEMS = [
+  { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+  { id: 'marks', label: 'Marks & CGPA', icon: BookMarked },
+  { id: 'timetable', label: 'Timetable', icon: Calendar },
+  { id: 'fees', label: 'Fee Status', icon: DollarSign },
+  { id: 'placements', label: 'Placements', icon: Briefcase },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'aiAssistant', label: 'AI Assistant', icon: Sparkles },
+  { id: 'aiPrediction', label: 'AI Prediction', icon: Target },
+]
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+function Toast({ message, onClose }) {
+  useEffect(() => {
+    if (message?.text) { const t = setTimeout(onClose, 4000); return () => clearTimeout(t) }
+  }, [message, onClose])
+  return (
+    <AnimatePresence>
+      {message?.text && (
+        <motion.div
+          initial={{ opacity: 0, y: -20, x: 20 }}
+          animate={{ opacity: 1, y: 0, x: 0 }}
+          exit={{ opacity: 0, y: -20, x: 20 }}
+          className={cn(
+            'fixed top-4 right-4 z-[200] flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-medium shadow-2xl border backdrop-blur-xl',
+            message.type === 'error' ? 'bg-red-950/90 text-red-300 border-red-500/30' : 'bg-emerald-950/90 text-emerald-300 border-emerald-500/30'
+          )}
+        >
+          {message.type === 'error' ? <X size={16} /> : <CheckCircle2 size={16} />}
+          {message.text}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
 }
 
-// ─── small reusable components ───────────────────────────────────────────────
-function StatCard({ label, value, sub, accent = 'violet' }) {
-  const colors = {
-    violet: 'from-violet-500/20 to-fuchsia-500/20 border-violet-500/30 text-violet-300',
-    emerald: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/30 text-emerald-300',
-    amber:   'from-amber-500/20 to-orange-500/20 border-amber-500/30 text-amber-300',
-    blue:    'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-300',
-    red:     'from-red-500/20 to-rose-500/20 border-red-500/30 text-red-300',
-  }
+// ─── Sidebar ─────────────────────────────────────────────────────────────────
+function Sidebar({ activeTab, onTabChange, collapsed, onToggle, profile }) {
   return (
-    <div className={`bg-gradient-to-br ${colors[accent]} border rounded-xl p-5`}>
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
-      <p className={`text-3xl font-bold ${colors[accent].split(' ')[3]}`}>{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
+    <aside className={cn('sidebar', collapsed && 'collapsed')}>
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-zinc-800/60 shrink-0">
+        <div className="w-9 h-9 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30">
+          <GraduationCap size={18} className="text-white" />
+        </div>
+        {!collapsed && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <p className="text-sm font-bold text-white">COLLEGO</p>
+            <p className="text-[10px] text-zinc-500">Student Portal</p>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Profile card in sidebar */}
+      {!collapsed && profile && (
+        <div className="mx-3 mt-3 p-3 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-emerald-500/15">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
+              {profile.firstName?.[0]}{profile.lastName?.[0]}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-zinc-200 truncate">{profile.firstName} {profile.lastName}</p>
+              <p className="text-[10px] text-zinc-500 truncate">{profile.enrollmentNumber}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <nav className="flex-1 overflow-y-auto py-3 scrollbar-hide px-2 mt-2">
+        {NAV_ITEMS.map(item => {
+          const Icon = item.icon
+          const isActive = activeTab === item.id
+          return (
+            <button
+              key={item.id}
+              onClick={() => onTabChange(item.id)}
+              title={collapsed ? item.label : undefined}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-all duration-200 relative group mb-0.5',
+                isActive
+                  ? 'bg-emerald-500/10 text-emerald-400 border-r-2 border-emerald-500'
+                  : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-200'
+              )}
+            >
+              <Icon size={16} className="shrink-0" />
+              {!collapsed && <span className="text-xs font-medium">{item.label}</span>}
+              {isActive && !collapsed && <ChevronRight size={12} className="ml-auto text-emerald-400" />}
+              {collapsed && (
+                <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-zinc-900 text-zinc-200 text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl border border-zinc-800">
+                  {item.label}
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </nav>
+
+      <div className="border-t border-zinc-800/60 p-2 shrink-0">
+        <button onClick={onToggle} className="w-full flex items-center justify-center gap-2 py-2 text-zinc-500 hover:text-zinc-300 text-xs rounded-xl hover:bg-zinc-800/60 transition-colors">
+          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {!collapsed && <span>Collapse</span>}
+        </button>
+      </div>
+    </aside>
+  )
+}
+
+// ─── Topbar ───────────────────────────────────────────────────────────────────
+function Topbar({ profile, unreadCount, onLogout, sidebarWidth }) {
+  const initials = profile ? `${profile.firstName?.[0] || ''}${profile.lastName?.[0] || ''}` : 'ST'
+  return (
+    <header className="topbar px-5" style={{ left: sidebarWidth }}>
+      <div className="flex-1 flex items-center gap-3">
+        <div className="flex items-center gap-2 bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 w-72 group focus-within:border-emerald-500/50 transition-all">
+          <Search size={14} className="text-zinc-600 group-focus-within:text-emerald-400 transition-colors" />
+          <input className="bg-transparent text-sm text-zinc-400 placeholder-zinc-600 outline-none w-full" placeholder="Search subjects, notices..." />
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <button className="relative p-2 rounded-xl text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-all">
+          <Bell size={17} />
+          {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />}
+        </button>
+        <div className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl hover:bg-zinc-800/60 transition-all">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">{initials}</div>
+          <div className="hidden md:block">
+            <p className="text-xs font-semibold text-zinc-200">{profile?.firstName} {profile?.lastName}</p>
+            <p className="text-[10px] text-zinc-500">{profile?.departmentName} · Sem {profile?.currentSemester}</p>
+          </div>
+        </div>
+        <button onClick={onLogout} className="p-2 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Logout">
+          <LogOut size={15} />
+        </button>
+      </div>
+    </header>
+  )
+}
+
+// ─── Mini Sparkline ───────────────────────────────────────────────────────────
+function Sparkline({ data, color }) {
+  return (
+    <ResponsiveContainer width="100%" height={40}>
+      <AreaChart data={data} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+        <defs>
+          <linearGradient id={`sg-${color}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <Area type="monotone" dataKey="v" stroke={color} fill={`url(#sg-${color})`} strokeWidth={1.5} dot={false} />
+      </AreaChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ─── Attendance Progress Badge ────────────────────────────────────────────────
+function AttBadge({ pct }) {
+  if (pct >= 75) return <Badge variant="success">{pct}%</Badge>
+  if (pct >= 50) return <Badge variant="warning">{pct}%</Badge>
+  return <Badge variant="destructive">{pct}%</Badge>
+}
+
+// ─── Custom Tooltip ──────────────────────────────────────────────────────────
+function CustomTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="glass-card rounded-xl px-3 py-2.5 border border-emerald-500/20">
+      <p className="text-xs font-semibold text-zinc-300 mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="text-xs" style={{ color: p.color }}>
+          {p.name}: <span className="font-bold">{p.value}</span>
+        </p>
+      ))}
     </div>
   )
 }
 
-function SectionBadge({ pct }) {
-  if (pct >= 75) return <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">{pct}%</span>
-  if (pct >= 50) return <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">{pct}%</span>
-  return <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-300 border border-red-500/30">{pct}%</span>
-}
-
-function Toast({ message }) {
-  if (!message.text) return null
-  return (
-    <div className={`fixed top-20 right-6 z-50 px-5 py-3 rounded-xl text-sm font-medium shadow-2xl border transition-all ${
-      message.type === 'error'
-        ? 'bg-red-500/20 text-red-300 border-red-500/30'
-        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-    }`}>
-      {message.text}
-    </div>
-  )
-}
-
-function Spinner() {
-  return (
-    <div className="flex items-center justify-center py-12">
-      <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
-}
-
-// ─── TAB: OVERVIEW ───────────────────────────────────────────────────────────
-function OverviewTab({ profile, attendance, cgpa, fees, notifications }) {
+// ─── OVERVIEW TAB ────────────────────────────────────────────────────────────
+function OverviewTab({ profile, attendance, cgpa, fees, notifications, onTabChange }) {
   const unread = notifications.filter(n => !n.read).length
-  const currentFee = fees.find(f => f.status === 'PENDING') || fees[0]
   const pendingFees = fees.filter(f => f.status === 'PENDING')
+  const now = new Date()
+  const hour = now.getHours()
+  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
+  const emoji = hour < 12 ? '☀️' : hour < 17 ? '👋' : '🌙'
+
+  // SGPA trend data
+  const sgpaData = (cgpa?.semesters || []).map(s => ({ name: s.semesterName?.substring(0, 4) || 'Sem', v: s.sgpa || 0 }))
+  const attData = [50, 60, 55, 70, 65, 78, 75, 80, 82, 87].map(v => ({ v }))
+
+  const statCards = [
+    {
+      label: 'Overall Attendance',
+      value: `${fmtNum(attendance?.overallPercentage, 1)}%`,
+      icon: ClipboardCheck,
+      iconColor: 'text-emerald-400',
+      bgColor: 'bg-emerald-500/10',
+      sparkColor: '#10b981',
+      sparkData: attData,
+      sub: `${attendance?.totalPresent ?? 0}/${attendance?.totalClasses ?? 0} classes`,
+      trend: 2.3,
+      onClick: () => onTabChange('attendance'),
+    },
+    {
+      label: 'Current CGPA',
+      value: fmtNum(cgpa?.cumulativeCgpa),
+      icon: GraduationCap,
+      iconColor: 'text-violet-400',
+      bgColor: 'bg-violet-500/10',
+      sparkColor: '#8b5cf6',
+      sparkData: sgpaData.length ? sgpaData : [{ v: 0 }],
+      sub: `${cgpa?.totalCreditsAllSemesters?.toFixed(0) ?? 0} total credits`,
+      onClick: () => onTabChange('marks'),
+    },
+    {
+      label: 'Fee Status',
+      value: pendingFees.length === 0 ? 'Clear' : `${pendingFees.length} Pending`,
+      icon: DollarSign,
+      iconColor: pendingFees.length === 0 ? 'text-emerald-400' : 'text-amber-400',
+      bgColor: pendingFees.length === 0 ? 'bg-emerald-500/10' : 'bg-amber-500/10',
+      sparkColor: '#f59e0b',
+      sparkData: [{ v: 80 }, { v: 60 }, { v: 90 }],
+      sub: pendingFees.length === 0 ? 'All paid' : 'Action required',
+      onClick: () => onTabChange('fees'),
+    },
+    {
+      label: 'Notifications',
+      value: unread,
+      icon: Bell,
+      iconColor: 'text-blue-400',
+      bgColor: 'bg-blue-500/10',
+      sparkColor: '#60a5fa',
+      sparkData: [{ v: 3 }, { v: 5 }, { v: 2 }, { v: 7 }, { v: 4 }],
+      sub: `${notifications.length} total`,
+      onClick: () => onTabChange('notifications'),
+    },
+  ]
 
   return (
     <div className="space-y-6">
-      {/* Welcome */}
-      <div className="bg-gradient-to-r from-violet-500/10 via-fuchsia-500/10 to-blue-500/10 border border-violet-500/20 rounded-2xl p-6">
-        <h2 className="text-2xl font-bold text-white mb-1">
-          Welcome, {profile?.firstName} {profile?.lastName} 👋
-        </h2>
-        <p className="text-slate-400 text-sm">
-          {profile?.enrollmentNumber} · {profile?.departmentName} · Semester {profile?.currentSemester} · Section {profile?.section}
-        </p>
-      </div>
+      {/* Welcome banner */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative rounded-2xl p-6 border border-emerald-500/10 overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(6,182,212,0.05) 100%)' }}
+      >
+        <div>
+          <h2 className="text-2xl font-bold text-white">{greeting}, {profile?.firstName} {emoji}</h2>
+          <p className="text-zinc-500 text-sm mt-1">
+            {profile?.enrollmentNumber} · {profile?.departmentName} · Semester {profile?.currentSemester} · Section {profile?.section}
+          </p>
+        </div>
+        <div className="absolute right-6 top-4 opacity-10 text-7xl pointer-events-none">🎓</div>
+      </motion.div>
 
-      {/* Key stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          label="Overall Attendance"
-          value={`${fmtNum(attendance?.overallPercentage, 1)}%`}
-          sub={`${attendance?.totalPresent}/${attendance?.totalClasses} classes`}
-          accent={attendance?.overallPercentage >= 75 ? 'emerald' : 'amber'}
-        />
-        <StatCard
-          label="Current CGPA"
-          value={fmtNum(cgpa?.cumulativeCgpa)}
-          sub={`${cgpa?.totalCreditsAllSemesters?.toFixed(0)} total credits`}
-          accent="violet"
-        />
-        <StatCard
-          label="Fee Status"
-          value={pendingFees.length === 0 ? 'Clear' : `${pendingFees.length} Pending`}
-          sub={currentFee ? `${currentFee.semesterName}` : 'All paid'}
-          accent={pendingFees.length === 0 ? 'emerald' : 'amber'}
-        />
-        <StatCard
-          label="Notifications"
-          value={unread}
-          sub={`${notifications.length} total`}
-          accent={unread > 0 ? 'violet' : 'blue'}
-        />
-      </div>
-
-      {/* Attendance & recent subjects */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-slate-300 mb-4">📊 Subject-wise Attendance</h3>
-          <div className="space-y-3">
-            {attendance?.subjectWise?.slice(0, 6).map(s => (
-              <div key={s.sectionId}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-slate-300 truncate max-w-[180px]">{s.courseName}</span>
-                  <SectionBadge pct={s.percentage} />
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCards.map((card, i) => {
+          const Icon = card.icon
+          return (
+            <motion.div
+              key={card.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08 }}
+              onClick={card.onClick}
+              className={cn(
+                'glass-card rounded-2xl p-5 cursor-pointer transition-all hover:scale-[1.01]',
+              )}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', card.bgColor)}>
+                  <Icon size={17} className={card.iconColor} />
                 </div>
-                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                {card.trend && (
+                  <div className="flex items-center gap-0.5 text-xs text-emerald-400">
+                    <ArrowUpRight size={11} /> {card.trend}%
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-zinc-500 mb-0.5">{card.label}</p>
+              <p className="text-2xl font-bold text-white">{card.value}</p>
+              <p className="text-[10px] text-zinc-600 mt-0.5">{card.sub}</p>
+              <div className="mt-3">
+                <Sparkline data={card.sparkData} color={card.sparkColor} />
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* Attendance chart + SGPA + Recent Notifications */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Attendance bar chart */}
+        <div className="lg:col-span-2 glass-card rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <ClipboardCheck size={15} className="text-emerald-400" />
+            Subject-wise Attendance
+          </h3>
+          <div className="space-y-3">
+            {(attendance?.subjectWise || []).slice(0, 6).map((s, i) => (
+              <motion.div key={s.sectionId || i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-xs text-zinc-300 truncate max-w-[200px]">{s.courseName}</span>
+                  <AttBadge pct={Math.round(s.percentage || 0)} />
+                </div>
+                <div className="progress-bar">
                   <div
-                    className={`h-full rounded-full transition-all ${s.percentage >= 75 ? 'bg-emerald-500' : s.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
-                    style={{ width: `${Math.min(s.percentage, 100)}%` }}
+                    className={cn('progress-bar-fill', s.percentage >= 75 ? 'bg-emerald-500' : s.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500')}
+                    style={{ width: `${Math.min(s.percentage || 0, 100)}%` }}
                   />
                 </div>
-              </div>
+              </motion.div>
             ))}
-            {!attendance?.subjectWise?.length && <p className="text-slate-600 text-sm">No attendance data yet.</p>}
+            {!attendance?.subjectWise?.length && (
+              <div className="text-center py-8 text-zinc-600">
+                <ClipboardCheck size={32} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No attendance data available</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* CGPA per semester */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-slate-300 mb-4">🎓 Semester SGPA History</h3>
-          <div className="space-y-3">
-            {cgpa?.semesters?.map(sem => (
-              <div key={sem.semesterId} className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-300">{sem.semesterName}</p>
-                  <p className="text-xs text-slate-500">{sem.academicYear} · {sem.totalCredits?.toFixed(0)} credits</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-violet-400">{fmtNum(sem.sgpa)}</p>
-                  <p className="text-xs text-slate-500">SGPA</p>
-                </div>
-              </div>
-            ))}
-            {!cgpa?.semesters?.length && <p className="text-slate-600 text-sm">No results data yet.</p>}
+        {/* SGPA history */}
+        <div className="glass-card rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <GraduationCap size={15} className="text-violet-400" />
+            SGPA History
+          </h3>
+          {sgpaData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={150}>
+              <AreaChart data={sgpaData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="sgpaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.08)" />
+                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="v" stroke="#8b5cf6" fill="url(#sgpaGrad)" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 3 }} name="SGPA" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-center py-8 text-zinc-600 text-sm">No results yet</div>
+          )}
+          <div className="mt-3 p-3 rounded-xl bg-violet-500/5 border border-violet-500/10">
+            <p className="text-xs text-zinc-500">Cumulative CGPA</p>
+            <p className="text-2xl font-bold text-violet-400">{fmtNum(cgpa?.cumulativeCgpa)}</p>
           </div>
         </div>
       </div>
 
-      {/* Recent notifications */}
-      {notifications.slice(0, 4).length > 0 && (
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-slate-300 mb-3">🔔 Recent Notifications</h3>
-          <div className="space-y-2">
-            {notifications.slice(0, 4).map(n => (
-              <div key={n.id} className={`flex items-start gap-3 p-3 rounded-lg ${!n.read ? 'bg-violet-500/10 border border-violet-500/20' : 'bg-slate-800/40'}`}>
-                {!n.read && <span className="mt-1.5 w-2 h-2 bg-violet-400 rounded-full shrink-0" />}
-                <div className={n.read ? 'ml-5' : ''}>
-                  <p className="text-sm font-medium text-slate-200">{n.title}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{n.message}</p>
-                </div>
+      {/* Recent Notifications */}
+      {notifications.slice(0, 3).length > 0 && (
+        <div className="glass-card rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Bell size={15} className="text-blue-400" /> Recent Notifications
+            </h3>
+            <button onClick={() => onTabChange('notifications')} className="text-xs text-indigo-400 hover:text-indigo-300">View All</button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {notifications.slice(0, 3).map(n => (
+              <div key={n.id} className={cn('rounded-xl p-3 border', !n.read ? 'bg-indigo-500/5 border-indigo-500/20' : 'bg-zinc-800/30 border-zinc-800/40')}>
+                {!n.read && <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full mb-2" />}
+                <p className="text-xs font-semibold text-zinc-200">{n.title}</p>
+                <p className="text-[10px] text-zinc-500 mt-1 line-clamp-2">{n.message}</p>
               </div>
             ))}
           </div>
@@ -169,69 +408,70 @@ function OverviewTab({ profile, attendance, cgpa, fees, notifications }) {
   )
 }
 
-// ─── TAB: ATTENDANCE ─────────────────────────────────────────────────────────
+// ─── ATTENDANCE TAB ──────────────────────────────────────────────────────────
 function AttendanceTab({ attendance, semesters, onSemesterChange, loading }) {
+  const overall = attendance?.overallPercentage || 0
+  const overallColor = overall >= 75 ? '#10b981' : overall >= 50 ? '#f59e0b' : '#ef4444'
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <h2 className="text-lg font-semibold">📋 Attendance</h2>
-        <select
-          onChange={e => onSemesterChange(e.target.value || null)}
-          className="bg-slate-900 border border-slate-700 text-white px-3 py-1.5 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-        >
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2"><ClipboardCheck size={20} className="text-emerald-400" /> Attendance</h2>
+        <select onChange={e => onSemesterChange(e.target.value || null)} className="collego-input w-48">
           <option value="">Current Semester</option>
-          {semesters.map(s => (
-            <option key={s.id} value={s.id}>{s.name} ({s.academicYear})</option>
-          ))}
+          {semesters.map(s => <option key={s.id} value={s.id}>{s.name} ({s.academicYear})</option>)}
         </select>
       </div>
 
-      {/* Overall stats */}
       <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Total Classes" value={attendance?.totalClasses ?? '—'} accent="blue" />
-        <StatCard label="Present" value={attendance?.totalPresent ?? '—'} accent="emerald" />
-        <StatCard
-          label="Overall %"
-          value={`${fmtNum(attendance?.overallPercentage, 1)}%`}
-          accent={attendance?.overallPercentage >= 75 ? 'emerald' : attendance?.overallPercentage >= 50 ? 'amber' : 'red'}
-        />
+        {[
+          { label: 'Total Classes', value: attendance?.totalClasses ?? 0, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+          { label: 'Classes Present', value: attendance?.totalPresent ?? 0, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+          { label: 'Overall %', value: `${fmtNum(overall, 1)}%`, color: overall >= 75 ? 'text-emerald-400' : overall >= 50 ? 'text-amber-400' : 'text-red-400', bg: overall >= 75 ? 'bg-emerald-500/10' : 'bg-amber-500/10' },
+        ].map((s, i) => (
+          <motion.div key={s.label} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className="glass-card rounded-2xl p-5">
+            <p className="text-xs text-zinc-500 mb-1">{s.label}</p>
+            <p className={cn('text-3xl font-bold', s.color)}>{s.value}</p>
+          </motion.div>
+        ))}
       </div>
 
-      {loading ? <Spinner /> : (
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-900">
-              <tr className="text-slate-400 text-xs uppercase">
-                <th className="px-4 py-3 text-left">Subject</th>
-                <th className="px-4 py-3 text-left">Code</th>
-                <th className="px-4 py-3 text-center">Total</th>
-                <th className="px-4 py-3 text-center">Present</th>
-                <th className="px-4 py-3 text-center">Absent</th>
-                <th className="px-4 py-3 text-center">%</th>
-                <th className="px-4 py-3 text-left">Progress</th>
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <table className="collego-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>Code</th>
+                <th style={{ textAlign: 'center' }}>Total</th>
+                <th style={{ textAlign: 'center' }}>Present</th>
+                <th style={{ textAlign: 'center' }}>Absent</th>
+                <th style={{ textAlign: 'center' }}>%</th>
+                <th>Progress</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
-              {attendance?.subjectWise?.map(s => (
-                <tr key={s.sectionId} className="hover:bg-slate-800/40 transition-colors">
-                  <td className="px-4 py-3 text-slate-200 font-medium">{s.courseName}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-400">{s.courseCode}</td>
-                  <td className="px-4 py-3 text-center text-slate-400">{s.totalClasses}</td>
-                  <td className="px-4 py-3 text-center text-emerald-400 font-semibold">{s.present}</td>
-                  <td className="px-4 py-3 text-center text-red-400 font-semibold">{s.absent}</td>
-                  <td className="px-4 py-3 text-center"><SectionBadge pct={s.percentage} /></td>
-                  <td className="px-4 py-3 w-36">
-                    <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${s.percentage >= 75 ? 'bg-emerald-500' : s.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
-                        style={{ width: `${Math.min(s.percentage, 100)}%` }}
-                      />
+            <tbody>
+              {(attendance?.subjectWise || []).map(s => (
+                <tr key={s.sectionId}>
+                  <td className="text-zinc-200 font-medium">{s.courseName}</td>
+                  <td><code className="text-[10px] text-zinc-500 bg-zinc-800/60 px-1.5 py-0.5 rounded">{s.courseCode}</code></td>
+                  <td style={{ textAlign: 'center' }}>{s.totalClasses}</td>
+                  <td style={{ textAlign: 'center', color: '#10b981', fontWeight: 600 }}>{s.present}</td>
+                  <td style={{ textAlign: 'center', color: '#ef4444', fontWeight: 600 }}>{s.absent}</td>
+                  <td style={{ textAlign: 'center' }}><AttBadge pct={Math.round(s.percentage || 0)} /></td>
+                  <td className="w-32">
+                    <div className="progress-bar">
+                      <div className={cn('progress-bar-fill', s.percentage >= 75 ? 'bg-emerald-500' : s.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500')} style={{ width: `${Math.min(s.percentage || 0, 100)}%` }} />
                     </div>
                   </td>
                 </tr>
               ))}
               {!attendance?.subjectWise?.length && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-600">No attendance data found.</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: '#52525b' }}>No attendance data found for this semester.</td></tr>
               )}
             </tbody>
           </table>
@@ -241,110 +481,80 @@ function AttendanceTab({ attendance, semesters, onSemesterChange, loading }) {
   )
 }
 
-// ─── TAB: MARKS ──────────────────────────────────────────────────────────────
-function MarksTab({ internalMarks, semesters, cgpa, loading }) {
-  const [view, setView] = useState('cgpa') // 'cgpa' | 'internal'
+// ─── MARKS TAB ───────────────────────────────────────────────────────────────
+function MarksTab({ internalMarks, cgpa, loading }) {
+  const [view, setView] = useState('cgpa')
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <h2 className="text-lg font-semibold">📝 Marks & Results</h2>
-        <div className="flex bg-slate-900/50 border border-slate-800 rounded-lg p-0.5">
-          {[['cgpa', '🎓 CGPA / SGPA'], ['internal', '📊 Internal Marks']].map(([id, label]) => (
-            <button key={id} onClick={() => setView(id)}
-              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${view === id ? 'bg-violet-500/20 text-violet-300' : 'text-slate-400 hover:text-slate-200'}`}>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2"><BookMarked size={20} className="text-violet-400" /> Marks & Results</h2>
+        <div className="flex bg-zinc-900/80 border border-zinc-800 rounded-xl p-1">
+          {[['cgpa', '🎓 CGPA/SGPA'], ['internal', '📊 Internal Marks']].map(([id, label]) => (
+            <button key={id} onClick={() => setView(id)} className={cn('px-4 py-1.5 rounded-lg text-xs font-medium transition-all', view === id ? 'bg-violet-500/20 text-violet-300' : 'text-zinc-500 hover:text-zinc-300')}>
               {label}
             </button>
           ))}
         </div>
       </div>
 
-      {loading ? <Spinner /> : view === 'cgpa' ? (
+      {view === 'cgpa' ? (
         <div className="space-y-4">
-          {/* CGPA summary */}
           <div className="grid grid-cols-2 gap-4">
-            <StatCard label="Cumulative CGPA" value={fmtNum(cgpa?.cumulativeCgpa)} sub="All semesters" accent="violet" />
-            <StatCard label="Total Credits" value={cgpa?.totalCreditsAllSemesters?.toFixed(0) ?? '—'} sub="Across all semesters" accent="blue" />
+            <div className="glass-card rounded-2xl p-5">
+              <p className="text-xs text-zinc-500">Cumulative CGPA</p>
+              <p className="text-4xl font-bold text-violet-400 mt-1">{fmtNum(cgpa?.cumulativeCgpa)}</p>
+              <p className="text-xs text-zinc-600 mt-1">All semesters</p>
+            </div>
+            <div className="glass-card rounded-2xl p-5">
+              <p className="text-xs text-zinc-500">Total Credits</p>
+              <p className="text-4xl font-bold text-blue-400 mt-1">{cgpa?.totalCreditsAllSemesters?.toFixed(0) ?? '—'}</p>
+              <p className="text-xs text-zinc-600 mt-1">Across all semesters</p>
+            </div>
           </div>
-
-          {cgpa?.semesters?.map(sem => (
-            <div key={sem.semesterId} className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 bg-slate-900/80 border-b border-slate-800">
+          {(cgpa?.semesters || []).map(sem => (
+            <div key={sem.semesterId} className="glass-card rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800/60">
                 <div>
-                  <p className="font-semibold text-slate-200">{sem.semesterName}</p>
-                  <p className="text-xs text-slate-500">{sem.academicYear} · {sem.totalCredits?.toFixed(0)} credits</p>
+                  <p className="font-semibold text-zinc-100">{sem.semesterName}</p>
+                  <p className="text-xs text-zinc-500">{sem.academicYear} · {sem.totalCredits?.toFixed(0)} credits</p>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-violet-400">{fmtNum(sem.sgpa)}</p>
-                  <p className="text-xs text-slate-500">SGPA</p>
+                  <p className="text-[10px] text-zinc-600">SGPA</p>
                 </div>
               </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-slate-500 text-xs uppercase bg-slate-900/40">
-                    <th className="px-4 py-2.5 text-left">Subject</th>
-                    <th className="px-4 py-2.5 text-center">Credits</th>
-                    <th className="px-4 py-2.5 text-center">Marks</th>
-                    <th className="px-4 py-2.5 text-center">Grade</th>
-                    <th className="px-4 py-2.5 text-center">GP</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {sem.subjects.map(sub => (
-                    <tr key={sub.sectionId} className="hover:bg-slate-800/30">
-                      <td className="px-4 py-2.5">
-                        <p className="text-slate-200">{sub.courseName}</p>
-                        <p className="text-xs text-slate-500 font-mono">{sub.courseCode}</p>
-                      </td>
-                      <td className="px-4 py-2.5 text-center text-slate-400">{sub.credits}</td>
-                      <td className="px-4 py-2.5 text-center text-slate-300">
-                        {sub.obtainedMarks != null ? `${sub.obtainedMarks}/${sub.maxMarks}` : '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-center font-bold">
-                        <span className={GRADE_COLOR[sub.grade] || 'text-slate-400'}>{sub.grade || '—'}</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-center text-slate-400">{sub.gradePoints != null ? sub.gradePoints.toFixed(1) : '—'}</td>
+              <table className="collego-table">
+                <thead><tr><th>Subject</th><th style={{ textAlign: 'center' }}>Credits</th><th style={{ textAlign: 'center' }}>Marks</th><th style={{ textAlign: 'center' }}>Grade</th><th style={{ textAlign: 'center' }}>GP</th></tr></thead>
+                <tbody>
+                  {(sem.subjects || []).map(sub => (
+                    <tr key={sub.sectionId}>
+                      <td><p className="text-zinc-200">{sub.courseName}</p><p className="text-[10px] text-zinc-600 font-mono">{sub.courseCode}</p></td>
+                      <td style={{ textAlign: 'center', color: '#94a3b8' }}>{sub.credits}</td>
+                      <td style={{ textAlign: 'center' }}>{sub.obtainedMarks != null ? `${sub.obtainedMarks}/${sub.maxMarks}` : '—'}</td>
+                      <td style={{ textAlign: 'center' }}><span className="font-bold" style={{ color: GRADE_COLORS[sub.grade] || '#94a3b8' }}>{sub.grade || '—'}</span></td>
+                      <td style={{ textAlign: 'center', color: '#94a3b8' }}>{sub.gradePoints?.toFixed(1) ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ))}
-          {!cgpa?.semesters?.length && <p className="text-slate-600 text-sm">No results found yet.</p>}
+          {!cgpa?.semesters?.length && <p className="text-zinc-600 text-sm">No results found yet.</p>}
         </div>
       ) : (
-        /* Internal Marks */
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-900">
-              <tr className="text-slate-400 text-xs uppercase">
-                <th className="px-4 py-3 text-left">Subject</th>
-                <th className="px-4 py-3 text-center">IA-1 (Obtained / Max)</th>
-                <th className="px-4 py-3 text-center">IA-2 (Obtained / Max)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {internalMarks.map(m => (
-                <tr key={m.sectionId} className="hover:bg-slate-800/40">
-                  <td className="px-4 py-3">
-                    <p className="text-slate-200">{m.courseName}</p>
-                    <p className="text-xs text-slate-500 font-mono">{m.courseCode}</p>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {m.ia1ObtainedMarks != null
-                      ? <span className="text-violet-300 font-semibold">{m.ia1ObtainedMarks} / {m.ia1MaxMarks}</span>
-                      : <span className="text-slate-600">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {m.ia2ObtainedMarks != null
-                      ? <span className="text-violet-300 font-semibold">{m.ia2ObtainedMarks} / {m.ia2MaxMarks}</span>
-                      : <span className="text-slate-600">—</span>}
-                  </td>
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <table className="collego-table">
+            <thead><tr><th>Subject</th><th style={{ textAlign: 'center' }}>IA-1 (Obtained / Max)</th><th style={{ textAlign: 'center' }}>IA-2 (Obtained / Max)</th></tr></thead>
+            <tbody>
+              {(internalMarks || []).map(m => (
+                <tr key={m.sectionId}>
+                  <td><p className="text-zinc-200">{m.courseName}</p><p className="text-[10px] text-zinc-600 font-mono">{m.courseCode}</p></td>
+                  <td style={{ textAlign: 'center' }}>{m.ia1ObtainedMarks != null ? <span className="text-violet-300 font-semibold">{m.ia1ObtainedMarks} / {m.ia1MaxMarks}</span> : <span className="text-zinc-700">—</span>}</td>
+                  <td style={{ textAlign: 'center' }}>{m.ia2ObtainedMarks != null ? <span className="text-violet-300 font-semibold">{m.ia2ObtainedMarks} / {m.ia2MaxMarks}</span> : <span className="text-zinc-700">—</span>}</td>
                 </tr>
               ))}
-              {!internalMarks.length && (
-                <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-600">No internal marks found.</td></tr>
-              )}
+              {!internalMarks?.length && <tr><td colSpan={3} style={{ textAlign: 'center', padding: '3rem', color: '#52525b' }}>No internal marks found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -353,409 +563,311 @@ function MarksTab({ internalMarks, semesters, cgpa, loading }) {
   )
 }
 
-// ─── TAB: TIMETABLE ──────────────────────────────────────────────────────────
+// ─── TIMETABLE TAB ───────────────────────────────────────────────────────────
 const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
+const DAY_COLORS = { MONDAY: '#6366f1', TUESDAY: '#8b5cf6', WEDNESDAY: '#06b6d4', THURSDAY: '#10b981', FRIDAY: '#f59e0b', SATURDAY: '#ef4444' }
 
 function TimetableTab({ timetable, loading }) {
   const days = timetable?.weeklySchedule ? DAY_ORDER.filter(d => timetable.weeklySchedule[d]?.length > 0) : []
-
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">📅 Timetable</h2>
-      {loading ? <Spinner /> : days.length === 0
-        ? <p className="text-slate-600">No timetable data found for active enrollments.</p>
-        : (
-          <div className="space-y-4">
-            {DAY_ORDER.map(day => {
-              const slots = timetable.weeklySchedule[day] || []
-              if (!slots.length) return null
-              return (
-                <div key={day} className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                  <div className="bg-slate-900/80 px-5 py-3 border-b border-slate-800">
-                    <h3 className="text-sm font-semibold text-slate-300 capitalize">{day.charAt(0) + day.slice(1).toLowerCase()}</h3>
-                  </div>
-                  <div className="divide-y divide-slate-800/60">
-                    {slots.sort((a, b) => a.startTime.localeCompare(b.startTime)).map(slot => (
-                      <div key={slot.id} className="flex items-center px-5 py-4 hover:bg-slate-800/30 transition-colors">
-                        <div className="w-28 shrink-0">
-                          <p className="text-sm font-mono text-violet-400">{slot.startTime}</p>
-                          <p className="text-xs text-slate-500 font-mono">{slot.endTime}</p>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-slate-200">{slot.courseName}</p>
-                          <p className="text-xs text-slate-500">{slot.courseCode} · Sec {slot.sectionName}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-slate-400">{slot.facultyName || '—'}</p>
-                          <p className="text-xs text-slate-600">{slot.roomNumber}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-white flex items-center gap-2"><Calendar size={20} className="text-teal-400" /> Timetable</h2>
+      {loading ? (
+        <div className="flex items-center justify-center py-16"><div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
+      ) : days.length === 0 ? (
+        <div className="glass-card rounded-2xl p-12 text-center"><Calendar size={48} className="mx-auto mb-3 opacity-20 text-teal-400" /><p className="text-zinc-500">No timetable data found for active enrollments.</p></div>
+      ) : (
+        <div className="space-y-4">
+          {DAY_ORDER.map(day => {
+            const slots = timetable?.weeklySchedule?.[day] || []
+            if (!slots.length) return null
+            const color = DAY_COLORS[day] || '#6366f1'
+            return (
+              <motion.div key={day} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-zinc-800/60 flex items-center gap-3" style={{ background: `${color}10` }}>
+                  <div className="w-2 h-5 rounded-full" style={{ background: color }} />
+                  <h3 className="text-sm font-semibold" style={{ color }}>{day.charAt(0) + day.slice(1).toLowerCase()}</h3>
                 </div>
-              )
-            })}
-          </div>
-        )}
+                <div>
+                  {slots.sort((a, b) => a.startTime?.localeCompare(b.startTime)).map(slot => (
+                    <div key={slot.id} className="flex items-center px-5 py-4 hover:bg-white/[0.02] transition-colors border-b border-zinc-800/30 last:border-0">
+                      <div className="w-24 shrink-0">
+                        <p className="text-sm font-mono font-semibold" style={{ color }}>{slot.startTime}</p>
+                        <p className="text-xs font-mono text-zinc-600">{slot.endTime}</p>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-zinc-200">{slot.courseName}</p>
+                        <p className="text-xs text-zinc-500">{slot.courseCode} · Sec {slot.sectionName}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-zinc-400">{slot.facultyName || '—'}</p>
+                        <p className="text-xs text-zinc-600">{slot.roomNumber}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
 
-// ─── TAB: FEES ───────────────────────────────────────────────────────────────
+// ─── FEES TAB ────────────────────────────────────────────────────────────────
 function FeesTab({ fees, loading }) {
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">💰 Fee Status</h2>
-      {loading ? <Spinner /> : fees.length === 0
-        ? <p className="text-slate-600">No fee records found.</p>
-        : (
-          <div className="space-y-4">
-            {fees.map(fee => {
-              const isPaid = fee.status === 'PAID'
-              return (
-                <div key={fee.id} className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                  <div className="flex items-center justify-between px-5 py-4 bg-slate-900/80 border-b border-slate-800">
-                    <div>
-                      <p className="font-semibold text-slate-200">{fee.semesterName}</p>
-                      <p className="text-xs text-slate-500">Due: {fmtDate(fee.dueDate)}</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-slate-200">₹{Number(fee.totalAmount).toLocaleString('en-IN')}</p>
-                        <p className="text-xs text-slate-500">Total Amount</p>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${isPaid ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border-amber-500/30'}`}>
-                        {fee.status}
-                      </span>
-                    </div>
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-white flex items-center gap-2"><DollarSign size={20} className="text-amber-400" /> Fee Status</h2>
+      {loading ? (
+        <div className="flex items-center justify-center py-16"><div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>
+      ) : fees.length === 0 ? (
+        <div className="glass-card rounded-2xl p-12 text-center"><DollarSign size={48} className="mx-auto mb-3 opacity-20 text-amber-400" /><p className="text-zinc-500">No fee records found.</p></div>
+      ) : (
+        <div className="space-y-4">
+          {fees.map(fee => {
+            const isPaid = fee.status === 'PAID'
+            return (
+              <motion.div key={fee.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800/60">
+                  <div>
+                    <p className="font-semibold text-zinc-100">{fee.semesterName}</p>
+                    <p className="text-xs text-zinc-500">Due: {fmtDate(fee.dueDate)}</p>
                   </div>
-
-                  {fee.items && fee.items.length > 0 && (
-                    <div className="divide-y divide-slate-800/60">
-                      {fee.items.map((item, i) => (
-                        <div key={i} className="flex justify-between items-center px-5 py-2.5 text-sm hover:bg-slate-800/20">
-                          <span className="text-slate-400">{item.description}</span>
-                          <span className="text-slate-300 font-medium">₹{Number(item.amount).toLocaleString('en-IN')}</span>
-                        </div>
-                      ))}
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-zinc-100">₹{Number(fee.totalAmount).toLocaleString('en-IN')}</p>
+                      <p className="text-xs text-zinc-600">Total Amount</p>
                     </div>
-                  )}
-
-                  {isPaid && (
-                    <div className="px-5 py-3 bg-emerald-500/5 border-t border-emerald-500/10">
-                      <p className="text-xs text-emerald-400">
-                        ✓ Paid on {fmtDate(fee.paidAt)}
-                        {fee.transactionRef && <span className="ml-3 text-slate-500">Ref: {fee.transactionRef}</span>}
-                      </p>
-                    </div>
-                  )}
+                    <Badge variant={isPaid ? 'success' : 'warning'}>{fee.status}</Badge>
+                  </div>
                 </div>
-              )
-            })}
-          </div>
-        )}
+                {fee.items?.map((item, i) => (
+                  <div key={i} className="flex justify-between items-center px-5 py-2.5 text-sm border-b border-zinc-800/30 last:border-0 hover:bg-white/[0.01]">
+                    <span className="text-zinc-400">{item.description}</span>
+                    <span className="text-zinc-300 font-medium">₹{Number(item.amount).toLocaleString('en-IN')}</span>
+                  </div>
+                ))}
+                {isPaid && (
+                  <div className="px-5 py-3 bg-emerald-500/5 border-t border-emerald-500/10">
+                    <p className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle2 size={11} /> Paid on {fmtDate(fee.paidAt)}{fee.transactionRef && <span className="ml-2 text-zinc-600">Ref: {fee.transactionRef}</span>}</p>
+                  </div>
+                )}
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
 
-// ─── TAB: PLACEMENT NOTICES ──────────────────────────────────────────────────
-function PlacementsTab({ notices, loading }) {
-  return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">🏢 Placement Notices</h2>
-      {loading ? <Spinner /> : notices.length === 0
-        ? <p className="text-slate-600">No placement notices right now.</p>
-        : (
-          <div className="space-y-3">
-            {notices.map(notice => {
-              const isExpired = notice.lastDate && new Date(notice.lastDate) < new Date()
-              return (
-                <div key={notice.id} className={`bg-slate-900/50 border rounded-xl p-5 ${isExpired ? 'border-slate-800/50 opacity-60' : 'border-slate-800 hover:border-violet-500/30 transition-colors'}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-slate-200">{notice.title}</h3>
-                        {isExpired && <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">Expired</span>}
-                      </div>
-                      <p className="text-sm font-medium text-violet-400 mb-2">{notice.companyName}</p>
-                      <p className="text-sm text-slate-400 mb-3">{notice.description}</p>
-                      <div className="flex flex-wrap gap-3 text-xs">
-                        {notice.eligibilityCriteria && (
-                          <span className="text-slate-400 bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700">
-                            ✅ {notice.eligibilityCriteria}
-                          </span>
-                        )}
-                        {notice.packageOffered && (
-                          <span className="text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">
-                            💰 {notice.packageOffered}
-                          </span>
-                        )}
-                        <span className="text-slate-500 bg-slate-800/50 px-2.5 py-1 rounded-md border border-slate-700/50">
-                          🏢 {notice.departmentName}
-                        </span>
-                      </div>
-                    </div>
-                    {notice.lastDate && (
-                      <div className={`text-right shrink-0 ${isExpired ? 'text-slate-600' : 'text-amber-300'}`}>
-                        <p className="text-xs font-semibold">Last Date</p>
-                        <p className="text-sm font-bold">{fmtDate(notice.lastDate)}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-    </div>
-  )
-}
+// ─── AI ASSISTANT TAB ────────────────────────────────────────────────────────
+function AiAssistantTab({ attendance, cgpa, fees }) {
+  const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Collego AI 🤖 Ask me anything about your attendance, marks, fees, placements, timetable, and more!" }])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const bottomRef = useState(null)
 
-// ─── TAB: NOTIFICATIONS ──────────────────────────────────────────────────────
-function NotificationsTab({ notifications, onMarkRead, loading }) {
-  const TYPE_COLORS = {
-    ACADEMIC: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
-    FEE: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
-    PLACEMENT: 'text-violet-300 bg-violet-500/10 border-violet-500/20',
-    GENERAL: 'text-slate-300 bg-slate-700/30 border-slate-700',
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return
+    const userMsg = { role: 'user', content: input }
+    setMessages(prev => [...prev, userMsg])
+    setInput('')
+    setLoading(true)
+    try {
+      const res = await api.post('/api/ai/chat', { message: input, history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })), context: { attendance, cgpa, fees } })
+      setMessages(prev => [...prev, { role: 'assistant', content: res.data.reply || "I couldn't process that. Please try again." }])
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'AI service is temporarily offline. Please try again later.' }])
+    } finally { setLoading(false) }
   }
 
+  const quickPrompts = ['What is my current attendance?', 'Show my CGPA', 'Any pending fees?', 'What placements are available?', 'Show my timetable']
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">🔔 Notifications</h2>
-      {loading ? <Spinner /> : notifications.length === 0
-        ? <p className="text-slate-600">No notifications yet.</p>
-        : (
-          <div className="space-y-2">
-            {notifications.map(n => (
-              <div key={n.id} className={`flex items-start gap-4 p-4 rounded-xl border transition-colors ${!n.read ? 'bg-violet-500/8 border-violet-500/25' : 'bg-slate-900/40 border-slate-800 opacity-70'}`}>
-                <div className="shrink-0 mt-0.5">
-                  {!n.read && <div className="w-2 h-2 bg-violet-400 rounded-full mt-1" />}
-                  {n.read && <div className="w-2 h-2 bg-transparent mt-1" />}
+    <div className="space-y-4 flex flex-col h-[calc(100vh-120px)]">
+      <h2 className="text-xl font-bold text-white flex items-center gap-2">
+        <Bot size={20} className="text-violet-400" /> AI College Assistant
+        <Badge variant="purple" className="ml-1">Phase 9</Badge>
+      </h2>
+      <div className="flex-1 glass-card rounded-2xl overflow-hidden flex flex-col" style={{ minHeight: '400px' }}>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {messages.map((msg, i) => (
+            <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+              {msg.role === 'assistant' && (
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mr-2 shrink-0 self-end mb-1">
+                  <Bot size={13} className="text-white" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${TYPE_COLORS[n.type] || TYPE_COLORS.GENERAL}`}>
-                      {n.type}
-                    </p>
-                    <span className="text-xs text-slate-600">{fmtDate(n.createdAt)}</span>
-                  </div>
-                  <p className="text-sm font-semibold text-slate-200">{n.title}</p>
-                  <p className="text-sm text-slate-400 mt-0.5">{n.message}</p>
-                </div>
-                {!n.read && (
-                  <button
-                    onClick={() => onMarkRead(n.id)}
-                    className="shrink-0 text-xs text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 px-3 py-1.5 rounded-lg transition-colors"
-                  >
-                    Mark read
-                  </button>
-                )}
+              )}
+              <div className={cn('max-w-[80%] px-4 py-3 rounded-2xl text-sm', msg.role === 'user' ? 'bg-indigo-600/30 text-indigo-100 rounded-br-sm border border-indigo-500/20' : 'bg-zinc-800/80 text-zinc-200 rounded-bl-sm border border-zinc-700/40')}>
+                {msg.role === 'assistant' && <p className="text-[10px] text-violet-400 font-semibold mb-1">Collego AI</p>}
+                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
               </div>
-            ))}
-          </div>
-        )}
+            </motion.div>
+          ))}
+          {loading && (
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0"><Bot size={13} className="text-white" /></div>
+              <div className="bg-zinc-800/80 border border-zinc-700/40 px-4 py-3 rounded-2xl rounded-bl-sm">
+                <div className="flex gap-1">{[0, 1, 2].map(i => <div key={i} className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}</div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="border-t border-zinc-800/60 p-3 flex gap-2">
+          <input
+            value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+            placeholder="Ask about attendance, marks, fees, placements..."
+            className="collego-input flex-1"
+          />
+          <Button variant="gradient" size="sm" onClick={sendMessage} disabled={loading || !input.trim()}>
+            <Send size={14} /> Send
+          </Button>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {quickPrompts.map(p => (
+          <button key={p} onClick={() => setInput(p)} className="text-xs bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700 text-zinc-400 hover:text-zinc-200 px-3 py-1.5 rounded-lg transition-colors">
+            {p}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
 
-// ─── TAB: DOCUMENTS ──────────────────────────────────────────────────────────
-function DocumentsTab({ semesters, cgpa, showMessage }) {
+// ─── DOCUMENTS TAB ────────────────────────────────────────────────────────────
+function DocumentsTab({ cgpa, showMessage }) {
   const [downloading, setDownloading] = useState(null)
-
   const downloadMarksheet = async (semesterId, semName) => {
     try {
       setDownloading(`sem-${semesterId}`)
       const res = await api.get(`/api/student/marksheet/${semesterId}`, { responseType: 'blob' })
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-      const a = document.createElement('a'); a.href = url
-      a.download = `marksheet_${semName.replace(/ /g, '_')}.pdf`; a.click()
+      const a = document.createElement('a'); a.href = url; a.download = `marksheet_${semName.replace(/ /g, '_')}.pdf`; a.click()
       window.URL.revokeObjectURL(url)
       showMessage(`Downloaded marksheet for ${semName}`)
-    } catch (err) {
-      showMessage(err.response?.data?.message || `No marks data for ${semName}`, 'error')
-    } finally {
-      setDownloading(null)
-    }
+    } catch (err) { showMessage(err.response?.data?.message || `No marks data for ${semName}`, 'error')
+    } finally { setDownloading(null) }
   }
-
   const downloadTranscript = async () => {
     try {
       setDownloading('transcript')
       const res = await api.get('/api/student/transcript', { responseType: 'blob' })
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-      const a = document.createElement('a'); a.href = url
-      a.download = 'academic_transcript.pdf'; a.click()
+      const a = document.createElement('a'); a.href = url; a.download = 'academic_transcript.pdf'; a.click()
       window.URL.revokeObjectURL(url)
       showMessage('Transcript downloaded')
-    } catch (err) {
-      showMessage('No academic data for transcript yet', 'error')
-    } finally {
-      setDownloading(null)
-    }
+    } catch { showMessage('No academic data for transcript yet', 'error')
+    } finally { setDownloading(null) }
   }
-
-  const semestersWithMarks = cgpa?.semesters || []
-
+  const sems = cgpa?.semesters || []
   return (
-    <div className="space-y-6">
-      <h2 className="text-lg font-semibold">📄 Academic Documents</h2>
-
-      {/* Transcript */}
-      <div className="bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border border-violet-500/20 rounded-xl p-6 flex items-center justify-between">
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-white flex items-center gap-2"><FileText size={20} className="text-teal-400" /> Academic Documents</h2>
+      <div className="glass-card rounded-2xl p-6 border border-violet-500/15 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(6,182,212,0.04) 100%)' }}>
         <div>
-          <h3 className="font-semibold text-slate-200 mb-1">Full Academic Transcript</h3>
-          <p className="text-sm text-slate-400">Complete academic history across all semesters with CGPA</p>
+          <h3 className="font-semibold text-zinc-100 mb-1">Full Academic Transcript</h3>
+          <p className="text-sm text-zinc-400">Complete academic history across all semesters with CGPA</p>
         </div>
-        <button
-          onClick={downloadTranscript}
-          disabled={downloading === 'transcript'}
-          className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-5 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 shadow-lg shadow-violet-500/20 shrink-0"
-        >
-          {downloading === 'transcript' ? '⏳ Generating...' : '⬇ Download Transcript'}
-        </button>
+        <Button variant="gradient" onClick={downloadTranscript} disabled={downloading === 'transcript'}>
+          <Download size={14} /> {downloading === 'transcript' ? 'Generating...' : 'Download Transcript'}
+        </Button>
       </div>
-
-      {/* Per-semester marksheets */}
       <div>
-        <h3 className="text-sm font-semibold text-slate-400 mb-3">Semester Marksheets</h3>
+        <h3 className="text-sm font-semibold text-zinc-400 mb-3">Semester Marksheets</h3>
         <div className="space-y-3">
-          {semestersWithMarks.map(sem => (
-            <div key={sem.semesterId} className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 flex items-center justify-between hover:border-slate-700 transition-colors">
+          {sems.map(sem => (
+            <div key={sem.semesterId} className="glass-card rounded-2xl p-5 flex items-center justify-between hover:border-zinc-700 transition-colors">
               <div>
-                <p className="font-semibold text-slate-200">{sem.semesterName}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{sem.academicYear} · {sem.subjects?.length} subjects · SGPA {fmtNum(sem.sgpa)}</p>
+                <p className="font-semibold text-zinc-100">{sem.semesterName}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">{sem.academicYear} · {sem.subjects?.length} subjects · SGPA {fmtNum(sem.sgpa)}</p>
               </div>
-              <button
-                onClick={() => downloadMarksheet(sem.semesterId, sem.semesterName)}
-                disabled={downloading === `sem-${sem.semesterId}`}
-                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-all disabled:opacity-50"
-              >
-                {downloading === `sem-${sem.semesterId}` ? '⏳ Generating...' : '⬇ Download PDF'}
-              </button>
+              <Button variant="outline" size="sm" onClick={() => downloadMarksheet(sem.semesterId, sem.semesterName)} disabled={downloading === `sem-${sem.semesterId}`}>
+                <Download size={13} /> {downloading === `sem-${sem.semesterId}` ? 'Generating...' : 'Download PDF'}
+              </Button>
             </div>
           ))}
-          {!semestersWithMarks.length && (
-            <p className="text-slate-600 text-sm">No semester results available yet for download.</p>
-          )}
+          {!sems.length && <p className="text-zinc-600 text-sm">No semester results available yet for download.</p>}
         </div>
       </div>
     </div>
   )
 }
 
-// ─── TAB: AI ASSISTANT (Phase 9 Feature 1 + Smart Search) ───────────────────
-function AiAssistantTab({ attendance, cgpa, fees }) {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! I\'m Collego Assistant 🤖 Ask me anything about your attendance, marks, fees, placements, timetable, and more!' }
-  ])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const messagesEndRef = useState(null)
-
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return
-    const userMsg = { role: 'user', content: input }
-    const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
-    setInput('')
-    setLoading(true)
-    try {
-      const res = await api.post('/api/ai/chat', {
-        message: input,
-        history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
-        context: { attendance, cgpa, fees }
-      })
-      setMessages(prev => [...prev, { role: 'assistant', content: res.data.reply || 'I couldn\'t process that. Please try again.' }])
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'AI service is temporarily offline. Please try again later.' }])
-    } finally {
-      setLoading(false)
-    }
-  }
-
+// ─── NOTIFICATIONS TAB ────────────────────────────────────────────────────────
+function NotificationsTab({ notifications, onMarkRead, loading }) {
+  const TYPE_CONFIG = { ACADEMIC: { v: 'info', label: '📚' }, FEE: { v: 'warning', label: '💰' }, PLACEMENT: { v: 'purple', label: '💼' }, GENERAL: { v: 'secondary', label: '📢' } }
   return (
-    <div className="space-y-4 h-full flex flex-col">
-      <div className="flex items-center gap-3">
-        <h2 className="text-lg font-semibold">🤖 AI College Assistant</h2>
-        <span className="text-xs bg-violet-500/15 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full">Phase 9</span>
-      </div>
-      <p className="text-sm text-slate-500">Ask me anything about your college data — attendance, marks, fees, placements, timetable, and more. I have access to your live data.</p>
-
-      {/* Chat window */}
-      <div className="flex-1 bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden flex flex-col" style={{minHeight: '420px'}}>
-        <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{maxHeight: '400px'}}>
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm ${
-                msg.role === 'user'
-                  ? 'bg-violet-600/40 text-violet-100 rounded-br-sm'
-                  : 'bg-slate-800 text-slate-200 rounded-bl-sm border border-slate-700'
-              }`}>
-                {msg.role === 'assistant' && (
-                  <div className="text-xs text-violet-400 font-semibold mb-1">🤖 Collego AI</div>
-                )}
-                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-white flex items-center gap-2"><Bell size={20} className="text-blue-400" /> Notifications</h2>
+      <div className="space-y-2">
+        {(notifications || []).map(n => {
+          const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.GENERAL
+          return (
+            <motion.div key={n.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className={cn('glass-card rounded-2xl p-4 flex items-start gap-4', !n.read ? 'border-indigo-500/20' : 'opacity-60')}>
+              <div className="mt-0.5">{!n.read && <div className="w-2 h-2 bg-indigo-400 rounded-full" />}</div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant={cfg.v} className="text-[10px]">{n.type}</Badge>
+                  <span className="text-[10px] text-zinc-600">{fmtDate(n.createdAt)}</span>
+                </div>
+                <p className="text-sm font-semibold text-zinc-200">{n.title}</p>
+                <p className="text-sm text-zinc-400 mt-0.5">{n.message}</p>
               </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-slate-800 border border-slate-700 px-4 py-3 rounded-2xl rounded-bl-sm">
-                <div className="flex gap-1">
-                  {[0,1,2].map(i => <div key={i} className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{animationDelay: `${i*0.15}s`}} />)}
+              {!n.read && (
+                <Button variant="outline" size="sm" onClick={() => onMarkRead(n.id)} className="shrink-0">Mark read</Button>
+              )}
+            </motion.div>
+          )
+        })}
+        {!notifications?.length && <div className="glass-card rounded-2xl p-12 text-center"><Bell size={40} className="mx-auto mb-3 opacity-20 text-blue-400" /><p className="text-zinc-500">No notifications yet.</p></div>}
+      </div>
+    </div>
+  )
+}
+
+// ─── PLACEMENTS TAB ──────────────────────────────────────────────────────────
+function PlacementsTab({ notices, loading }) {
+  return (
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-white flex items-center gap-2"><Briefcase size={20} className="text-emerald-400" /> Placement Notices</h2>
+      {(notices || []).map(notice => {
+        const isExpired = notice.lastDate && new Date(notice.lastDate) < new Date()
+        return (
+          <motion.div key={notice.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn('glass-card rounded-2xl p-5', isExpired ? 'opacity-50' : 'hover:border-emerald-500/20 transition-colors')}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-zinc-100">{notice.title}</h3>
+                  {isExpired && <Badge variant="secondary">Expired</Badge>}
+                </div>
+                <p className="text-sm text-emerald-400 mb-2">{notice.companyName}</p>
+                <p className="text-sm text-zinc-400 mb-3">{notice.description}</p>
+                <div className="flex flex-wrap gap-2">
+                  {notice.eligibilityCriteria && <Badge variant="secondary">{notice.eligibilityCriteria}</Badge>}
+                  {notice.packageOffered && <Badge variant="success">💰 {notice.packageOffered}</Badge>}
+                  <Badge variant="info">🏢 {notice.departmentName}</Badge>
                 </div>
               </div>
+              {notice.lastDate && (
+                <div className={cn('text-right shrink-0', isExpired ? 'text-zinc-600' : 'text-amber-400')}>
+                  <p className="text-xs font-semibold">Last Date</p>
+                  <p className="text-sm font-bold">{fmtDate(notice.lastDate)}</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Input */}
-        <div className="border-t border-slate-800 p-3 flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder="Ask about attendance, marks, fees, placements..."
-            className="flex-1 bg-slate-800 border border-slate-700 text-white px-4 py-2 rounded-xl text-sm focus:outline-none focus:border-violet-500 placeholder-slate-600"
-          />
-          <button
-            onClick={sendMessage}
-            disabled={loading || !input.trim()}
-            className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-          >
-            Send
-          </button>
-        </div>
-      </div>
-
-      {/* Quick prompts */}
-      <div>
-        <p className="text-xs text-slate-500 mb-2">Quick prompts:</p>
-        <div className="flex flex-wrap gap-2">
-          {[
-            'What is my current attendance?',
-            'Show my CGPA',
-            'Do I have any pending fees?',
-            'What placements are available?',
-            'Show my timetable'
-          ].map(prompt => (
-            <button
-              key={prompt}
-              onClick={() => { setInput(prompt); }}
-              className="text-xs bg-slate-800/60 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
-      </div>
+          </motion.div>
+        )
+      })}
+      {!notices?.length && <div className="glass-card rounded-2xl p-12 text-center"><Briefcase size={40} className="mx-auto mb-3 opacity-20 text-emerald-400" /><p className="text-zinc-500">No placement notices right now.</p></div>}
     </div>
   )
 }
 
-// ─── TAB: AI PERFORMANCE PREDICTION (Phase 9 Feature 3) ─────────────────────
+// ─── AI PREDICTION TAB ────────────────────────────────────────────────────────
 function AiPredictionTab() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -767,438 +879,136 @@ function AiPredictionTab() {
       try {
         const res = await api.get('/api/ai/performance-prediction')
         setData(res.data)
-      } catch (e) {
-        setError(e.response?.data?.message || 'AI prediction service unavailable.')
-      } finally {
-        setLoading(false)
-      }
+      } catch (e) { setError(e.response?.data?.message || 'AI prediction service unavailable.') }
+      finally { setLoading(false) }
     }
     load()
   }, [])
 
-  const TREND_CONFIG = {
-    improving: { color: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: '📈' },
-    declining: { color: 'text-red-300', bg: 'bg-red-500/10 border-red-500/30', icon: '📉' },
-    stable: { color: 'text-blue-300', bg: 'bg-blue-500/10 border-blue-500/30', icon: '➡️' },
-  }
-  const RISK_CONFIG = {
-    LOW: { color: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/30', label: '🟢 Low Risk' },
-    MEDIUM: { color: 'text-amber-300', bg: 'bg-amber-500/10 border-amber-500/30', label: '🟡 Medium Risk' },
-    HIGH: { color: 'text-red-300', bg: 'bg-red-500/10 border-red-500/30', label: '🔴 High Risk' },
-  }
-
+  const RISK_CONFIG = { LOW: { v: 'success', icon: '🟢' }, MEDIUM: { v: 'warning', icon: '🟡' }, HIGH: { v: 'destructive', icon: '🔴' } }
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <h2 className="text-lg font-semibold">🎯 AI Performance Prediction</h2>
-        <span className="text-xs bg-violet-500/15 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full">Phase 9</span>
-      </div>
-      <p className="text-sm text-slate-500">AI-powered CGPA/SGPA projection based on your academic history using linear regression trend analysis.</p>
-
-      {loading && <Spinner />}
-      {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm">{error}</div>}
-
-      {data && !loading && (
-        <div className="space-y-5">
-          {/* Prediction Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Predicted SGPA" value={fmtNum(data.predictedSgpa)} sub="Next semester" accent="violet" />
-            <StatCard label="Projected CGPA" value={fmtNum(data.predictedCgpa)} sub="With predicted" accent="blue" />
-            <div className={`border rounded-xl p-5 ${(TREND_CONFIG[data.trend] || TREND_CONFIG.stable).bg}`}>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Trend</p>
-              <p className={`text-2xl font-bold ${(TREND_CONFIG[data.trend] || TREND_CONFIG.stable).color}`}>
-                {(TREND_CONFIG[data.trend] || TREND_CONFIG.stable).icon}
-              </p>
-              <p className={`text-sm font-semibold mt-1 capitalize ${(TREND_CONFIG[data.trend] || TREND_CONFIG.stable).color}`}>{data.trend}</p>
-            </div>
-            <div className={`border rounded-xl p-5 ${(RISK_CONFIG[data.riskLevel] || RISK_CONFIG.LOW).bg}`}>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Risk Level</p>
-              <p className={`text-sm font-bold mt-2 ${(RISK_CONFIG[data.riskLevel] || RISK_CONFIG.LOW).color}`}>
-                {(RISK_CONFIG[data.riskLevel] || RISK_CONFIG.LOW).label}
-              </p>
-              <p className="text-xs text-slate-600 mt-1">Confidence: {Math.round((data.confidenceScore || 0) * 100)}%</p>
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-white flex items-center gap-2"><Target size={20} className="text-indigo-400" /> AI Performance Prediction <Badge variant="purple">Phase 9</Badge></h2>
+      <p className="text-sm text-zinc-500">AI-powered CGPA/SGPA projection based on your academic history using linear regression trend analysis.</p>
+      {loading && <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}
+      {error && <div className="glass-card rounded-2xl p-5 border border-red-500/20"><p className="text-red-300 text-sm">{error}</p></div>}
+      {data && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="glass-card rounded-2xl p-5">
+            <p className="text-xs text-zinc-500">Predicted SGPA</p>
+            <p className="text-3xl font-bold text-indigo-400 mt-1">{data.predictedSgpa?.toFixed(2) ?? '—'}</p>
+          </div>
+          <div className="glass-card rounded-2xl p-5">
+            <p className="text-xs text-zinc-500">Risk Level</p>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant={RISK_CONFIG[data.riskLevel]?.v ?? 'secondary'}>{RISK_CONFIG[data.riskLevel]?.icon} {data.riskLevel}</Badge>
             </div>
           </div>
-
-          {/* AI Insights */}
-          {data.insights && data.insights.length > 0 && (
-            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-slate-300 mb-3">💡 AI Insights</h3>
-              <div className="space-y-2">
-                {data.insights.map((insight, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="text-violet-400 mt-0.5 shrink-0">•</span>
-                    <p className="text-sm text-slate-300">{insight}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!data && !loading && !error && (
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center text-slate-600 text-sm">
-          No academic history data available for prediction. Complete at least one semester.
+          <div className="glass-card rounded-2xl p-5">
+            <p className="text-xs text-zinc-500">Trend</p>
+            <p className="text-sm font-semibold text-zinc-200 mt-2">{data.trend}</p>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-// ─── TAB: AI ATTENDANCE RISK (Phase 9 Feature 4) ────────────────────────────
-function AiAttendanceRiskTab() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+// ─── Main Student Dashboard ───────────────────────────────────────────────────
+export default function StudentDashboard() {
+  const navigate = useNavigate()
+  const [collapsed, setCollapsed] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [toast, setToast] = useState({ text: '', type: 'success' })
+
+  const [profile, setProfile] = useState(null)
+  const [attendance, setAttendance] = useState(null)
+  const [cgpa, setCgpa] = useState(null)
+  const [fees, setFees] = useState([])
+  const [notifications, setNotifications] = useState([])
+  const [timetable, setTimetable] = useState(null)
+  const [internalMarks, setInternalMarks] = useState([])
+  const [placements, setPlacements] = useState([])
+  const [semesters, setSemesters] = useState([])
+  const [loadingTab, setLoadingTab] = useState(false)
+
+  const sidebarWidth = collapsed ? 68 : 240
+  const showMsg = useCallback((text, type = 'success') => setToast({ text, type }), [])
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true)
-      try {
-        const res = await api.get('/api/ai/attendance-risk')
-        setData(res.data)
-      } catch (e) {
-        setError(e.response?.data?.message || 'AI attendance risk service unavailable.')
-      } finally {
-        setLoading(false)
-      }
+      const [prRes, atRes, cgRes, feRes, notRes, ttRes, imRes, plRes, semRes] = await Promise.allSettled([
+        api.get('/api/student/profile'),
+        api.get('/api/student/attendance'),
+        api.get('/api/student/cgpa'),
+        api.get('/api/student/fees'),
+        api.get('/api/student/notifications'),
+        api.get('/api/student/timetable'),
+        api.get('/api/student/internal-marks'),
+        api.get('/api/student/placement-notices'),
+        api.get('/api/student/semesters'),
+      ])
+      if (prRes.status === 'fulfilled') setProfile(prRes.value.data)
+      if (atRes.status === 'fulfilled') setAttendance(atRes.value.data)
+      if (cgRes.status === 'fulfilled') setCgpa(cgRes.value.data)
+      if (feRes.status === 'fulfilled') setFees(Array.isArray(feRes.value.data) ? feRes.value.data : [])
+      if (notRes.status === 'fulfilled') setNotifications(Array.isArray(notRes.value.data) ? notRes.value.data : [])
+      if (ttRes.status === 'fulfilled') setTimetable(ttRes.value.data)
+      if (imRes.status === 'fulfilled') setInternalMarks(Array.isArray(imRes.value.data) ? imRes.value.data : [])
+      if (plRes.status === 'fulfilled') setPlacements(Array.isArray(plRes.value.data) ? plRes.value.data : [])
+      if (semRes.status === 'fulfilled') setSemesters(Array.isArray(semRes.value.data) ? semRes.value.data : [])
     }
     load()
   }, [])
 
-  const RISK_COLORS = {
-    SAFE: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
-    WARNING: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
-    CRITICAL: 'bg-red-500/10 border-red-500/30 text-red-300',
-    DEFAULTER: 'bg-red-900/20 border-red-700/50 text-red-200',
-  }
-  const OVERALL_RISK_COLORS = {
-    LOW: 'from-emerald-500/10 to-teal-500/10 border-emerald-500/20',
-    MEDIUM: 'from-amber-500/10 to-orange-500/10 border-amber-500/20',
-    HIGH: 'from-red-500/10 to-rose-500/10 border-red-500/20',
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <h2 className="text-lg font-semibold">⚠️ Attendance Risk Analysis</h2>
-        <span className="text-xs bg-violet-500/15 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full">Phase 9</span>
-      </div>
-      <p className="text-sm text-slate-500">AI early-warning system analyzing your attendance trends and predicting examination eligibility risk.</p>
-
-      {loading && <Spinner />}
-      {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm">{error}</div>}
-
-      {data && !loading && (
-        <div className="space-y-5">
-          {/* Overall Risk Banner */}
-          <div className={`bg-gradient-to-r ${(OVERALL_RISK_COLORS[data.overallRisk] || OVERALL_RISK_COLORS.LOW)} border rounded-2xl p-5`}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Overall Risk Status</p>
-                <p className={`text-2xl font-bold ${
-                  data.overallRisk === 'HIGH' ? 'text-red-300' : data.overallRisk === 'MEDIUM' ? 'text-amber-300' : 'text-emerald-300'
-                }`}>
-                  {data.overallRisk === 'HIGH' ? '🔴 High Risk' : data.overallRisk === 'MEDIUM' ? '🟡 Medium Risk' : '🟢 Low Risk'}
-                </p>
-              </div>
-              <p className="text-sm text-slate-400 max-w-sm text-right">{data.summary}</p>
-            </div>
-          </div>
-
-          {/* Subject Risk Cards */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-slate-400">Subject-wise Risk Assessment</h3>
-            {data.riskItems && data.riskItems.map((item, i) => (
-              <div key={i} className={`border rounded-xl p-4 ${RISK_COLORS[item.riskLevel] || RISK_COLORS.SAFE}`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-slate-200">{item.courseName}</span>
-                      <span className="font-mono text-xs text-slate-500">{item.courseCode}</span>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${RISK_COLORS[item.riskLevel]}`}>{item.riskLevel}</span>
-                    </div>
-                    <p className="text-sm mt-1">{item.message}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={`text-2xl font-bold ${
-                      item.currentPercentage >= 75 ? 'text-emerald-300' :
-                      item.currentPercentage >= 65 ? 'text-amber-300' : 'text-red-300'
-                    }`}>{item.currentPercentage}%</p>
-                    {item.classesNeededToReach75 > 0 && (
-                      <p className="text-xs text-slate-500 mt-0.5">Need {item.classesNeededToReach75} more</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Recommendations */}
-          {data.recommendations && data.recommendations.length > 0 && (
-            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-slate-300 mb-3">💡 Recommendations</h3>
-              <div className="space-y-2">
-                {data.recommendations.map((rec, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="text-amber-400 mt-0.5 shrink-0">→</span>
-                    <p className="text-sm text-slate-300">{rec}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!data && !loading && !error && (
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center text-slate-600 text-sm">
-          No attendance data available for risk analysis.
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-const TABS = [
-  { id: 'overview',       label: '🏠 Overview' },
-  { id: 'attendance',     label: '📋 Attendance' },
-  { id: 'marks',          label: '📝 Marks & CGPA' },
-  { id: 'timetable',      label: '📅 Timetable' },
-  { id: 'fees',           label: '💰 Fees' },
-  { id: 'placements',     label: '🏢 Placements' },
-  { id: 'notifications',  label: '🔔 Notifications' },
-  { id: 'documents',      label: '📄 Documents' },
-  { id: 'ai-assistant',   label: '🤖 AI Assistant' },
-  { id: 'ai-prediction',  label: '🎯 AI Insights' },
-  { id: 'ai-risk',        label: '⚠️ Risk Alert' },
-]
-
-export default function StudentDashboard() {
-  const navigate   = useNavigate()
-  const email      = authService.getEmail()
-  const [activeTab, setActiveTab]           = useState('overview')
-  const [loading, setLoading]               = useState(false)
-  const [message, setMessage]               = useState({ text: '', type: '' })
-
-  // Data
-  const [profile, setProfile]               = useState(null)
-  const [attendance, setAttendance]         = useState(null)
-  const [internalMarks, setInternalMarks]   = useState([])
-  const [cgpa, setCgpa]                     = useState(null)
-  const [timetable, setTimetable]           = useState(null)
-  const [fees, setFees]                     = useState([])
-  const [notices, setNotices]               = useState([])
-  const [notifications, setNotifications]   = useState([])
-  const [semesters, setSemesters]           = useState([])
-  const [attendanceSemId, setAttendanceSemId] = useState(null)
-
-  const showMessage = useCallback((text, type = 'success') => {
-    setMessage({ text, type })
-    setTimeout(() => setMessage({ text: '', type: '' }), 4000)
-  }, [])
-
-  const fetchAll = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [profileRes, overallAttRes, internalRes, cgpaRes, ttRes, feesRes, noticesRes, notifsRes] = await Promise.allSettled([
-        api.get('/api/student/profile'),
-        api.get('/api/student/attendance/overall'),
-        api.get('/api/student/marks/internal'),
-        api.get('/api/student/cgpa'),
-        api.get('/api/student/timetable'),
-        api.get('/api/student/fees'),
-        api.get('/api/student/placements'),
-        api.get('/api/student/notifications'),
-      ])
-
-      if (profileRes.status === 'fulfilled')   setProfile(profileRes.value.data)
-      if (overallAttRes.status === 'fulfilled') setAttendance(overallAttRes.value.data)
-      if (internalRes.status === 'fulfilled')  setInternalMarks(internalRes.value.data)
-      if (cgpaRes.status === 'fulfilled')      setCgpa(cgpaRes.value.data)
-      if (ttRes.status === 'fulfilled')        setTimetable(ttRes.value.data)
-      if (feesRes.status === 'fulfilled')      setFees(feesRes.value.data)
-      if (noticesRes.status === 'fulfilled')   setNotices(noticesRes.value.data)
-      if (notifsRes.status === 'fulfilled')    setNotifications(notifsRes.value.data)
-    } catch (err) {
-      showMessage('Failed to load some data', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [showMessage])
-
-  // Fetch semesters for the attendance filter
-  useEffect(() => {
-    api.get('/api/semesters').then(r => setSemesters(r.data)).catch(() => {})
-    fetchAll()
-  }, [fetchAll])
-
-  const handleAttendanceSemesterChange = async (semId) => {
-    setAttendanceSemId(semId)
-    try {
-      const url = semId ? `/api/student/attendance?semesterId=${semId}` : '/api/student/attendance/overall'
-      const res = await api.get(url)
-      if (semId) {
-        // endpoint returns array of SubjectAttendanceResponse
-        const arr = res.data
-        const totalClasses = arr.reduce((s, x) => s + x.totalClasses, 0)
-        const totalPresent = arr.reduce((s, x) => s + x.present, 0)
-        setAttendance({
-          subjectWise: arr,
-          totalClasses,
-          totalPresent,
-          overallPercentage: totalClasses > 0 ? Math.round((totalPresent / totalClasses) * 1000) / 10 : 0
-        })
-      } else {
-        setAttendance(res.data)
-      }
-    } catch {
-      showMessage('Failed to load attendance for selected semester', 'error')
-    }
-  }
-
   const handleMarkRead = async (id) => {
     try {
-      await api.put(`/api/student/notifications/${id}/read`)
+      await api.patch(`/api/student/notifications/${id}/read`)
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-    } catch {
-      showMessage('Failed to mark notification as read', 'error')
-    }
+    } catch { showMsg('Failed to mark as read', 'error') }
   }
 
-  const handleLogout = async () => {
-    await authService.logout()
-    navigate('/login')
+  const handleSemesterChange = async (semId) => {
+    setLoadingTab(true)
+    try {
+      const url = semId ? `/api/student/attendance?semesterId=${semId}` : '/api/student/attendance'
+      const res = await api.get(url)
+      setAttendance(res.data)
+    } catch { } finally { setLoadingTab(false) }
+  }
+
+  const renderTab = () => {
+    switch (activeTab) {
+      case 'overview': return <OverviewTab profile={profile} attendance={attendance} cgpa={cgpa} fees={fees} notifications={notifications} onTabChange={setActiveTab} />
+      case 'attendance': return <AttendanceTab attendance={attendance} semesters={semesters} onSemesterChange={handleSemesterChange} loading={loadingTab} />
+      case 'marks': return <MarksTab internalMarks={internalMarks} cgpa={cgpa} loading={loadingTab} />
+      case 'timetable': return <TimetableTab timetable={timetable} loading={loadingTab} />
+      case 'fees': return <FeesTab fees={fees} loading={loadingTab} />
+      case 'placements': return <PlacementsTab notices={placements} loading={loadingTab} />
+      case 'notifications': return <NotificationsTab notifications={notifications} onMarkRead={handleMarkRead} loading={loadingTab} />
+      case 'documents': return <DocumentsTab cgpa={cgpa} showMessage={showMsg} />
+      case 'aiAssistant': return <AiAssistantTab attendance={attendance} cgpa={cgpa} fees={fees} />
+      case 'aiPrediction': return <AiPredictionTab />
+      default: return null
+    }
   }
 
   const unreadCount = notifications.filter(n => !n.read).length
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* ── Navbar ── */}
-      <nav className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center font-bold text-sm">C</div>
-          <h1 className="text-lg font-semibold tracking-tight">
-            Collego <span className="text-slate-500 font-normal">Student</span>
-          </h1>
+    <div className="min-h-screen" style={{ background: 'rgb(9, 9, 11)' }}>
+      <Toast message={toast} onClose={() => setToast({ text: '', type: 'success' })} />
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} profile={profile} />
+      <Topbar profile={profile} unreadCount={unreadCount} onLogout={() => { authService.clearTokens(); navigate('/login') }} sidebarWidth={sidebarWidth} />
+      <main className="main-content" style={{ marginLeft: sidebarWidth }}>
+        <div className="p-6">
+          <AnimatePresence mode="wait">
+            <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+              {renderTab()}
+            </motion.div>
+          </AnimatePresence>
         </div>
-        <div className="flex items-center gap-4">
-          {unreadCount > 0 && (
-            <button onClick={() => setActiveTab('notifications')} className="relative">
-              <span className="text-slate-400 text-lg">🔔</span>
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-violet-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{unreadCount}</span>
-            </button>
-          )}
-          <span className="text-sm text-slate-400 hidden sm:block">{email}</span>
-          <button
-            onClick={handleLogout}
-            className="text-sm bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors border border-slate-700"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
-
-      <Toast message={message} />
-
-      <div className="flex">
-        {/* ── Sidebar ── */}
-        <aside className="w-56 shrink-0 min-h-[calc(100vh-65px)] bg-slate-900/50 border-r border-slate-800 p-3 sticky top-[65px] self-start">
-          <div className="space-y-0.5">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center justify-between ${
-                  activeTab === tab.id
-                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                    : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-transparent'
-                }`}
-              >
-                <span>{tab.label}</span>
-                {tab.id === 'notifications' && unreadCount > 0 && (
-                  <span className="bg-violet-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Profile mini-card */}
-          {profile && (
-            <div className="mt-6 bg-slate-900/80 border border-slate-800 rounded-xl p-3">
-              <p className="text-xs font-semibold text-slate-200 truncate">{profile.firstName} {profile.lastName}</p>
-              <p className="text-xs text-slate-500 mt-0.5 truncate">{profile.enrollmentNumber}</p>
-              <p className="text-xs text-slate-600 mt-0.5 truncate">{profile.departmentName}</p>
-              {cgpa?.cumulativeCgpa != null && (
-                <div className="mt-2 flex justify-between items-center">
-                  <span className="text-xs text-slate-500">CGPA</span>
-                  <span className="text-sm font-bold text-violet-400">{fmtNum(cgpa.cumulativeCgpa)}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </aside>
-
-        {/* ── Main Content ── */}
-        <main className="flex-1 p-6 min-w-0">
-          {activeTab === 'overview' && (
-            <OverviewTab
-              profile={profile}
-              attendance={attendance}
-              cgpa={cgpa}
-              fees={fees}
-              notifications={notifications}
-            />
-          )}
-          {activeTab === 'attendance' && (
-            <AttendanceTab
-              attendance={attendance}
-              semesters={semesters}
-              onSemesterChange={handleAttendanceSemesterChange}
-              loading={loading}
-            />
-          )}
-          {activeTab === 'marks' && (
-            <MarksTab
-              internalMarks={internalMarks}
-              semesters={semesters}
-              cgpa={cgpa}
-              loading={loading}
-            />
-          )}
-          {activeTab === 'timetable' && (
-            <TimetableTab timetable={timetable} loading={loading} />
-          )}
-          {activeTab === 'fees' && (
-            <FeesTab fees={fees} loading={loading} />
-          )}
-          {activeTab === 'placements' && (
-            <PlacementsTab notices={notices} loading={loading} />
-          )}
-          {activeTab === 'notifications' && (
-            <NotificationsTab
-              notifications={notifications}
-              onMarkRead={handleMarkRead}
-              loading={loading}
-            />
-          )}
-          {activeTab === 'documents' && (
-            <DocumentsTab
-              semesters={semesters}
-              cgpa={cgpa}
-              showMessage={showMessage}
-            />
-          )}
-          {activeTab === 'ai-assistant' && (
-            <AiAssistantTab attendance={attendance} cgpa={cgpa} fees={fees} />
-          )}
-          {activeTab === 'ai-prediction' && <AiPredictionTab />}
-          {activeTab === 'ai-risk' && <AiAttendanceRiskTab />}
-        </main>
-      </div>
+      </main>
     </div>
   )
 }

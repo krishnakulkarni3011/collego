@@ -1,139 +1,944 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  LayoutDashboard, BookOpen, ClipboardCheck, FileText,
+  Megaphone, Target, ChevronRight, ChevronLeft, LogOut,
+  Search, GraduationCap, Users, BookMarked, BarChart3,
+  FolderOpen, Plus, CheckCircle2, X, Send, Sparkles,
+  ArrowLeft, Edit, Clock, Calendar, Star, Trophy,
+  AlertTriangle, TrendingUp, Upload, Grid3X3, Bell,
+  RefreshCw, ChevronDown, Bot, Zap
+} from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Cell, PieChart, Pie, AreaChart, Area
+} from 'recharts'
 import { authService } from '../services/authService'
 import api from '../services/api'
+import { cn } from '../lib/utils'
+import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-const fmtDate = (d) =>
-  d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 const fmtNum = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
 
-// ─── tiny shared UI ───────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, accent = 'violet', icon }) {
-  const colors = {
-    violet: 'from-violet-500/20 to-fuchsia-500/20 border-violet-500/30 text-violet-300',
-    emerald: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/30 text-emerald-300',
-    amber: 'from-amber-500/20 to-orange-500/20 border-amber-500/30 text-amber-300',
-    blue: 'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-300',
-    red: 'from-red-500/20 to-rose-500/20 border-red-500/30 text-red-300',
-    fuchsia: 'from-fuchsia-500/20 to-pink-500/20 border-fuchsia-500/30 text-fuchsia-300',
-  }
-  const c = colors[accent]
+// ─── Toast ───────────────────────────────────────────────────────────────────
+function Toast({ message, onClose }) {
+  useEffect(() => {
+    if (message?.text) { const t = setTimeout(onClose, 4000); return () => clearTimeout(t) }
+  }, [message, onClose])
   return (
-    <div className={`bg-gradient-to-br ${c} border rounded-xl p-5`}>
-      {icon && <div className="text-2xl mb-2">{icon}</div>}
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
-      <p className={`text-3xl font-bold ${c.split(' ')[3]}`}>{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
+    <AnimatePresence>
+      {message?.text && (
+        <motion.div
+          initial={{ opacity: 0, y: -20, x: 20 }}
+          animate={{ opacity: 1, y: 0, x: 0 }}
+          exit={{ opacity: 0, y: -20, x: 20 }}
+          className={cn(
+            'fixed top-4 right-4 z-[200] flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-medium shadow-2xl border backdrop-blur-xl',
+            message.type === 'error' ? 'bg-red-950/90 text-red-300 border-red-500/30' : 'bg-emerald-950/90 text-emerald-300 border-emerald-500/30'
+          )}
+        >
+          {message.type === 'error' ? <X size={16} /> : <CheckCircle2 size={16} />}
+          {message.text}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// ─── Attendance Badge ─────────────────────────────────────────────────────────
+function AttBadge({ pct }) {
+  if (pct >= 75) return <Badge variant="success">{pct}%</Badge>
+  if (pct >= 50) return <Badge variant="warning">{pct}%</Badge>
+  return <Badge variant="destructive">{pct}%</Badge>
+}
+
+// ─── Custom Tooltip ──────────────────────────────────────────────────────────
+function CustomTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="glass-card rounded-xl px-3 py-2.5 border border-violet-500/20">
+      <p className="text-xs font-semibold text-zinc-300 mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="text-xs" style={{ color: p.color }}>
+          {p.name}: <span className="font-bold">{p.value}</span>
+        </p>
+      ))}
     </div>
   )
 }
 
-function Spinner() {
-  return (
-    <div className="flex items-center justify-center py-16">
-      <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
-}
+// ─── Global Nav items ─────────────────────────────────────────────────────────
+const GLOBAL_NAV = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'questionPapers', label: 'Question Papers', icon: FileText },
+  { id: 'notices', label: 'Notices', icon: Megaphone },
+  { id: 'ai-notice-gen', label: 'AI Notice Generator', icon: Sparkles },
+]
 
-function Toast({ message }) {
-  if (!message.text) return null
-  return (
-    <div
-      className={`fixed top-20 right-6 z-50 px-5 py-3 rounded-xl text-sm font-medium shadow-2xl border transition-all ${
-        message.type === 'error'
-          ? 'bg-red-500/20 text-red-300 border-red-500/30'
-          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-      }`}
-    >
-      {message.text}
-    </div>
-  )
-}
-
-function AttendanceBadge({ pct }) {
-  if (pct >= 75)
-    return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">{pct}%</span>
-  if (pct >= 50)
-    return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">{pct}%</span>
-  return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-300 border border-red-500/30">{pct}%</span>
-}
-
-function ProgressBar({ value, max = 100 }) {
-  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
-  const color = pct >= 75 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500'
-  return (
-    <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden w-full">
-      <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-    </div>
-  )
-}
-
-// ─── TABS ─────────────────────────────────────────────────────────────────────
 const SECTION_TABS = [
-  { id: 'attendance', label: '📋 Attendance' },
-  { id: 'internalMarks', label: '📝 Internal Marks' },
-  { id: 'semesterMarks', label: '🎓 Semester Marks' },
-  { id: 'studentPerformance', label: '👥 Student Performance' },
-  { id: 'assignments', label: '📚 Assignments' },
-  { id: 'materials', label: '📂 Materials' },
-  { id: 'analytics', label: '📊 Analytics' },
+  { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+  { id: 'internalMarks', label: 'Internal Marks', icon: BookMarked },
+  { id: 'semesterMarks', label: 'Semester Marks', icon: GraduationCap },
+  { id: 'studentPerformance', label: 'Student Performance', icon: Users },
+  { id: 'assignments', label: 'Assignments', icon: BookOpen },
+  { id: 'materials', label: 'Materials', icon: FolderOpen },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
 ]
 
-const GLOBAL_TABS = [
-  { id: 'overview', label: '🏠 Overview' },
-  { id: 'questionPapers', label: '📄 Question Papers' },
-  { id: 'notices', label: '📢 Notices' },
-  { id: 'ai-notice-gen', label: '🤖 AI Notice Gen' },
-]
+// ─── Sidebar ─────────────────────────────────────────────────────────────────
+function Sidebar({ activeTab, selectedSection, sections, onGlobalNav, onSectionSelect, onBack, collapsed, onToggle, loading }) {
+  return (
+    <aside className={cn('sidebar', collapsed && 'collapsed')}>
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-zinc-800/60 shrink-0">
+        <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-violet-500/30">
+          <GraduationCap size={18} className="text-white" />
+        </div>
+        {!collapsed && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <p className="text-sm font-bold text-white">COLLEGO</p>
+            <p className="text-[10px] text-zinc-500">Faculty Portal</p>
+          </motion.div>
+        )}
+      </div>
 
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-function FacultyDashboard() {
+      <nav className="flex-1 overflow-y-auto py-3 scrollbar-hide px-2">
+        {/* Global Nav */}
+        {!collapsed && <p className="text-[9px] font-semibold text-zinc-600 uppercase tracking-widest px-3 pt-2 pb-1.5">Dashboard</p>}
+        {GLOBAL_NAV.map(item => {
+          const Icon = item.icon
+          const isActive = activeTab === item.id && !selectedSection
+          return (
+            <button
+              key={item.id}
+              onClick={() => onGlobalNav(item.id)}
+              title={collapsed ? item.label : undefined}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 relative group mb-0.5',
+                isActive ? 'bg-violet-500/10 text-violet-400 border-r-2 border-violet-500' : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-200'
+              )}
+            >
+              <Icon size={16} className="shrink-0" />
+              {!collapsed && <span className="text-xs font-medium">{item.label}</span>}
+              {isActive && !collapsed && <ChevronRight size={12} className="ml-auto" />}
+              {collapsed && (
+                <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-zinc-900 text-zinc-200 text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl border border-zinc-800">
+                  {item.label}
+                </div>
+              )}
+            </button>
+          )
+        })}
+
+        {/* My Sections */}
+        {!collapsed && <p className="text-[9px] font-semibold text-zinc-600 uppercase tracking-widest px-3 pt-4 pb-1.5">My Sections</p>}
+        {loading && sections.length === 0 && !collapsed && (
+          <div className="flex items-center gap-2 px-3 py-2">
+            <div className="w-4 h-4 border border-violet-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-zinc-600">Loading...</span>
+          </div>
+        )}
+        {sections.length === 0 && !loading && !collapsed && (
+          <p className="text-xs text-zinc-700 px-3 py-2">No sections assigned yet.</p>
+        )}
+        {sections.map(sec => {
+          const isActive = selectedSection?.sectionId === sec.sectionId
+          return (
+            <button
+              key={sec.sectionId}
+              onClick={() => onSectionSelect(sec)}
+              title={collapsed ? `${sec.courseName} (${sec.courseCode})` : undefined}
+              className={cn(
+                'w-full flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 relative group mb-0.5',
+                isActive ? 'bg-violet-500/10 text-violet-400 border-r-2 border-violet-500' : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
+              )}
+            >
+              <div className={cn('w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5', isActive ? 'bg-violet-500/20 text-violet-400' : 'bg-zinc-800 text-zinc-500')}>
+                {sec.courseCode?.substring(0, 2)}
+              </div>
+              {!collapsed && (
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-xs font-medium truncate">{sec.courseName}</p>
+                  <p className="text-[10px] text-zinc-600">Sec {sec.sectionName} · {sec.enrolledStudents} students</p>
+                </div>
+              )}
+              {collapsed && (
+                <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-zinc-900 text-zinc-200 text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl border border-zinc-800">
+                  {sec.courseName} — Sec {sec.sectionName}
+                </div>
+              )}
+            </button>
+          )
+        })}
+
+        {/* Summary */}
+        {!collapsed && sections.length > 0 && (
+          <div className="mx-2 mt-4 p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/40">
+            <p className="text-[10px] text-zinc-600">
+              <span className="text-zinc-300 font-semibold">{sections.length}</span> sections ·{' '}
+              <span className="text-zinc-300 font-semibold">{sections.reduce((a, s) => a + (s.enrolledStudents || 0), 0)}</span> students
+            </p>
+          </div>
+        )}
+      </nav>
+
+      <div className="border-t border-zinc-800/60 p-2 shrink-0">
+        <button onClick={onToggle} className="w-full flex items-center justify-center gap-2 py-2 text-zinc-500 hover:text-zinc-300 text-xs rounded-xl hover:bg-zinc-800/60 transition-colors">
+          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {!collapsed && <span>Collapse</span>}
+        </button>
+      </div>
+    </aside>
+  )
+}
+
+// ─── Topbar ───────────────────────────────────────────────────────────────────
+function Topbar({ email, sidebarWidth, onLogout }) {
+  const initials = email ? email.substring(0, 2).toUpperCase() : 'FC'
+  return (
+    <header className="topbar px-5" style={{ left: sidebarWidth }}>
+      <div className="flex-1 flex items-center gap-3">
+        <div className="flex items-center gap-2 bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 w-72 group focus-within:border-violet-500/50 transition-all">
+          <Search size={14} className="text-zinc-600 group-focus-within:text-violet-400 transition-colors" />
+          <input className="bg-transparent text-sm text-zinc-400 placeholder-zinc-600 outline-none w-full" placeholder="Search students, courses, papers..." />
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <button className="p-2 rounded-xl text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-all"><Bell size={17} /></button>
+        <div className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-zinc-800/60 transition-all">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-xs font-bold text-white">{initials}</div>
+          <div className="hidden md:block">
+            <p className="text-xs font-semibold text-zinc-200">Faculty User</p>
+            <p className="text-[10px] text-zinc-500">{email}</p>
+          </div>
+        </div>
+        <button onClick={onLogout} className="p-2 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Logout">
+          <LogOut size={15} />
+        </button>
+      </div>
+    </header>
+  )
+}
+
+// ─── Overview Tab ─────────────────────────────────────────────────────────────
+function OverviewTab({ sections, overviewData, onSectionSelect }) {
+  const now = new Date()
+  const hour = now.getHours()
+  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
+  const COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+
+  return (
+    <div className="space-y-6">
+      {/* Greeting */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+        className="relative rounded-2xl p-6 border border-violet-500/10 overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(168,85,247,0.05) 50%, rgba(6,182,212,0.03) 100%)' }}>
+        <h2 className="text-2xl font-bold text-white">{greeting}, Faculty 👋</h2>
+        <p className="text-zinc-500 text-sm mt-1">Here's a summary of your teaching assignments.</p>
+        <div className="absolute right-6 top-4 opacity-10 text-7xl pointer-events-none">🏫</div>
+      </motion.div>
+
+      {/* Stats */}
+      {overviewData && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Sections Assigned', value: overviewData.totalSections, icon: BookOpen, color: 'text-violet-400', bg: 'bg-violet-500/10' },
+            { label: 'Total Students', value: overviewData.totalStudents, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+            { label: 'Unique Courses', value: overviewData.courses.length, icon: BookMarked, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+            { label: 'Semesters', value: overviewData.semesters.length, icon: Calendar, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+          ].map((s, i) => {
+            const Icon = s.icon
+            return (
+              <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="glass-card rounded-2xl p-5">
+                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center mb-3', s.bg)}>
+                  <Icon size={18} className={s.color} />
+                </div>
+                <p className="text-xs text-zinc-500">{s.label}</p>
+                <p className={cn('text-3xl font-bold mt-1', s.color)}>{s.value}</p>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Section Cards */}
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-400 mb-3 flex items-center gap-2">
+          <BookOpen size={14} /> My Teaching Sections
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {sections.map((sec, i) => (
+            <motion.button
+              key={sec.sectionId}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.06 }}
+              onClick={() => onSectionSelect(sec)}
+              className="glass-card rounded-2xl p-5 text-left hover:border-violet-500/30 transition-all group hover:scale-[1.01]"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-zinc-200 group-hover:text-violet-300 transition-colors truncate">{sec.courseName}</h4>
+                  <p className="text-xs text-zinc-600 font-mono mt-0.5">{sec.courseCode}</p>
+                </div>
+                <div className="w-8 h-8 rounded-xl shrink-0 ml-2 flex items-center justify-center text-sm font-bold" style={{ background: `${COLORS[i % COLORS.length]}20`, color: COLORS[i % COLORS.length] }}>
+                  {sec.sectionName}
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs text-zinc-600 mb-3">
+                <span className="flex items-center gap-1"><Users size={10} /> {sec.enrolledStudents} students</span>
+                <span>{sec.semesterName}</span>
+                <span>{sec.credits} credits</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex gap-1">
+                  {SECTION_TABS.slice(0, 4).map(tab => {
+                    const Icon = tab.icon
+                    return <div key={tab.id} className="w-6 h-6 rounded-lg bg-zinc-800/60 flex items-center justify-center"><Icon size={10} className="text-zinc-600" /></div>
+                  })}
+                </div>
+                <span className="text-xs text-violet-400 group-hover:text-violet-300 transition-colors flex items-center gap-1">Manage <ChevronRight size={11} /></span>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
+      {/* Feature Guide */}
+      <div className="glass-card rounded-2xl p-5 border border-violet-500/10">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-3 flex items-center gap-2">
+          <Zap size={14} className="text-amber-400" /> Available Features
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {[
+            { icon: ClipboardCheck, label: 'Mark Attendance', desc: 'Bulk per-session entry', color: 'text-emerald-400' },
+            { icon: BookMarked, label: 'Internal Marks', desc: 'IA-1, IA-2, IA-3 upload', color: 'text-violet-400' },
+            { icon: GraduationCap, label: 'Semester Marks', desc: 'Auto grade calculation', color: 'text-blue-400' },
+            { icon: Users, label: 'Student Performance', desc: 'Combined view per student', color: 'text-teal-400' },
+            { icon: BookOpen, label: 'Assignments', desc: 'Create & track assignments', color: 'text-amber-400' },
+            { icon: Sparkles, label: 'AI Notice Gen', desc: 'AI-powered notice drafting', color: 'text-fuchsia-400' },
+          ].map(f => {
+            const Icon = f.icon
+            return (
+              <div key={f.label} className="flex items-start gap-3 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/40">
+                <Icon size={16} className={cn('mt-0.5 shrink-0', f.color)} />
+                <div>
+                  <p className="text-xs font-semibold text-zinc-300">{f.label}</p>
+                  <p className="text-[10px] text-zinc-600 mt-0.5">{f.desc}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Section Header + Tab Bar ─────────────────────────────────────────────────
+function SectionHeader({ section, activeTab, onTabChange, onBack }) {
+  return (
+    <div className="mb-5">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <button onClick={onBack} className="p-1 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-all">
+              <ArrowLeft size={14} />
+            </button>
+            <h2 className="text-lg font-bold text-white">{section.courseName}</h2>
+            <Badge variant="purple" className="text-[10px]">{section.courseCode}</Badge>
+          </div>
+          <p className="text-xs text-zinc-500 ml-7">Section {section.sectionName} · {section.semesterName} · {section.enrolledStudents} students · {section.credits} credits</p>
+        </div>
+      </div>
+      <div className="flex gap-1 bg-zinc-900/60 rounded-xl p-1 border border-zinc-800/60 overflow-x-auto scrollbar-hide">
+        {SECTION_TABS.map(tab => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
+                activeTab === tab.id ? 'bg-violet-500/20 text-violet-300' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/40'
+              )}
+            >
+              <Icon size={12} />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Attendance Tab ───────────────────────────────────────────────────────────
+function AttendanceTab({ attendanceDate, setAttendanceDate, attendanceRecords, toggleAttendance, onSubmit, loading }) {
+  const present = attendanceRecords.filter(r => r.status === 'PRESENT').length
+  const absent = attendanceRecords.length - present
+  const pct = attendanceRecords.length > 0 ? Math.round((present / attendanceRecords.length) * 100) : 0
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <input type="date" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} className="collego-input w-44" />
+        <Button variant="success" size="sm" onClick={() => attendanceRecords.forEach((_, i) => toggleAttendance(i, 'PRESENT'))}>
+          <CheckCircle2 size={13} /> All Present
+        </Button>
+        <Button variant="destructive" size="sm" onClick={() => attendanceRecords.forEach((_, i) => toggleAttendance(i, 'ABSENT'))}>
+          <X size={13} /> All Absent
+        </Button>
+        <div className="ml-auto flex items-center gap-3 text-xs">
+          <span className="text-emerald-400 font-bold">{present} Present</span>
+          <span className="text-red-400 font-bold">{absent} Absent</span>
+          <span className="text-zinc-600">/ {attendanceRecords.length} total</span>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="glass-card rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-emerald-400">{present}</p>
+          <p className="text-xs text-zinc-500">Present</p>
+        </div>
+        <div className="glass-card rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-red-400">{absent}</p>
+          <p className="text-xs text-zinc-500">Absent</p>
+        </div>
+        <div className="glass-card rounded-xl p-4 text-center">
+          <p className={cn('text-2xl font-bold', pct >= 75 ? 'text-emerald-400' : pct >= 50 ? 'text-amber-400' : 'text-red-400')}>{pct}%</p>
+          <p className="text-xs text-zinc-500">Attendance</p>
+        </div>
+      </div>
+
+      {/* Student list */}
+      <div className="glass-card rounded-2xl overflow-hidden">
+        <table className="collego-table">
+          <thead>
+            <tr><th>#</th><th>Enrollment</th><th>Student Name</th><th style={{ textAlign: 'center' }}>Status</th></tr>
+          </thead>
+          <tbody>
+            {attendanceRecords.map((r, i) => (
+              <tr key={r.studentId}>
+                <td className="text-zinc-600">{i + 1}</td>
+                <td><code className="text-[10px] bg-zinc-800/60 px-1.5 py-0.5 rounded">{r.enrollmentNumber}</code></td>
+                <td className="text-zinc-200 font-medium">{r.studentName}</td>
+                <td style={{ textAlign: 'center' }}>
+                  <button
+                    onClick={() => toggleAttendance(i)}
+                    className={cn(
+                      'px-4 py-1.5 rounded-xl text-xs font-bold transition-all border',
+                      r.status === 'PRESENT'
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                        : 'bg-red-500/15 text-red-400 border-red-500/30 hover:bg-red-500/25'
+                    )}
+                  >
+                    {r.status === 'PRESENT' ? '✓ Present' : '✗ Absent'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {attendanceRecords.length === 0 && (
+              <tr><td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: '#52525b' }}>No students enrolled in this section.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {attendanceRecords.length > 0 && (
+        <Button variant="gradient" onClick={onSubmit} disabled={loading}>
+          {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><CheckCircle2 size={14} /> Save Attendance</>}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+// ─── Internal Marks Tab ───────────────────────────────────────────────────────
+function InternalMarksTab({ examName, setExamName, maxMarks, setMaxMarks, marksEntries, setMarksEntries, onSubmit, sectionMarks, loading }) {
+  return (
+    <div className="space-y-5">
+      <div className="glass-card rounded-2xl p-5">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-4 flex items-center gap-2"><Plus size={14} className="text-violet-400" /> Enter Internal Marks</h3>
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Exam Name</label>
+            <select value={examName} onChange={e => setExamName(e.target.value)} className="collego-input">
+              {['IA-1', 'IA-2', 'IA-3', 'Mid-Sem', 'Quiz-1', 'Quiz-2'].map(n => <option key={n}>{n}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Max Marks</label>
+            <input type="number" value={maxMarks} onChange={e => setMaxMarks(e.target.value)} className="collego-input" min="1" />
+          </div>
+        </div>
+        <div className="glass-card rounded-xl overflow-hidden mb-4">
+          <table className="collego-table">
+            <thead><tr><th>Enrollment</th><th>Student</th><th style={{ textAlign: 'center' }}>Marks / {maxMarks}</th></tr></thead>
+            <tbody>
+              {marksEntries.map((entry, i) => (
+                <tr key={entry.studentId}>
+                  <td><code className="text-[10px] bg-zinc-800/60 px-1.5 py-0.5 rounded">{entry.enrollmentNumber}</code></td>
+                  <td className="text-zinc-200">{entry.studentName}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input
+                      type="number" value={entry.obtainedMarks} min="0" max={maxMarks}
+                      onChange={e => setMarksEntries(prev => prev.map((m, j) => j === i ? { ...m, obtainedMarks: e.target.value } : m))}
+                      className="w-20 text-center collego-input py-1 text-sm"
+                      placeholder="—"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Button variant="gradient" onClick={onSubmit} disabled={loading}>
+          {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><Upload size={14} /> Upload Marks</>}
+        </Button>
+      </div>
+
+      {sectionMarks.length > 0 && (
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-zinc-800/60">
+            <h3 className="text-sm font-semibold text-zinc-300">Recorded Marks</h3>
+          </div>
+          <table className="collego-table">
+            <thead><tr><th>Student</th><th>Exam</th><th style={{ textAlign: 'center' }}>Obtained</th><th style={{ textAlign: 'center' }}>Max</th></tr></thead>
+            <tbody>
+              {sectionMarks.map(m => (
+                <tr key={m.id}>
+                  <td><p className="text-zinc-200">{m.studentName}</p><code className="text-[10px] text-zinc-600">{m.enrollmentNumber}</code></td>
+                  <td><Badge variant="secondary">{m.examName}</Badge></td>
+                  <td style={{ textAlign: 'center', color: '#a78bfa', fontWeight: 600 }}>{m.obtainedMarks}</td>
+                  <td style={{ textAlign: 'center', color: '#71717a' }}>{m.maxMarks}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Semester Marks Tab ───────────────────────────────────────────────────────
+function SemesterMarksTab({ semMaxMarks, setSemMaxMarks, semMarksEntries, setSemMarksEntries, onSubmit, loading }) {
+  return (
+    <div className="space-y-5">
+      <div className="glass-card rounded-2xl p-5">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-4 flex items-center gap-2"><GraduationCap size={14} className="text-blue-400" /> Upload Semester Marks</h3>
+        <div className="mb-4">
+          <label className="text-xs text-zinc-500 mb-1.5 block">Max Marks</label>
+          <input type="number" value={semMaxMarks} onChange={e => setSemMaxMarks(e.target.value)} className="collego-input w-32" min="1" />
+        </div>
+        <div className="glass-card rounded-xl overflow-hidden mb-4">
+          <table className="collego-table">
+            <thead><tr><th>Enrollment</th><th>Student</th><th style={{ textAlign: 'center' }}>Marks / {semMaxMarks}</th></tr></thead>
+            <tbody>
+              {semMarksEntries.map((entry, i) => (
+                <tr key={entry.studentId}>
+                  <td><code className="text-[10px] bg-zinc-800/60 px-1.5 py-0.5 rounded">{entry.enrollmentNumber}</code></td>
+                  <td className="text-zinc-200">{entry.studentName}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input
+                      type="number" value={entry.obtainedMarks} min="0" max={semMaxMarks}
+                      onChange={e => setSemMarksEntries(prev => prev.map((m, j) => j === i ? { ...m, obtainedMarks: e.target.value } : m))}
+                      className="w-20 text-center collego-input py-1 text-sm"
+                      placeholder="—"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Button variant="gradient" onClick={onSubmit} disabled={loading}>
+          {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><Upload size={14} /> Upload Semester Marks</>}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Student Performance Tab ──────────────────────────────────────────────────
+function StudentPerformanceTab({ data, loading }) {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold text-zinc-300 flex items-center gap-2"><Users size={15} className="text-teal-400" /> Student Performance Overview</h3>
+      {loading ? (
+        <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+      ) : (
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <table className="collego-table">
+            <thead><tr><th>Student</th><th>Enrollment</th><th style={{ textAlign: 'center' }}>Attendance %</th><th style={{ textAlign: 'center' }}>IA-1</th><th style={{ textAlign: 'center' }}>IA-2</th></tr></thead>
+            <tbody>
+              {data.map(s => {
+                const attPct = s.attendance ? Math.round((s.attendance.presentClasses / (s.attendance.totalClasses || 1)) * 100) : null
+                return (
+                  <tr key={s.studentId}>
+                    <td className="text-zinc-200 font-medium">{s.studentName}</td>
+                    <td><code className="text-[10px] bg-zinc-800/60 px-1.5 py-0.5 rounded">{s.enrollmentNumber}</code></td>
+                    <td style={{ textAlign: 'center' }}>{attPct != null ? <AttBadge pct={attPct} /> : <span className="text-zinc-700">—</span>}</td>
+                    <td style={{ textAlign: 'center', color: '#a78bfa' }}>{s.ia1ObtainedMarks ?? '—'}</td>
+                    <td style={{ textAlign: 'center', color: '#a78bfa' }}>{s.ia2ObtainedMarks ?? '—'}</td>
+                  </tr>
+                )
+              })}
+              {data.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: '#52525b' }}>No performance data found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Assignments Tab ──────────────────────────────────────────────────────────
+function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, onSubmit, assignments, loading }) {
+  return (
+    <div className="space-y-5">
+      <div className="glass-card rounded-2xl p-5">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-4 flex items-center gap-2"><Plus size={14} className="text-amber-400" /> Create Assignment</h3>
+        <div className="space-y-3">
+          <div><label className="text-xs text-zinc-500 mb-1.5 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Assignment title" className="collego-input" /></div>
+          <div><label className="text-xs text-zinc-500 mb-1.5 block">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="Assignment description..." className="collego-input resize-none" /></div>
+          <div><label className="text-xs text-zinc-500 mb-1.5 block">Due Date (optional)</label><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="collego-input w-48" /></div>
+        </div>
+        <Button variant="gradient" size="sm" className="mt-4" onClick={onSubmit} disabled={loading || !title.trim()}>
+          {loading ? <><RefreshCw size={13} className="animate-spin" /> Creating...</> : <><Plus size={13} /> Create Assignment</>}
+        </Button>
+      </div>
+      {assignments.length > 0 && (
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-zinc-800/60"><h3 className="text-sm font-semibold text-zinc-300">Existing Assignments</h3></div>
+          <div className="divide-y divide-zinc-800/40">
+            {assignments.map(a => (
+              <div key={a.id} className="px-5 py-4 hover:bg-white/[0.01] transition-colors">
+                <div className="flex items-start justify-between">
+                  <div><p className="text-sm font-semibold text-zinc-200">{a.title}</p><p className="text-xs text-zinc-500 mt-0.5">{a.description}</p></div>
+                  {a.dueDate && <span className="text-xs text-amber-400 shrink-0 ml-4 flex items-center gap-1"><Clock size={11} /> {fmtDate(a.dueDate)}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Materials Tab ────────────────────────────────────────────────────────────
+function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit, materials, loading }) {
+  const MATERIAL_TYPES = ['NOTES', 'SLIDES', 'REFERENCE', 'VIDEO', 'ASSIGNMENT', 'OTHER']
+  return (
+    <div className="space-y-5">
+      <div className="glass-card rounded-2xl p-5">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-4 flex items-center gap-2"><Plus size={14} className="text-teal-400" /> Add Course Material</h3>
+        <div className="space-y-3">
+          <div><label className="text-xs text-zinc-500 mb-1.5 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Material title" className="collego-input" /></div>
+          <div><label className="text-xs text-zinc-500 mb-1.5 block">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} placeholder="Description..." className="collego-input resize-none" /></div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Type</label>
+            <select value={type} onChange={e => setType(e.target.value)} className="collego-input w-48">
+              {MATERIAL_TYPES.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+        <Button variant="gradient" size="sm" className="mt-4" onClick={onSubmit} disabled={loading || !title.trim()}>
+          {loading ? <><RefreshCw size={13} className="animate-spin" /> Adding...</> : <><Plus size={13} /> Add Material</>}
+        </Button>
+      </div>
+      {materials.length > 0 && (
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <table className="collego-table">
+            <thead><tr><th>Title</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              {materials.map(m => (
+                <tr key={m.id}>
+                  <td className="text-zinc-200 font-medium">{m.title}</td>
+                  <td><Badge variant="info">{m.materialType}</Badge></td>
+                  <td className="text-zinc-500 text-xs max-w-xs truncate">{m.description || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Analytics Tab ────────────────────────────────────────────────────────────
+function AnalyticsTab({ analytics, loading }) {
+  const COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b']
+  const attData = analytics ? [
+    { name: '<50%', value: analytics.studentsBelow50 || 0 },
+    { name: '50-75%', value: (analytics.studentsBelow75 || 0) - (analytics.studentsBelow50 || 0) },
+    { name: '>75%', value: analytics.studentsAbove75 || 0 },
+  ] : []
+
+  return (
+    <div className="space-y-5">
+      {loading ? (
+        <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+      ) : !analytics ? (
+        <div className="glass-card rounded-2xl p-12 text-center"><BarChart3 size={40} className="mx-auto mb-3 opacity-20 text-violet-400" /><p className="text-zinc-500">No analytics data available yet.</p></div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="glass-card rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-zinc-300 mb-4">Attendance Distribution</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={attData} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={entry => `${entry.name}: ${entry.value}`} labelLine={false}>
+                  {['#ef4444', '#f59e0b', '#10b981'].map((c, i) => <Cell key={i} fill={c} />)}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="glass-card rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-zinc-300 mb-4">Section Summary</h3>
+            <div className="space-y-3">
+              {[
+                { label: 'Average Attendance', value: `${fmtNum(analytics.averageAttendancePercentage, 1)}%`, color: 'text-emerald-400' },
+                { label: 'Students > 75%', value: analytics.studentsAbove75 || 0, color: 'text-emerald-400' },
+                { label: 'Students 50-75%', value: (analytics.studentsBelow75 || 0) - (analytics.studentsBelow50 || 0), color: 'text-amber-400' },
+                { label: 'Students < 50%', value: analytics.studentsBelow50 || 0, color: 'text-red-400' },
+                { label: 'Avg Internal Marks', value: fmtNum(analytics.averageInternalMarks), color: 'text-violet-400' },
+                { label: 'Pass Rate', value: `${fmtNum(analytics.passPercentage, 1)}%`, color: 'text-blue-400' },
+              ].map(item => (
+                <div key={item.label} className="flex justify-between items-center">
+                  <span className="text-xs text-zinc-500">{item.label}</span>
+                  <span className={cn('text-sm font-bold', item.color)}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Question Papers Tab ──────────────────────────────────────────────────────
+function QuestionPapersTab({ sections, examType, setExamType, year, setYear, semNum, setSemNum, fileName, setFileName, selectedSectionId, setSelectedSectionId, onSubmit, papers, loading }) {
+  return (
+    <div className="space-y-5">
+      <div className="glass-card rounded-2xl p-5">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-4 flex items-center gap-2"><Upload size={14} className="text-blue-400" /> Upload Question Paper</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Course / Section</label>
+            <select value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="collego-input">
+              <option value="">Select course</option>
+              {sections.map(s => <option key={s.sectionId} value={s.sectionId}>{s.courseName} (Sec {s.sectionName})</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Exam Type</label>
+            <select value={examType} onChange={e => setExamType(e.target.value)} className="collego-input">
+              {['END_TERM', 'MID_TERM', 'INTERNAL', 'QUIZ'].map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Year</label>
+            <input type="number" value={year} onChange={e => setYear(e.target.value)} className="collego-input" min="2000" max="2100" />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">File Name (optional)</label>
+            <input value={fileName} onChange={e => setFileName(e.target.value)} placeholder="e.g., CS101_EndTerm_2025.pdf" className="collego-input" />
+          </div>
+        </div>
+        <Button variant="gradient" size="sm" className="mt-4" onClick={onSubmit} disabled={loading || !selectedSectionId}>
+          {loading ? <><RefreshCw size={13} className="animate-spin" /> Uploading...</> : <><Upload size={13} /> Submit for Approval</>}
+        </Button>
+      </div>
+      {papers.length > 0 && (
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-zinc-800/60"><h3 className="text-sm font-semibold text-zinc-300">My Uploaded Papers</h3></div>
+          <table className="collego-table">
+            <thead><tr><th>Course</th><th>Exam Type</th><th>Year</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
+            <tbody>
+              {papers.map(p => (
+                <tr key={p.id}>
+                  <td className="text-zinc-200">{p.courseName}</td>
+                  <td><Badge variant="info">{p.examType}</Badge></td>
+                  <td className="text-zinc-400">{p.year}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <Badge variant={p.status === 'APPROVED' ? 'success' : p.status === 'REJECTED' ? 'destructive' : 'warning'}>
+                      {p.status || 'PENDING'}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Notices Tab ─────────────────────────────────────────────────────────────
+function NoticesTab({ title, setTitle, message, setMessage, type, setType, deptId, setDeptId, departments, onSubmit, sentNotices, loading }) {
+  const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'FEE', 'EXAM']
+  return (
+    <div className="space-y-5">
+      <div className="glass-card rounded-2xl p-5">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-4 flex items-center gap-2"><Megaphone size={14} className="text-amber-400" /> Broadcast Notice</h3>
+        <div className="space-y-3">
+          <div><label className="text-xs text-zinc-500 mb-1.5 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Notice title" className="collego-input" /></div>
+          <div><label className="text-xs text-zinc-500 mb-1.5 block">Message</label><textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} placeholder="Notice message..." className="collego-input resize-none" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-zinc-500 mb-1.5 block">Type</label>
+              <select value={type} onChange={e => setType(e.target.value)} className="collego-input">
+                {TYPE_OPTIONS.map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 mb-1.5 block">Department (optional)</label>
+              <select value={deptId} onChange={e => setDeptId(e.target.value)} className="collego-input">
+                <option value="">All departments</option>
+                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+        <Button variant="gradient" size="sm" className="mt-4" onClick={onSubmit} disabled={loading || !title.trim() || !message.trim()}>
+          {loading ? <><RefreshCw size={13} className="animate-spin" /> Sending...</> : <><Send size={13} /> Send Notice</>}
+        </Button>
+      </div>
+      {sentNotices.length > 0 && (
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-zinc-800/60"><h3 className="text-sm font-semibold text-zinc-300">Sent Notices</h3></div>
+          <div className="divide-y divide-zinc-800/40">
+            {sentNotices.map((n, i) => (
+              <div key={i} className="px-5 py-4">
+                <div className="flex items-start justify-between">
+                  <div><p className="text-sm font-semibold text-zinc-200">{n.title}</p><p className="text-xs text-zinc-500 mt-1">{n.message}</p></div>
+                  <div className="text-right shrink-0 ml-4">
+                    <Badge variant="info">{n.type}</Badge>
+                    <p className="text-[10px] text-zinc-600 mt-1">{n.recipientCount} recipients</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── AI Notice Generator Tab ──────────────────────────────────────────────────
+function AiNoticeGenTab({ prompt, setPrompt, audience, setAudience, noticeType, setNoticeType, onGenerate, result, loading, onUse }) {
+  return (
+    <div className="space-y-5">
+      <div className="glass-card rounded-2xl p-5 border border-fuchsia-500/10">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-1 flex items-center gap-2">
+          <Sparkles size={15} className="text-fuchsia-400" /> AI Notice Generator
+          <Badge variant="purple" className="text-[10px]">Phase 9</Badge>
+        </h3>
+        <p className="text-xs text-zinc-600 mb-4">Describe the notice briefly and AI will generate a professional, complete notice.</p>
+        <div className="space-y-3">
+          <div><label className="text-xs text-zinc-500 mb-1.5 block">Your Prompt</label><textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={3} placeholder="e.g., 'Inform students about mid-semester exam schedule starting next week'" className="collego-input resize-none" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-zinc-500 mb-1.5 block">Audience</label>
+              <select value={audience} onChange={e => setAudience(e.target.value)} className="collego-input">
+                {['students', 'faculty', 'all'].map(a => <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 mb-1.5 block">Notice Type</label>
+              <select value={noticeType} onChange={e => setNoticeType(e.target.value)} className="collego-input">
+                {['GENERAL', 'ACADEMIC', 'EXAM', 'PLACEMENT', 'FEE'].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+        <Button variant="gradient" size="sm" className="mt-4" onClick={onGenerate} disabled={loading || !prompt.trim()}>
+          {loading ? (
+            <><div className="flex gap-0.5">{[0,1,2].map(i => <div key={i} className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: `${i*0.15}s` }} />)}</div> Generating...</>
+          ) : (
+            <><Sparkles size={13} /> Generate with AI</>
+          )}
+        </Button>
+      </div>
+
+      {result && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-2xl p-5 border border-fuchsia-500/20">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-fuchsia-300 flex items-center gap-2"><Bot size={14} /> AI Generated Notice</h3>
+            <Button variant="gradient" size="sm" onClick={onUse}><CheckCircle2 size={13} /> Use this Notice</Button>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-zinc-500 mb-1">Title</p>
+              <p className="text-sm font-semibold text-zinc-200 bg-zinc-800/40 px-3 py-2 rounded-lg">{result.title}</p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-500 mb-1">Body</p>
+              <p className="text-sm text-zinc-300 bg-zinc-800/40 px-3 py-3 rounded-lg leading-relaxed whitespace-pre-wrap">{result.body}</p>
+            </div>
+            {result.summary && (
+              <div>
+                <p className="text-xs text-zinc-500 mb-1">Summary</p>
+                <p className="text-xs text-zinc-400 italic">{result.summary}</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Faculty Dashboard ───────────────────────────────────────────────────
+export default function FacultyDashboard() {
   const navigate = useNavigate()
   const email = authService.getEmail()
 
+  const [collapsed, setCollapsed] = useState(false)
   const [sections, setSections] = useState([])
   const [selectedSection, setSelectedSection] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(false)
   const [tabLoading, setTabLoading] = useState(false)
   const [message, setMessage] = useState({ text: '', type: '' })
-
-  // Overview state
   const [overviewData, setOverviewData] = useState(null)
 
-  // Attendance state
+  // Attendance
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0])
   const [attendanceRecords, setAttendanceRecords] = useState([])
-  const [sectionAttendance, setSectionAttendance] = useState([])
 
-  // Marks state
+  // Marks
   const [examName, setExamName] = useState('IA-1')
   const [maxMarks, setMaxMarks] = useState(50)
   const [marksEntries, setMarksEntries] = useState([])
   const [sectionMarks, setSectionMarks] = useState([])
-
-  // Semester marks state
   const [semMaxMarks, setSemMaxMarks] = useState(100)
   const [semMarksEntries, setSemMarksEntries] = useState([])
-
-  // Student performance state
   const [studentPerformance, setStudentPerformance] = useState([])
 
-  // Assignment state
+  // Assignments & Materials
   const [assignmentTitle, setAssignmentTitle] = useState('')
   const [assignmentDesc, setAssignmentDesc] = useState('')
   const [assignmentDueDate, setAssignmentDueDate] = useState('')
   const [sectionAssignments, setSectionAssignments] = useState([])
-
-  // Material state
   const [materialTitle, setMaterialTitle] = useState('')
   const [materialDesc, setMaterialDesc] = useState('')
   const [materialType, setMaterialType] = useState('NOTES')
   const [sectionMaterials, setSectionMaterials] = useState([])
 
-  // Notice state
+  // Notices
   const [noticeTitle, setNoticeTitle] = useState('')
   const [noticeMessage, setNoticeMessage] = useState('')
   const [noticeType, setNoticeType] = useState('GENERAL')
@@ -141,7 +946,7 @@ function FacultyDashboard() {
   const [departments, setDepartments] = useState([])
   const [sentNotices, setSentNotices] = useState([])
 
-  // Question Paper state
+  // Question Papers
   const [qpExamType, setQpExamType] = useState('END_TERM')
   const [qpYear, setQpYear] = useState(new Date().getFullYear())
   const [qpSemNum, setQpSemNum] = useState(1)
@@ -149,72 +954,57 @@ function FacultyDashboard() {
   const [qpSelectedSectionId, setQpSelectedSectionId] = useState('')
   const [myQuestionPapers, setMyQuestionPapers] = useState([])
 
-  // Analytics state
+  // Analytics
   const [analytics, setAnalytics] = useState(null)
 
-  // AI Notice Generator state (Phase 9 Feature 9)
+  // AI Notice Gen
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiAudience, setAiAudience] = useState('students')
   const [aiNoticeType, setAiNoticeType] = useState('GENERAL')
   const [aiResult, setAiResult] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
 
-  // ─── Init ────────────────────────────────────────────────────────────────────
+  const sidebarWidth = collapsed ? 68 : 240
+  const showMsg = useCallback((text, type = 'success') => {
+    setMessage({ text, type })
+  }, [])
+
   useEffect(() => {
     fetchSections()
     fetchDepartments()
   }, [])
 
   const fetchSections = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
       const res = await api.get('/api/faculty/sections')
       setSections(res.data)
-    } catch {
-      showMessage('Failed to load sections', 'error')
-    } finally {
-      setLoading(false)
-    }
+    } catch { showMsg('Failed to load sections', 'error') }
+    finally { setLoading(false) }
   }
 
   const fetchDepartments = async () => {
-    try {
-      const res = await api.get('/api/departments')
-      setDepartments(res.data)
-    } catch {
-      /* silent */
-    }
+    try { const res = await api.get('/api/departments'); setDepartments(res.data) } catch { }
   }
 
-  const showMessage = (text, type = 'success') => {
-    setMessage({ text, type })
-    setTimeout(() => setMessage({ text: '', type: '' }), 4000)
-  }
-
-  const handleLogout = async () => {
-    await authService.logout()
-    navigate('/login')
-  }
-
-  // ─── Overview ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (activeTab === 'overview' && sections.length > 0) {
-      buildOverview()
+      setOverviewData({
+        totalSections: sections.length,
+        totalStudents: sections.reduce((s, sec) => s + (sec.enrolledStudents || 0), 0),
+        semesters: [...new Set(sections.map(s => s.semesterName))],
+        courses: [...new Set(sections.map(s => s.courseName))],
+      })
     }
   }, [activeTab, sections])
 
-  const buildOverview = () => {
-    const totalStudents = sections.reduce((s, sec) => s + (sec.enrolledStudents || 0), 0)
-    setOverviewData({
-      totalSections: sections.length,
-      totalStudents,
-      semesters: [...new Set(sections.map((s) => s.semesterName))],
-      courses: [...new Set(sections.map((s) => s.courseName))],
-    })
+  const handleGlobalNav = (tabId) => {
+    setSelectedSection(null)
+    setActiveTab(tabId)
+    if (tabId === 'questionPapers') loadMyQPs()
   }
 
-  // ─── Section selection ───────────────────────────────────────────────────────
-  const selectSection = (section) => {
+  const handleSectionSelect = (section) => {
     setSelectedSection(section)
     setActiveTab('attendance')
     setAnalytics(null)
@@ -229,324 +1019,12 @@ function FacultyDashboard() {
     try {
       const res = await api.get(`/api/faculty/attendance/${sectionId}`)
       const students = res.data
-      setSectionAttendance(students)
-      setAttendanceRecords(
-        students.map((s) => ({
-          studentId: s.studentId,
-          studentName: s.studentName,
-          enrollmentNumber: s.enrollmentNumber,
-          status: 'PRESENT',
-        }))
-      )
-      setMarksEntries(
-        students.map((s) => ({
-          studentId: s.studentId,
-          studentName: s.studentName,
-          enrollmentNumber: s.enrollmentNumber,
-          obtainedMarks: '',
-        }))
-      )
-      setSemMarksEntries(
-        students.map((s) => ({
-          studentId: s.studentId,
-          studentName: s.studentName,
-          enrollmentNumber: s.enrollmentNumber,
-          obtainedMarks: '',
-        }))
-      )
-    } catch {
-      showMessage('Failed to load student data', 'error')
-    }
+      setAttendanceRecords(students.map(s => ({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, status: 'PRESENT' })))
+      setMarksEntries(students.map(s => ({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, obtainedMarks: '' })))
+      setSemMarksEntries(students.map(s => ({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, obtainedMarks: '' })))
+    } catch { showMsg('Failed to load student data', 'error') }
   }
 
-  // ─── Attendance ──────────────────────────────────────────────────────────────
-  const handleMarkAttendance = async () => {
-    try {
-      setLoading(true)
-      const res = await api.post('/api/faculty/attendance', {
-        sectionId: selectedSection.sectionId,
-        date: attendanceDate,
-        records: attendanceRecords.map((r) => ({ studentId: r.studentId, status: r.status })),
-      })
-      showMessage(`Attendance saved: ${res.data.markedPresent} present, ${res.data.markedAbsent} absent`)
-      loadEnrolledStudents(selectedSection.sectionId)
-    } catch (err) {
-      showMessage(err.response?.data?.message || 'Failed to mark attendance', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const toggleAttendance = (idx) => {
-    setAttendanceRecords((prev) =>
-      prev.map((r, i) =>
-        i === idx ? { ...r, status: r.status === 'PRESENT' ? 'ABSENT' : 'PRESENT' } : r
-      )
-    )
-  }
-
-  // ─── Internal Marks ──────────────────────────────────────────────────────────
-  const handleUploadInternalMarks = async () => {
-    const entries = marksEntries
-      .filter((e) => e.obtainedMarks !== '' && e.obtainedMarks !== null)
-      .map((e) => ({ studentId: e.studentId, obtainedMarks: parseFloat(e.obtainedMarks) }))
-    if (entries.length === 0) { showMessage('Enter marks for at least one student', 'error'); return }
-    try {
-      setLoading(true)
-      const res = await api.post('/api/faculty/marks/internal', {
-        sectionId: selectedSection.sectionId,
-        examName,
-        maxMarks: parseFloat(maxMarks),
-        entries,
-      })
-      showMessage(`Internal marks saved: ${res.data.created} created, ${res.data.updated} updated`)
-      loadSectionMarks()
-    } catch (err) {
-      showMessage(err.response?.data?.message || 'Failed to upload marks', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadSectionMarks = async () => {
-    try {
-      setTabLoading(true)
-      const res = await api.get(`/api/faculty/marks/internal/${selectedSection.sectionId}`)
-      setSectionMarks(res.data)
-    } catch {
-      showMessage('Failed to load marks', 'error')
-    } finally {
-      setTabLoading(false)
-    }
-  }
-
-  // ─── Semester Marks ──────────────────────────────────────────────────────────
-  const handleUploadSemesterMarks = async () => {
-    const entries = semMarksEntries
-      .filter((e) => e.obtainedMarks !== '' && e.obtainedMarks !== null)
-      .map((e) => ({ studentId: e.studentId, obtainedMarks: parseFloat(e.obtainedMarks) }))
-    if (entries.length === 0) { showMessage('Enter marks for at least one student', 'error'); return }
-    try {
-      setLoading(true)
-      const res = await api.post('/api/faculty/marks/semester', {
-        sectionId: selectedSection.sectionId,
-        maxMarks: parseFloat(semMaxMarks),
-        entries,
-      })
-      showMessage(`Semester marks saved: ${res.data.created} created, ${res.data.updated} updated`)
-    } catch (err) {
-      showMessage(err.response?.data?.message || 'Failed to upload semester marks', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ─── Student Performance (combined marks + attendance per student) ─────────
-  const loadStudentPerformance = useCallback(async () => {
-    if (!selectedSection) return
-    try {
-      setTabLoading(true)
-      const [attRes, marksRes] = await Promise.all([
-        api.get(`/api/faculty/attendance/${selectedSection.sectionId}`),
-        api.get(`/api/faculty/marks/internal/${selectedSection.sectionId}`),
-      ])
-      const attMap = {}
-      attRes.data.forEach((s) => { attMap[s.studentId] = s })
-      const combined = marksRes.data.map((m) => ({
-        ...m,
-        attendance: attMap[m.studentId] || null,
-      }))
-      // Also add students who have attendance but no marks entry
-      attRes.data.forEach((s) => {
-        if (!combined.find((c) => c.studentId === s.studentId)) {
-          combined.push({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, attendance: s })
-        }
-      })
-      setStudentPerformance(combined)
-    } catch {
-      showMessage('Failed to load student performance', 'error')
-    } finally {
-      setTabLoading(false)
-    }
-  }, [selectedSection])
-
-  // ─── Assignments ─────────────────────────────────────────────────────────────
-  const handleCreateAssignment = async () => {
-    try {
-      setLoading(true)
-      await api.post('/api/faculty/assignments', {
-        sectionId: selectedSection.sectionId,
-        title: assignmentTitle,
-        description: assignmentDesc,
-        dueDate: assignmentDueDate || null,
-        fileName: null,
-      })
-      showMessage('Assignment created successfully')
-      setAssignmentTitle(''); setAssignmentDesc(''); setAssignmentDueDate('')
-      loadAssignments()
-    } catch (err) {
-      showMessage(err.response?.data?.message || 'Failed to create assignment', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadAssignments = async () => {
-    try {
-      setTabLoading(true)
-      const res = await api.get(`/api/faculty/assignments/${selectedSection.sectionId}`)
-      setSectionAssignments(res.data)
-    } catch {
-      showMessage('Failed to load assignments', 'error')
-    } finally {
-      setTabLoading(false)
-    }
-  }
-
-  // ─── Materials ───────────────────────────────────────────────────────────────
-  const handleCreateMaterial = async () => {
-    try {
-      setLoading(true)
-      await api.post('/api/faculty/materials', {
-        sectionId: selectedSection.sectionId,
-        title: materialTitle,
-        description: materialDesc,
-        materialType,
-        fileName: null,
-      })
-      showMessage('Course material added successfully')
-      setMaterialTitle(''); setMaterialDesc('')
-      loadMaterials()
-    } catch (err) {
-      showMessage(err.response?.data?.message || 'Failed to add material', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadMaterials = async () => {
-    try {
-      setTabLoading(true)
-      const res = await api.get(`/api/faculty/materials/${selectedSection.sectionId}`)
-      setSectionMaterials(res.data)
-    } catch {
-      showMessage('Failed to load materials', 'error')
-    } finally {
-      setTabLoading(false)
-    }
-  }
-
-  // ─── Question Papers ─────────────────────────────────────────────────────────
-  const handleUploadQP = async () => {
-    const sec = sections.find((s) => s.sectionId === parseInt(qpSelectedSectionId))
-    if (!sec) { showMessage('Please select a course/section', 'error'); return }
-    try {
-      setLoading(true)
-      await api.post('/api/faculty/question-papers', {
-        courseId: sec.courseId,
-        departmentId: null, // Will be derived from course on backend if needed
-        examType: qpExamType,
-        year: parseInt(qpYear),
-        semesterNumber: sec.semesterNumber,
-        fileName: qpFileName || `${sec.courseCode}_${qpExamType}_${qpYear}.pdf`,
-      })
-      showMessage('Question paper uploaded (pending admin approval)')
-      setQpFileName('')
-      loadMyQPs()
-    } catch (err) {
-      // Fallback: try with explicit dept from first dept
-      try {
-        await api.post('/api/faculty/question-papers', {
-          courseId: sec.courseId,
-          departmentId: departments[0]?.id || 1,
-          examType: qpExamType,
-          year: parseInt(qpYear),
-          semesterNumber: sec.semesterNumber,
-          fileName: qpFileName || `${sec.courseCode}_${qpExamType}_${qpYear}.pdf`,
-        })
-        showMessage('Question paper uploaded (pending admin approval)')
-        setQpFileName('')
-        loadMyQPs()
-      } catch (err2) {
-        showMessage(err2.response?.data?.message || 'Failed to upload question paper', 'error')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadMyQPs = async () => {
-    try {
-      const res = await api.get('/api/faculty/question-papers')
-      setMyQuestionPapers(res.data)
-    } catch {
-      showMessage('Failed to load question papers', 'error')
-    }
-  }
-
-  // ─── Notices ─────────────────────────────────────────────────────────────────
-  const handleDraftNotice = async () => {
-    try {
-      setLoading(true)
-      const res = await api.post('/api/faculty/notices', {
-        title: noticeTitle,
-        message: noticeMessage,
-        type: noticeType,
-        departmentId: noticeDeptId ? parseInt(noticeDeptId) : null,
-      })
-      showMessage(`Notice sent to ${res.data.recipientCount} students`)
-      setSentNotices((prev) => [{ title: noticeTitle, message: noticeMessage, type: noticeType, recipientCount: res.data.recipientCount, sentAt: new Date().toISOString() }, ...prev])
-      setNoticeTitle(''); setNoticeMessage('')
-    } catch (err) {
-      showMessage(err.response?.data?.message || 'Failed to send notice', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ─── AI Notice Generator (Phase 9) ──────────────────────────────────────────
-  const handleAiGenerateNotice = async () => {
-    if (!aiPrompt.trim()) { showMessage('Enter a prompt for the notice', 'error'); return }
-    try {
-      setAiLoading(true)
-      setAiResult(null)
-      const res = await api.post('/api/ai/generate-notice', {
-        prompt: aiPrompt,
-        audience: aiAudience,
-        noticeType: aiNoticeType,
-      })
-      setAiResult(res.data)
-      showMessage('AI notice generated! Review and use the content below.')
-    } catch (err) {
-      showMessage(err.response?.data?.message || 'AI notice generation failed', 'error')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
-  const useAiNotice = () => {
-    if (!aiResult) return
-    setNoticeTitle(aiResult.title || '')
-    setNoticeMessage(aiResult.body || '')
-    setActiveTab('notices')
-    setSelectedSection(null)
-    showMessage('AI-generated notice copied to Notice form!')
-  }
-
-  // ─── Analytics ───────────────────────────────────────────────────────────────
-  const loadAnalytics = async () => {
-    try {
-      setTabLoading(true)
-      const res = await api.get(`/api/faculty/analytics/${selectedSection.sectionId}`)
-      setAnalytics(res.data)
-    } catch {
-      showMessage('Failed to load analytics', 'error')
-    } finally {
-      setTabLoading(false)
-    }
-  }
-
-  // ─── Tab change handler ───────────────────────────────────────────────────────
   const handleTabChange = (tabId) => {
     setActiveTab(tabId)
     if (!selectedSection) return
@@ -557,1255 +1035,208 @@ function FacultyDashboard() {
     if (tabId === 'studentPerformance') loadStudentPerformance()
   }
 
-  // ─── Derived helpers ──────────────────────────────────────────────────────────
-  const presentCount = attendanceRecords.filter((r) => r.status === 'PRESENT').length
-  const absentCount = attendanceRecords.length - presentCount
+  const handleMarkAttendance = async () => {
+    setLoading(true)
+    try {
+      const res = await api.post('/api/faculty/attendance', { sectionId: selectedSection.sectionId, date: attendanceDate, records: attendanceRecords.map(r => ({ studentId: r.studentId, status: r.status })) })
+      showMsg(`Attendance saved: ${res.data.markedPresent} present, ${res.data.markedAbsent} absent`)
+      loadEnrolledStudents(selectedSection.sectionId)
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to mark attendance', 'error') }
+    finally { setLoading(false) }
+  }
 
-  // ─── Render ───────────────────────────────────────────────────────────────────
+  const toggleAttendance = (idx, forceStatus) => {
+    setAttendanceRecords(prev => prev.map((r, i) => i === idx ? { ...r, status: forceStatus || (r.status === 'PRESENT' ? 'ABSENT' : 'PRESENT') } : r))
+  }
+
+  const handleUploadInternalMarks = async () => {
+    const entries = marksEntries.filter(e => e.obtainedMarks !== '' && e.obtainedMarks !== null).map(e => ({ studentId: e.studentId, obtainedMarks: parseFloat(e.obtainedMarks) }))
+    if (!entries.length) { showMsg('Enter marks for at least one student', 'error'); return }
+    setLoading(true)
+    try {
+      const res = await api.post('/api/faculty/marks/internal', { sectionId: selectedSection.sectionId, examName, maxMarks: parseFloat(maxMarks), entries })
+      showMsg(`Marks saved: ${res.data.created} created, ${res.data.updated} updated`)
+      loadSectionMarks()
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload marks', 'error') }
+    finally { setLoading(false) }
+  }
+
+  const loadSectionMarks = async () => {
+    setTabLoading(true)
+    try { const res = await api.get(`/api/faculty/marks/internal/${selectedSection.sectionId}`); setSectionMarks(res.data) }
+    catch { } finally { setTabLoading(false) }
+  }
+
+  const handleUploadSemesterMarks = async () => {
+    const entries = semMarksEntries.filter(e => e.obtainedMarks !== '' && e.obtainedMarks !== null).map(e => ({ studentId: e.studentId, obtainedMarks: parseFloat(e.obtainedMarks) }))
+    if (!entries.length) { showMsg('Enter marks for at least one student', 'error'); return }
+    setLoading(true)
+    try {
+      const res = await api.post('/api/faculty/marks/semester', { sectionId: selectedSection.sectionId, maxMarks: parseFloat(semMaxMarks), entries })
+      showMsg(`Semester marks saved: ${res.data.created} created, ${res.data.updated} updated`)
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload semester marks', 'error') }
+    finally { setLoading(false) }
+  }
+
+  const loadStudentPerformance = useCallback(async () => {
+    if (!selectedSection) return
+    setTabLoading(true)
+    try {
+      const [attRes, marksRes] = await Promise.all([api.get(`/api/faculty/attendance/${selectedSection.sectionId}`), api.get(`/api/faculty/marks/internal/${selectedSection.sectionId}`)])
+      const attMap = {}; attRes.data.forEach(s => { attMap[s.studentId] = s })
+      const combined = marksRes.data.map(m => ({ ...m, attendance: attMap[m.studentId] || null }))
+      attRes.data.forEach(s => { if (!combined.find(c => c.studentId === s.studentId)) combined.push({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, attendance: s }) })
+      setStudentPerformance(combined)
+    } catch { } finally { setTabLoading(false) }
+  }, [selectedSection])
+
+  const handleCreateAssignment = async () => {
+    setLoading(true)
+    try {
+      await api.post('/api/faculty/assignments', { sectionId: selectedSection.sectionId, title: assignmentTitle, description: assignmentDesc, dueDate: assignmentDueDate || null, fileName: null })
+      showMsg('Assignment created successfully')
+      setAssignmentTitle(''); setAssignmentDesc(''); setAssignmentDueDate('')
+      loadAssignments()
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to create assignment', 'error') }
+    finally { setLoading(false) }
+  }
+
+  const loadAssignments = async () => {
+    setTabLoading(true)
+    try { const res = await api.get(`/api/faculty/assignments/${selectedSection.sectionId}`); setSectionAssignments(res.data) }
+    catch { } finally { setTabLoading(false) }
+  }
+
+  const handleCreateMaterial = async () => {
+    setLoading(true)
+    try {
+      await api.post('/api/faculty/materials', { sectionId: selectedSection.sectionId, title: materialTitle, description: materialDesc, materialType, fileName: null })
+      showMsg('Material added successfully')
+      setMaterialTitle(''); setMaterialDesc('')
+      loadMaterials()
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to add material', 'error') }
+    finally { setLoading(false) }
+  }
+
+  const loadMaterials = async () => {
+    setTabLoading(true)
+    try { const res = await api.get(`/api/faculty/materials/${selectedSection.sectionId}`); setSectionMaterials(res.data) }
+    catch { } finally { setTabLoading(false) }
+  }
+
+  const handleUploadQP = async () => {
+    const sec = sections.find(s => s.sectionId === parseInt(qpSelectedSectionId))
+    if (!sec) { showMsg('Please select a course/section', 'error'); return }
+    setLoading(true)
+    try {
+      await api.post('/api/faculty/question-papers', { courseId: sec.courseId, departmentId: null, examType: qpExamType, year: parseInt(qpYear), semesterNumber: sec.semesterNumber, fileName: qpFileName || `${sec.courseCode}_${qpExamType}_${qpYear}.pdf` })
+      showMsg('Question paper uploaded (pending admin approval)')
+      setQpFileName(''); loadMyQPs()
+    } catch (err) {
+      try {
+        await api.post('/api/faculty/question-papers', { courseId: sec.courseId, departmentId: departments[0]?.id || 1, examType: qpExamType, year: parseInt(qpYear), semesterNumber: sec.semesterNumber, fileName: qpFileName || `${sec.courseCode}_${qpExamType}_${qpYear}.pdf` })
+        showMsg('Question paper uploaded (pending admin approval)')
+        setQpFileName(''); loadMyQPs()
+      } catch (e2) { showMsg(e2.response?.data?.message || 'Failed to upload', 'error') }
+    } finally { setLoading(false) }
+  }
+
+  const loadMyQPs = async () => {
+    try { const res = await api.get('/api/faculty/question-papers'); setMyQuestionPapers(res.data) } catch { }
+  }
+
+  const handleDraftNotice = async () => {
+    setLoading(true)
+    try {
+      const res = await api.post('/api/faculty/notices', { title: noticeTitle, message: noticeMessage, type: noticeType, departmentId: noticeDeptId ? parseInt(noticeDeptId) : null })
+      showMsg(`Notice sent to ${res.data.recipientCount} students`)
+      setSentNotices(prev => [{ title: noticeTitle, message: noticeMessage, type: noticeType, recipientCount: res.data.recipientCount, sentAt: new Date().toISOString() }, ...prev])
+      setNoticeTitle(''); setNoticeMessage('')
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to send notice', 'error') }
+    finally { setLoading(false) }
+  }
+
+  const handleAiGenerateNotice = async () => {
+    if (!aiPrompt.trim()) { showMsg('Enter a prompt for the notice', 'error'); return }
+    setAiLoading(true); setAiResult(null)
+    try {
+      const res = await api.post('/api/ai/generate-notice', { prompt: aiPrompt, audience: aiAudience, noticeType: aiNoticeType })
+      setAiResult(res.data)
+      showMsg('AI notice generated! Review the content below.')
+    } catch (err) { showMsg(err.response?.data?.message || 'AI notice generation failed', 'error') }
+    finally { setAiLoading(false) }
+  }
+
+  const useAiNotice = () => {
+    if (!aiResult) return
+    setNoticeTitle(aiResult.title || ''); setNoticeMessage(aiResult.body || '')
+    setSelectedSection(null); setActiveTab('notices')
+    showMsg('AI notice copied to Notice form!')
+  }
+
+  const loadAnalytics = async () => {
+    setTabLoading(true)
+    try { const res = await api.get(`/api/faculty/analytics/${selectedSection.sectionId}`); setAnalytics(res.data) }
+    catch { } finally { setTabLoading(false) }
+  }
+
+  const renderContent = () => {
+    if (!selectedSection) {
+      switch (activeTab) {
+        case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
+        case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} semNum={qpSemNum} setSemNum={setQpSemNum} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} />
+        case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} deptId={noticeDeptId} setDeptId={setNoticeDeptId} departments={departments} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
+        case 'ai-notice-gen': return <AiNoticeGenTab prompt={aiPrompt} setPrompt={setAiPrompt} audience={aiAudience} setAudience={setAiAudience} noticeType={aiNoticeType} setNoticeType={setAiNoticeType} onGenerate={handleAiGenerateNotice} result={aiResult} loading={aiLoading} onUse={useAiNotice} />
+        default: return null
+      }
+    }
+
+    switch (activeTab) {
+      case 'attendance': return <AttendanceTab attendanceDate={attendanceDate} setAttendanceDate={setAttendanceDate} attendanceRecords={attendanceRecords} toggleAttendance={toggleAttendance} onSubmit={handleMarkAttendance} loading={loading} />
+      case 'internalMarks': return <InternalMarksTab examName={examName} setExamName={setExamName} maxMarks={maxMarks} setMaxMarks={setMaxMarks} marksEntries={marksEntries} setMarksEntries={setMarksEntries} onSubmit={handleUploadInternalMarks} sectionMarks={sectionMarks} loading={loading} />
+      case 'semesterMarks': return <SemesterMarksTab semMaxMarks={semMaxMarks} setSemMaxMarks={setSemMaxMarks} semMarksEntries={semMarksEntries} setSemMarksEntries={setSemMarksEntries} onSubmit={handleUploadSemesterMarks} loading={loading} />
+      case 'studentPerformance': return <StudentPerformanceTab data={studentPerformance} loading={tabLoading} />
+      case 'assignments': return <AssignmentsTab title={assignmentTitle} setTitle={setAssignmentTitle} desc={assignmentDesc} setDesc={setAssignmentDesc} dueDate={assignmentDueDate} setDueDate={setAssignmentDueDate} onSubmit={handleCreateAssignment} assignments={sectionAssignments} loading={loading} />
+      case 'materials': return <MaterialsTab title={materialTitle} setTitle={setMaterialTitle} desc={materialDesc} setDesc={setMaterialDesc} type={materialType} setType={setMaterialType} onSubmit={handleCreateMaterial} materials={sectionMaterials} loading={loading} />
+      case 'analytics': return <AnalyticsTab analytics={analytics} loading={tabLoading} />
+      default: return null
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans">
-      {/* Navbar */}
-      <nav className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center font-bold text-sm">C</div>
-          <h1 className="text-lg font-semibold tracking-tight">Collego <span className="text-slate-500 font-normal">Faculty</span></h1>
+    <div className="min-h-screen" style={{ background: 'rgb(9, 9, 11)' }}>
+      <Toast message={message} onClose={() => setMessage({ text: '', type: '' })} />
+      <Sidebar
+        activeTab={activeTab} selectedSection={selectedSection} sections={sections}
+        onGlobalNav={handleGlobalNav} onSectionSelect={handleSectionSelect}
+        onBack={() => { setSelectedSection(null); setActiveTab('overview') }}
+        collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} loading={loading}
+      />
+      <Topbar email={email} sidebarWidth={sidebarWidth} onLogout={async () => { await authService.logout(); navigate('/login') }} />
+
+      <main className="main-content" style={{ marginLeft: sidebarWidth }}>
+        <div className="p-6">
+          {selectedSection && (
+            <SectionHeader
+              section={selectedSection}
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              onBack={() => { setSelectedSection(null); setActiveTab('overview') }}
+            />
+          )}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${activeTab}-${selectedSection?.sectionId}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              {renderContent()}
+            </motion.div>
+          </AnimatePresence>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-400 hidden sm:block">{email}</span>
-          <button
-            onClick={handleLogout}
-            className="text-sm bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors border border-slate-700"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
-
-      <Toast message={message} />
-
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-72 min-h-[calc(100vh-65px)] bg-slate-900/50 border-r border-slate-800 p-4 flex flex-col gap-2 sticky top-[65px] self-start overflow-y-auto">
-          {/* Global Tabs */}
-          <div className="mb-2">
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2">Dashboard</h2>
-            {GLOBAL_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setSelectedSection(null)
-                  setActiveTab(tab.id)
-                  if (tab.id === 'questionPapers') loadMyQPs()
-                }}
-                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all mb-0.5 ${
-                  activeTab === tab.id && !selectedSection
-                    ? 'bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30'
-                    : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-transparent'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* My Sections */}
-          <div>
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2">My Sections</h2>
-            {loading && sections.length === 0 && <p className="text-sm text-slate-500 px-2">Loading...</p>}
-            {sections.length === 0 && !loading && (
-              <p className="text-xs text-slate-600 px-2">No sections assigned yet.</p>
-            )}
-            {sections.map((sec) => (
-              <button
-                key={sec.sectionId}
-                onClick={() => selectSection(sec)}
-                className={`w-full text-left px-3 py-3 rounded-lg text-sm transition-all mb-0.5 ${
-                  selectedSection?.sectionId === sec.sectionId
-                    ? 'bg-violet-500/15 text-violet-300 border border-violet-500/30'
-                    : 'hover:bg-slate-800 text-slate-300 border border-transparent'
-                }`}
-              >
-                <div className="font-medium truncate">{sec.courseName}</div>
-                <div className="text-xs text-slate-500 mt-0.5">
-                  {sec.courseCode} · Sec {sec.sectionName} · {sec.enrolledStudents} students
-                </div>
-                <div className="text-xs text-slate-600 mt-0.5">{sec.semesterName}</div>
-              </button>
-            ))}
-          </div>
-
-          {/* Summary */}
-          {sections.length > 0 && (
-            <div className="mt-auto pt-4 border-t border-slate-800">
-              <div className="bg-slate-900/60 rounded-lg p-3 space-y-1">
-                <p className="text-xs text-slate-500">
-                  <span className="text-slate-300 font-semibold">{sections.length}</span> sections
-                  · <span className="text-slate-300 font-semibold">{sections.reduce((a, s) => a + (s.enrolledStudents || 0), 0)}</span> students
-                </p>
-                <p className="text-xs text-slate-600">{[...new Set(sections.map((s) => s.semesterName))].join(', ')}</p>
-              </div>
-            </div>
-          )}
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 p-6 min-h-[calc(100vh-65px)]">
-
-          {/* ===== OVERVIEW ===== */}
-          {activeTab === 'overview' && !selectedSection && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-1">Faculty Portal</h2>
-                <p className="text-slate-400 text-sm">Welcome back! Here's a summary of your teaching assignments.</p>
-              </div>
-
-              {overviewData ? (
-                <>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard icon="📚" label="Sections Assigned" value={overviewData.totalSections} accent="violet" />
-                    <StatCard icon="👥" label="Total Students" value={overviewData.totalStudents} accent="blue" />
-                    <StatCard icon="📖" label="Unique Courses" value={overviewData.courses.length} accent="emerald" />
-                    <StatCard icon="🗓️" label="Semesters" value={overviewData.semesters.length} sub={overviewData.semesters.join(', ')} accent="amber" />
-                  </div>
-
-                  {/* Section cards */}
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">My Teaching Sections</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {sections.map((sec) => (
-                        <button
-                          key={sec.sectionId}
-                          onClick={() => selectSection(sec)}
-                          className="text-left bg-slate-900/50 border border-slate-800 hover:border-violet-500/40 rounded-xl p-5 transition-all hover:bg-slate-900/80 group"
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <h4 className="font-semibold text-slate-200 group-hover:text-violet-300 transition-colors">{sec.courseName}</h4>
-                              <p className="text-xs text-slate-500 font-mono mt-0.5">{sec.courseCode}</p>
-                            </div>
-                            <span className="text-xs bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2 py-1 rounded-md">Sec {sec.sectionName}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-slate-500">
-                            <span>👥 {sec.enrolledStudents} students</span>
-                            <span>{sec.semesterName}</span>
-                            <span>{sec.credits} credits</span>
-                          </div>
-                          <div className="mt-3 pt-3 border-t border-slate-800 text-xs text-violet-400 group-hover:text-violet-300 transition-colors">
-                            Click to manage →
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Phase 4 Feature Guide */}
-                  <div className="bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5 border border-violet-500/20 rounded-xl p-5">
-                    <h3 className="font-semibold text-slate-300 mb-3">📋 Phase 4 — Available Features</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                      {[
-                        { icon: '📋', label: 'Mark Attendance', desc: 'Bulk per-session entry' },
-                        { icon: '📝', label: 'Internal Marks', desc: 'IA-1, IA-2, IA-3 upload' },
-                        { icon: '🎓', label: 'Semester Marks', desc: 'Auto grade calculation' },
-                        { icon: '👥', label: 'Student Performance', desc: 'Combined view per student' },
-                        { icon: '📚', label: 'Assignments', desc: 'Create & track assignments' },
-                        { icon: '📂', label: 'Course Materials', desc: 'Syllabus, notes, references' },
-                        { icon: '📄', label: 'Question Papers', desc: 'Upload for admin approval' },
-                        { icon: '📢', label: 'Notices', desc: 'Broadcast to students' },
-                        { icon: '📊', label: 'Analytics', desc: 'Attendance & marks insights' },
-                      ].map((f) => (
-                        <div key={f.label} className="flex items-start gap-2 bg-slate-900/40 rounded-lg p-3">
-                          <span className="text-lg">{f.icon}</span>
-                          <div>
-                            <p className="text-slate-300 font-medium text-xs">{f.label}</p>
-                            <p className="text-slate-600 text-xs">{f.desc}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-center h-48 text-slate-500 text-sm">
-                  {loading ? <Spinner /> : 'Select a section from the sidebar to begin.'}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Section header + tabs */}
-          {selectedSection && activeTab !== 'questionPapers' && activeTab !== 'notices' && activeTab !== 'overview' && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-1">
-                <h2 className="text-lg font-semibold">
-                  {selectedSection.courseName}{' '}
-                  <span className="text-slate-500 text-sm font-normal">({selectedSection.courseCode})</span>
-                </h2>
-                <button
-                  onClick={() => { setSelectedSection(null); setActiveTab('overview') }}
-                  className="text-xs text-slate-500 hover:text-slate-300 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  ← Back to Overview
-                </button>
-              </div>
-              <p className="text-xs text-slate-500 mb-4">
-                Section {selectedSection.sectionName} · {selectedSection.semesterName} · {selectedSection.enrolledStudents} students · {selectedSection.credits} credits
-              </p>
-              <div className="flex gap-1 bg-slate-900/50 rounded-xl p-1 border border-slate-800 flex-wrap">
-                {SECTION_TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
-                    className={`flex-1 min-w-[90px] px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                      activeTab === tab.id ? 'bg-violet-500/20 text-violet-300' : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ===== ATTENDANCE TAB ===== */}
-          {activeTab === 'attendance' && selectedSection && (
-            <div className="space-y-5">
-              <div className="flex items-center gap-4 flex-wrap">
-                <input
-                  type="date"
-                  value={attendanceDate}
-                  onChange={(e) => setAttendanceDate(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                />
-                <button
-                  onClick={() => setAttendanceRecords((prev) => prev.map((r) => ({ ...r, status: 'PRESENT' })))}
-                  className="text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-3 py-2 rounded-lg hover:bg-emerald-500/25 transition-colors"
-                >
-                  ✓ All Present
-                </button>
-                <button
-                  onClick={() => setAttendanceRecords((prev) => prev.map((r) => ({ ...r, status: 'ABSENT' })))}
-                  className="text-xs bg-red-500/15 text-red-300 border border-red-500/30 px-3 py-2 rounded-lg hover:bg-red-500/25 transition-colors"
-                >
-                  ✗ All Absent
-                </button>
-                <div className="ml-auto flex items-center gap-3 text-xs text-slate-500">
-                  <span className="text-emerald-400 font-semibold">{presentCount} Present</span>
-                  <span className="text-red-400 font-semibold">{absentCount} Absent</span>
-                  <span>/ {attendanceRecords.length} total</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-900">
-                    <tr className="text-slate-400 text-xs uppercase">
-                      <th className="px-4 py-3 text-left">#</th>
-                      <th className="px-4 py-3 text-left">Enrollment</th>
-                      <th className="px-4 py-3 text-left">Student Name</th>
-                      <th className="px-4 py-3 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {attendanceRecords.map((r, i) => (
-                      <tr key={r.studentId} className="hover:bg-slate-800/50 transition-colors">
-                        <td className="px-4 py-3 text-slate-500">{i + 1}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-400">{r.enrollmentNumber}</td>
-                        <td className="px-4 py-3 text-slate-200">{r.studentName}</td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => toggleAttendance(i)}
-                            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                              r.status === 'PRESENT'
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30'
-                                : 'bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30'
-                            }`}
-                          >
-                            {r.status}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {attendanceRecords.length === 0 && (
-                      <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-600">No students enrolled in this section.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <button
-                onClick={handleMarkAttendance}
-                disabled={loading || attendanceRecords.length === 0}
-                className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-6 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 shadow-lg shadow-violet-500/20"
-              >
-                {loading ? 'Saving...' : `Submit Attendance for ${attendanceDate}`}
-              </button>
-
-              {/* Attendance Summary */}
-              {sectionAttendance.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-semibold text-slate-400 mb-3">📊 Cumulative Attendance Summary</h3>
-                  <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-900">
-                        <tr className="text-slate-400 text-xs uppercase">
-                          <th className="px-4 py-3 text-left">Student</th>
-                          <th className="px-4 py-3 text-center">Total</th>
-                          <th className="px-4 py-3 text-center">Present</th>
-                          <th className="px-4 py-3 text-center">Absent</th>
-                          <th className="px-4 py-3 text-center">Percentage</th>
-                          <th className="px-4 py-3 text-left w-36">Progress</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {sectionAttendance.map((s) => (
-                          <tr key={s.studentId} className="hover:bg-slate-800/40">
-                            <td className="px-4 py-3">
-                              <p className="text-slate-200">{s.studentName}</p>
-                              <p className="text-xs text-slate-500 font-mono">{s.enrollmentNumber}</p>
-                            </td>
-                            <td className="px-4 py-3 text-center text-slate-400">{s.totalClasses}</td>
-                            <td className="px-4 py-3 text-center text-emerald-400 font-semibold">{s.present}</td>
-                            <td className="px-4 py-3 text-center text-red-400 font-semibold">{s.absent}</td>
-                            <td className="px-4 py-3 text-center"><AttendanceBadge pct={s.percentage} /></td>
-                            <td className="px-4 py-3"><ProgressBar value={s.percentage} /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ===== INTERNAL MARKS TAB ===== */}
-          {activeTab === 'internalMarks' && selectedSection && (
-            <div className="space-y-5">
-              {/* Entry form */}
-              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-slate-300 mb-4">Enter Internal Marks</h3>
-                <div className="flex items-center gap-4 mb-4 flex-wrap">
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Exam</label>
-                    <select
-                      value={examName}
-                      onChange={(e) => setExamName(e.target.value)}
-                      className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                    >
-                      <option value="IA-1">IA-1</option>
-                      <option value="IA-2">IA-2</option>
-                      <option value="IA-3">IA-3</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Max Marks</label>
-                    <input
-                      type="number"
-                      value={maxMarks}
-                      onChange={(e) => setMaxMarks(e.target.value)}
-                      className="w-24 bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      onClick={() => setMarksEntries((prev) => prev.map((m) => ({ ...m, obtainedMarks: '' })))}
-                      className="text-xs text-slate-400 hover:text-slate-200 bg-slate-800 border border-slate-700 px-3 py-2 rounded-lg transition-colors"
-                    >
-                      Clear All
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-900">
-                      <tr className="text-slate-400 text-xs uppercase">
-                        <th className="px-4 py-3 text-left">#</th>
-                        <th className="px-4 py-3 text-left">Enrollment</th>
-                        <th className="px-4 py-3 text-left">Student Name</th>
-                        <th className="px-4 py-3 text-center">Marks (/{maxMarks})</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {marksEntries.map((e, i) => (
-                        <tr key={e.studentId} className="hover:bg-slate-800/50">
-                          <td className="px-4 py-3 text-slate-500">{i + 1}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-slate-400">{e.enrollmentNumber}</td>
-                          <td className="px-4 py-3 text-slate-200">{e.studentName}</td>
-                          <td className="px-4 py-3 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max={maxMarks}
-                              value={e.obtainedMarks}
-                              onChange={(ev) =>
-                                setMarksEntries((prev) =>
-                                  prev.map((m, j) =>
-                                    j === i ? { ...m, obtainedMarks: ev.target.value } : m
-                                  )
-                                )
-                              }
-                              className="w-24 bg-slate-800 border border-slate-600 text-white px-3 py-1.5 rounded-lg text-sm text-center focus:outline-none focus:border-violet-500"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                      {marksEntries.length === 0 && (
-                        <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-600">No students enrolled.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="flex items-center gap-4 mt-4">
-                  <button
-                    onClick={handleUploadInternalMarks}
-                    disabled={loading}
-                    className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-6 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 shadow-lg shadow-violet-500/20"
-                  >
-                    {loading ? 'Saving...' : `Save ${examName} Marks`}
-                  </button>
-                  <button
-                    onClick={loadSectionMarks}
-                    className="text-sm text-slate-400 hover:text-slate-200 bg-slate-800 border border-slate-700 px-4 py-2.5 rounded-lg transition-colors"
-                  >
-                    Refresh Existing
-                  </button>
-                </div>
-              </div>
-
-              {/* Existing marks - nicely formatted table */}
-              {tabLoading ? <Spinner /> : sectionMarks.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-400 mb-3">📋 Existing Internal Marks for Section</h3>
-                  <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-900">
-                        <tr className="text-slate-400 text-xs uppercase">
-                          <th className="px-4 py-3 text-left">Student</th>
-                          <th className="px-4 py-3 text-center">IA-1</th>
-                          <th className="px-4 py-3 text-center">IA-2</th>
-                          <th className="px-4 py-3 text-center">IA-3</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {sectionMarks.map((student) => (
-                          <tr key={student.studentId} className="hover:bg-slate-800/40">
-                            <td className="px-4 py-3">
-                              <p className="text-slate-200">{student.studentName}</p>
-                              <p className="text-xs text-slate-500 font-mono">{student.enrollmentNumber}</p>
-                            </td>
-                            {['IA-1', 'IA-2', 'IA-3'].map((ia) => (
-                              <td key={ia} className="px-4 py-3 text-center">
-                                {student[ia] ? (
-                                  <div>
-                                    <span className="text-violet-300 font-semibold">{student[ia].obtainedMarks}</span>
-                                    <span className="text-slate-500">/{student[ia].maxMarks}</span>
-                                    <div className="mt-1 mx-auto w-20">
-                                      <ProgressBar value={student[ia].obtainedMarks} max={student[ia].maxMarks} />
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-700">—</span>
-                                )}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ===== SEMESTER MARKS TAB ===== */}
-          {activeTab === 'semesterMarks' && selectedSection && (
-            <div className="space-y-5">
-              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-slate-300 mb-4">Enter Semester / End-Term Marks</h3>
-                <div className="flex items-center gap-4 mb-4">
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Max Marks</label>
-                    <input
-                      type="number"
-                      value={semMaxMarks}
-                      onChange={(e) => setSemMaxMarks(e.target.value)}
-                      className="w-28 bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                    />
-                  </div>
-                  <p className="text-xs text-slate-500 mt-4">Grades (O/A+/A/B+/B/C/P/F) and grade points are auto-calculated from percentage.</p>
-                </div>
-
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-900">
-                      <tr className="text-slate-400 text-xs uppercase">
-                        <th className="px-4 py-3 text-left">#</th>
-                        <th className="px-4 py-3 text-left">Enrollment</th>
-                        <th className="px-4 py-3 text-left">Student Name</th>
-                        <th className="px-4 py-3 text-center">Marks (/{semMaxMarks})</th>
-                        <th className="px-4 py-3 text-center">% (Preview)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {semMarksEntries.map((e, i) => {
-                        const pct = e.obtainedMarks !== '' ? Math.round((parseFloat(e.obtainedMarks) / parseFloat(semMaxMarks)) * 100) : null
-                        return (
-                          <tr key={e.studentId} className="hover:bg-slate-800/50">
-                            <td className="px-4 py-3 text-slate-500">{i + 1}</td>
-                            <td className="px-4 py-3 font-mono text-xs text-slate-400">{e.enrollmentNumber}</td>
-                            <td className="px-4 py-3 text-slate-200">{e.studentName}</td>
-                            <td className="px-4 py-3 text-center">
-                              <input
-                                type="number"
-                                min="0"
-                                max={semMaxMarks}
-                                value={e.obtainedMarks}
-                                onChange={(ev) =>
-                                  setSemMarksEntries((prev) =>
-                                    prev.map((m, j) =>
-                                      j === i ? { ...m, obtainedMarks: ev.target.value } : m
-                                    )
-                                  )
-                                }
-                                className="w-24 bg-slate-800 border border-slate-600 text-white px-3 py-1.5 rounded-lg text-sm text-center focus:outline-none focus:border-violet-500"
-                              />
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              {pct !== null ? <AttendanceBadge pct={pct} /> : <span className="text-slate-700">—</span>}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                      {semMarksEntries.length === 0 && (
-                        <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-600">No students enrolled.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                <button
-                  onClick={handleUploadSemesterMarks}
-                  disabled={loading}
-                  className="mt-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-6 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 shadow-lg shadow-violet-500/20"
-                >
-                  {loading ? 'Saving...' : 'Save Semester Marks'}
-                </button>
-              </div>
-
-              {/* Grade reference */}
-              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Grade Reference Table</h4>
-                <div className="grid grid-cols-4 md:grid-cols-8 gap-2 text-xs">
-                  {[
-                    { range: '≥90%', grade: 'O', gp: '10', color: 'text-emerald-300' },
-                    { range: '80–89%', grade: 'A+', gp: '9', color: 'text-emerald-400' },
-                    { range: '70–79%', grade: 'A', gp: '8', color: 'text-teal-300' },
-                    { range: '60–69%', grade: 'B+', gp: '7', color: 'text-blue-300' },
-                    { range: '55–59%', grade: 'B', gp: '6', color: 'text-blue-400' },
-                    { range: '50–54%', grade: 'C', gp: '5', color: 'text-yellow-300' },
-                    { range: '45–49%', grade: 'P', gp: '4', color: 'text-yellow-400' },
-                    { range: '<45%', grade: 'F', gp: '0', color: 'text-red-400' },
-                  ].map((g) => (
-                    <div key={g.grade} className="bg-slate-800/50 rounded-lg p-2 text-center border border-slate-700/50">
-                      <p className={`text-lg font-bold ${g.color}`}>{g.grade}</p>
-                      <p className="text-slate-500">{g.gp} GP</p>
-                      <p className="text-slate-600 text-[10px] mt-0.5">{g.range}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ===== STUDENT PERFORMANCE TAB ===== */}
-          {activeTab === 'studentPerformance' && selectedSection && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-slate-200">👥 Student Performance Overview</h3>
-                <button
-                  onClick={loadStudentPerformance}
-                  className="text-xs text-slate-400 hover:text-slate-200 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  ↻ Refresh
-                </button>
-              </div>
-              {tabLoading ? <Spinner /> : (
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-900">
-                      <tr className="text-slate-400 text-xs uppercase">
-                        <th className="px-4 py-3 text-left">Student</th>
-                        <th className="px-4 py-3 text-center">Attendance</th>
-                        <th className="px-4 py-3 text-center">IA-1</th>
-                        <th className="px-4 py-3 text-center">IA-2</th>
-                        <th className="px-4 py-3 text-center">IA-3</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {studentPerformance.map((sp) => (
-                        <tr key={sp.studentId} className="hover:bg-slate-800/40 transition-colors">
-                          <td className="px-4 py-3">
-                            <p className="text-slate-200 font-medium">{sp.studentName}</p>
-                            <p className="text-xs text-slate-500 font-mono">{sp.enrollmentNumber}</p>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {sp.attendance ? (
-                              <div>
-                                <AttendanceBadge pct={sp.attendance.percentage} />
-                                <p className="text-xs text-slate-600 mt-0.5">{sp.attendance.present}/{sp.attendance.totalClasses}</p>
-                              </div>
-                            ) : <span className="text-slate-700">—</span>}
-                          </td>
-                          {['IA-1', 'IA-2', 'IA-3'].map((ia) => (
-                            <td key={ia} className="px-4 py-3 text-center">
-                              {sp[ia] ? (
-                                <div>
-                                  <span className="text-violet-300 font-semibold">{sp[ia].obtainedMarks}</span>
-                                  <span className="text-slate-500">/{sp[ia].maxMarks}</span>
-                                </div>
-                              ) : <span className="text-slate-700">—</span>}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                      {studentPerformance.length === 0 && (
-                        <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-600">No data available. Mark attendance or upload marks first.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ===== ASSIGNMENTS TAB ===== */}
-          {activeTab === 'assignments' && selectedSection && (
-            <div className="space-y-6">
-              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 space-y-3">
-                <h3 className="text-sm font-semibold text-slate-300 mb-1">📚 New Assignment</h3>
-                <input
-                  type="text"
-                  placeholder="Assignment title *"
-                  value={assignmentTitle}
-                  onChange={(e) => setAssignmentTitle(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-white px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                />
-                <textarea
-                  placeholder="Description / instructions (optional)"
-                  value={assignmentDesc}
-                  onChange={(e) => setAssignmentDesc(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-white px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:border-violet-500 h-24 resize-none"
-                />
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-slate-400">Due Date:</label>
-                    <input
-                      type="date"
-                      value={assignmentDueDate}
-                      onChange={(e) => setAssignmentDueDate(e.target.value)}
-                      className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                    />
-                  </div>
-                  <button
-                    onClick={handleCreateAssignment}
-                    disabled={loading || !assignmentTitle}
-                    className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-5 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
-                  >
-                    {loading ? 'Creating...' : 'Create Assignment'}
-                  </button>
-                </div>
-              </div>
-
-              {tabLoading ? <Spinner /> : sectionAssignments.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-400 mb-3">Existing Assignments ({sectionAssignments.length})</h3>
-                  <div className="space-y-3">
-                    {sectionAssignments.map((a) => {
-                      const isOverdue = a.dueDate && new Date(a.dueDate) < new Date()
-                      return (
-                        <div key={a.id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
-                          <div className="flex justify-between items-start gap-4">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-slate-200">{a.title}</h4>
-                              {a.description && <p className="text-xs text-slate-500 mt-1">{a.description}</p>}
-                              <p className="text-xs text-slate-600 mt-2">Created {fmtDate(a.createdAt)}</p>
-                            </div>
-                            <div className="text-right shrink-0">
-                              {a.dueDate ? (
-                                <span className={`text-xs px-2 py-1 rounded-md border ${isOverdue ? 'text-red-400 bg-red-500/10 border-red-500/20' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'}`}>
-                                  {isOverdue ? '⚠ Overdue: ' : 'Due: '}{fmtDate(a.dueDate)}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-slate-600">No due date</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-              {!tabLoading && sectionAssignments.length === 0 && (
-                <p className="text-slate-600 text-sm">No assignments created yet for this section.</p>
-              )}
-            </div>
-          )}
-
-          {/* ===== MATERIALS TAB ===== */}
-          {activeTab === 'materials' && selectedSection && (
-            <div className="space-y-6">
-              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 space-y-3">
-                <h3 className="text-sm font-semibold text-slate-300 mb-1">📂 Add Course Material</h3>
-                <input
-                  type="text"
-                  placeholder="Material title *"
-                  value={materialTitle}
-                  onChange={(e) => setMaterialTitle(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-white px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                />
-                <textarea
-                  placeholder="Description (optional)"
-                  value={materialDesc}
-                  onChange={(e) => setMaterialDesc(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-white px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:border-violet-500 h-20 resize-none"
-                />
-                <div className="flex items-center gap-4">
-                  <select
-                    value={materialType}
-                    onChange={(e) => setMaterialType(e.target.value)}
-                    className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                  >
-                    <option value="SYLLABUS">📋 Syllabus</option>
-                    <option value="NOTES">📝 Lecture Notes</option>
-                    <option value="REFERENCE">📖 Reference Material</option>
-                    <option value="OTHER">📎 Other</option>
-                  </select>
-                  <button
-                    onClick={handleCreateMaterial}
-                    disabled={loading || !materialTitle}
-                    className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-5 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
-                  >
-                    {loading ? 'Adding...' : 'Add Material'}
-                  </button>
-                </div>
-              </div>
-
-              {tabLoading ? <Spinner /> : sectionMaterials.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-400 mb-3">Uploaded Materials ({sectionMaterials.length})</h3>
-                  <div className="space-y-2">
-                    {sectionMaterials.map((m) => {
-                      const typeIcon = { SYLLABUS: '📋', NOTES: '📝', REFERENCE: '📖', OTHER: '📎' }
-                      return (
-                        <div key={m.id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between hover:border-slate-700 transition-colors">
-                          <div className="flex items-start gap-3">
-                            <span className="text-xl mt-0.5">{typeIcon[m.materialType] || '📎'}</span>
-                            <div>
-                              <h4 className="font-medium text-slate-200">{m.title}</h4>
-                              {m.description && <p className="text-xs text-slate-500 mt-0.5">{m.description}</p>}
-                              <p className="text-xs text-slate-600 mt-0.5">{m.materialType} · {fmtDate(m.createdAt)}</p>
-                            </div>
-                          </div>
-                          {m.fileName && (
-                            <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded font-mono">{m.fileName}</span>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-              {!tabLoading && sectionMaterials.length === 0 && (
-                <p className="text-slate-600 text-sm">No materials added yet for this section.</p>
-              )}
-            </div>
-          )}
-
-          {/* ===== ANALYTICS TAB ===== */}
-          {activeTab === 'analytics' && selectedSection && (
-            <div className="space-y-5">
-              {tabLoading ? <Spinner /> : !analytics ? (
-                <div className="flex flex-col items-center justify-center h-48 gap-3">
-                  <p className="text-slate-500 text-sm">Analytics not loaded yet.</p>
-                  <button onClick={loadAnalytics} className="bg-violet-500/20 text-violet-300 border border-violet-500/30 px-4 py-2 rounded-lg text-sm hover:bg-violet-500/30 transition-colors">
-                    Load Analytics
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* Header */}
-                  <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-                    <h3 className="font-semibold text-slate-200">{analytics.courseName} <span className="text-slate-500 font-normal text-sm">({analytics.courseCode})</span></h3>
-                    <p className="text-xs text-slate-500 mt-0.5">{analytics.totalStudents} enrolled students</p>
-                  </div>
-
-                  {/* Stat cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard icon="📋" label="Avg Attendance" value={`${fmtNum(analytics.averageAttendancePercentage, 1)}%`} accent={analytics.averageAttendancePercentage >= 75 ? 'emerald' : 'amber'} />
-                    <StatCard icon="✅" label="≥75% Attendance" value={analytics.studentsAbove75Attendance} sub="students" accent="emerald" />
-                    <StatCard icon="⚠️" label="<75% Attendance" value={analytics.studentsBelow75Attendance} sub="at risk" accent="amber" />
-                    <StatCard icon="🎓" label="Pass Rate" value={analytics.passPercentage !== null ? `${fmtNum(analytics.passPercentage, 1)}%` : '—'} sub={`${analytics.totalPassed} passed · ${analytics.totalFailed} failed`} accent={analytics.passPercentage >= 50 ? 'emerald' : 'red'} />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Attendance breakdown */}
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Attendance Distribution</h4>
-                      <div className="space-y-3">
-                        <div>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-emerald-400">≥75% (Satisfactory)</span>
-                            <span className="text-slate-400">{analytics.studentsAbove75Attendance} students</span>
-                          </div>
-                          <ProgressBar value={analytics.studentsAbove75Attendance} max={analytics.totalStudents} />
-                        </div>
-                        <div>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-amber-400">&lt;75% (At Risk)</span>
-                            <span className="text-slate-400">{analytics.studentsBelow75Attendance} students</span>
-                          </div>
-                          <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${analytics.totalStudents > 0 ? (analytics.studentsBelow75Attendance / analytics.totalStudents) * 100 : 0}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Internal marks */}
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Internal Marks Averages</h4>
-                      <div className="space-y-4">
-                        {analytics.ia1Average !== null && (
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-300">IA-1 Average</span>
-                              <span className="text-violet-400 font-semibold">{fmtNum(analytics.ia1Average, 1)} / {analytics.ia1MaxMarks}</span>
-                            </div>
-                            <ProgressBar value={analytics.ia1Average} max={analytics.ia1MaxMarks} />
-                          </div>
-                        )}
-                        {analytics.ia2Average !== null && (
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-slate-300">IA-2 Average</span>
-                              <span className="text-violet-400 font-semibold">{fmtNum(analytics.ia2Average, 1)} / {analytics.ia2MaxMarks}</span>
-                            </div>
-                            <ProgressBar value={analytics.ia2Average} max={analytics.ia2MaxMarks} />
-                          </div>
-                        )}
-                        {analytics.ia1Average === null && analytics.ia2Average === null && (
-                          <p className="text-xs text-slate-600">No internal marks uploaded yet.</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Semester results */}
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Semester Exam Results</h4>
-                      {analytics.passPercentage !== null ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-4">
-                            <div className="text-center">
-                              <p className="text-3xl font-bold text-emerald-400">{fmtNum(analytics.passPercentage, 1)}%</p>
-                              <p className="text-xs text-slate-500">Pass Rate</p>
-                            </div>
-                            <div className="flex-1 space-y-2">
-                              <div>
-                                <div className="flex justify-between text-xs mb-0.5">
-                                  <span className="text-emerald-400">Passed: {analytics.totalPassed}</span>
-                                  <span className="text-red-400">Failed: {analytics.totalFailed}</span>
-                                </div>
-                                <ProgressBar value={analytics.totalPassed} max={analytics.totalPassed + analytics.totalFailed} />
-                              </div>
-                            </div>
-                          </div>
-                          <p className="text-xs text-slate-500">Class Average: <span className="text-slate-300 font-semibold">{fmtNum(analytics.semesterAverage, 1)} / {analytics.semesterMaxMarks}</span></p>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-600">No semester marks uploaded yet.</p>
-                      )}
-                    </div>
-
-                    {/* Grade distribution */}
-                    {analytics.gradeDistribution && analytics.gradeDistribution.length > 0 && (
-                      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Grade Distribution</h4>
-                        <div className="grid grid-cols-4 gap-2">
-                          {analytics.gradeDistribution.map((g) => {
-                            const gradeColor = { O: 'text-emerald-300', 'A+': 'text-emerald-400', A: 'text-teal-300', 'B+': 'text-blue-300', B: 'text-blue-400', C: 'text-yellow-300', P: 'text-yellow-400', F: 'text-red-400' }
-                            return (
-                              <div key={g.grade} className="bg-slate-800/50 border border-slate-700/50 rounded-lg px-3 py-3 text-center">
-                                <p className={`text-xl font-bold ${gradeColor[g.grade] || 'text-slate-400'}`}>{g.grade}</p>
-                                <p className="text-sm text-slate-300 font-semibold mt-1">{g.count}</p>
-                                <p className="text-xs text-slate-600">students</p>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ===== QUESTION PAPERS TAB ===== */}
-          {activeTab === 'questionPapers' && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-1">📄 Question Papers</h2>
-                <p className="text-sm text-slate-500">Upload previous-year question papers for admin approval. Once approved, students can find them in the repository.</p>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Upload form */}
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 space-y-4">
-                  <h3 className="text-sm font-semibold text-slate-300">Upload New Question Paper</h3>
-
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Select Course / Section *</label>
-                    <select
-                      value={qpSelectedSectionId}
-                      onChange={(e) => {
-                        setQpSelectedSectionId(e.target.value)
-                        const sec = sections.find((s) => s.sectionId === parseInt(e.target.value))
-                        if (sec) setQpSemNum(sec.semesterNumber)
-                      }}
-                      className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                    >
-                      <option value="">— Choose a course —</option>
-                      {sections.map((s) => (
-                        <option key={s.sectionId} value={s.sectionId}>
-                          {s.courseName} ({s.courseCode}) · Sem {s.semesterNumber}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-slate-400 mb-1 block">Exam Type</label>
-                      <select
-                        value={qpExamType}
-                        onChange={(e) => setQpExamType(e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                      >
-                        <option value="MID_TERM">Mid Term</option>
-                        <option value="END_TERM">End Term</option>
-                        <option value="SUPPLEMENTARY">Supplementary</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-400 mb-1 block">Year</label>
-                      <input
-                        type="number"
-                        value={qpYear}
-                        onChange={(e) => setQpYear(e.target.value)}
-                        min="2000"
-                        max="2100"
-                        className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">File Name (optional)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. CS101_EndTerm_2024.pdf"
-                      value={qpFileName}
-                      onChange={(e) => setQpFileName(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleUploadQP}
-                    disabled={loading || !qpSelectedSectionId}
-                    className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-5 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 shadow-lg shadow-violet-500/20"
-                  >
-                    {loading ? 'Uploading...' : 'Upload Question Paper (Pending Approval)'}
-                  </button>
-                  <p className="text-xs text-slate-600">Uploaded papers go into a pending queue. An admin must approve before students can access them.</p>
-                </div>
-
-                {/* My uploads */}
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-400 mb-3">My Uploaded Papers ({myQuestionPapers.length})</h3>
-                  {myQuestionPapers.length === 0 ? (
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center text-slate-600 text-sm">
-                      No question papers uploaded yet.
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                      {myQuestionPapers.map((qp) => (
-                        <div key={qp.id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
-                          <div className="flex justify-between items-start gap-3">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-slate-200">{qp.courseName}</h4>
-                              <p className="text-xs text-slate-500 mt-0.5">
-                                {qp.courseCode} · {qp.examType?.replace('_', ' ')} · {qp.year} · Sem {qp.semesterNumber}
-                              </p>
-                              {qp.fileName && <p className="text-xs text-slate-600 font-mono mt-0.5">{qp.fileName}</p>}
-                            </div>
-                            <span className={`shrink-0 text-xs px-2 py-1 rounded-md border ${
-                              qp.status === 'APPROVED' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                              qp.status === 'REJECTED' ? 'text-red-400 bg-red-500/10 border-red-500/20' :
-                              'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                            }`}>
-                              {qp.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ===== NOTICES TAB ===== */}
-          {activeTab === 'notices' && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-1">📢 Draft & Send Notices</h2>
-                <p className="text-sm text-slate-500">Broadcast announcements to students. You can target a specific department or send to all students.</p>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Draft form */}
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 space-y-4">
-                  <h3 className="text-sm font-semibold text-slate-300">Compose Notice</h3>
-
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Title *</label>
-                    <input
-                      type="text"
-                      placeholder="Notice title"
-                      value={noticeTitle}
-                      onChange={(e) => setNoticeTitle(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 text-white px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Message *</label>
-                    <textarea
-                      placeholder="Write the notice content here..."
-                      value={noticeMessage}
-                      onChange={(e) => setNoticeMessage(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 text-white px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:border-violet-500 h-32 resize-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-slate-400 mb-1 block">Type</label>
-                      <select
-                        value={noticeType}
-                        onChange={(e) => setNoticeType(e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                      >
-                        <option value="GENERAL">General</option>
-                        <option value="ACADEMIC">Academic</option>
-                        <option value="PLACEMENT">Placement</option>
-                        <option value="FEE">Fee</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-400 mb-1 block">Department (optional)</label>
-                      <select
-                        value={noticeDeptId}
-                        onChange={(e) => setNoticeDeptId(e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                      >
-                        <option value="">All Students</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleDraftNotice}
-                    disabled={loading || !noticeTitle || !noticeMessage}
-                    className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-5 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 shadow-lg shadow-violet-500/20"
-                  >
-                    {loading ? 'Sending...' : '📢 Send Notice'}
-                  </button>
-                  <p className="text-xs text-slate-500 flex items-center gap-2">
-                    ✨ Use the <button onClick={() => setActiveTab('ai-notice-gen')} className="text-violet-400 hover:underline font-medium">🤖 AI Notice Generator</button> to draft notices with AI!
-                  </p>
-                </div>
-
-                {/* Sent notices history */}
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-400 mb-3">Sent This Session ({sentNotices.length})</h3>
-                  {sentNotices.length === 0 ? (
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center text-slate-600 text-sm">
-                      No notices sent in this session yet.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {sentNotices.map((n, i) => (
-                        <div key={i} className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-slate-200">{n.title}</h4>
-                              <p className="text-xs text-slate-500 mt-1 line-clamp-2">{n.message}</p>
-                            </div>
-                            <div className="shrink-0 text-right">
-                              <span className="text-xs bg-slate-800 text-slate-400 px-2 py-1 rounded-md border border-slate-700">{n.type}</span>
-                              <p className="text-xs text-emerald-400 mt-1">✓ {n.recipientCount} sent</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ===== AI NOTICE GENERATOR (Phase 9 Feature 9) ===== */}
-          {activeTab === 'ai-notice-gen' && !selectedSection && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-bold text-white">🤖 AI Notice Generator</h2>
-                <span className="text-xs bg-violet-500/15 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full">Phase 9</span>
-              </div>
-              <p className="text-slate-400 text-sm">Describe your notice in plain language, and the AI will generate a professionally formatted notice for you. Review and send it via the Notices tab.</p>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Input Panel */}
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 space-y-4">
-                  <h3 className="font-semibold text-slate-200">✍️ Your Prompt</h3>
-
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Describe the notice in plain language</label>
-                    <textarea
-                      value={aiPrompt}
-                      onChange={e => setAiPrompt(e.target.value)}
-                      placeholder="e.g. Remind students that the internal exam IA-2 is scheduled for next Monday at 10 AM in Room 204. Attendance is mandatory."
-                      rows={4}
-                      className="w-full bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-violet-500 placeholder-slate-600 resize-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-slate-400 mb-1 block">Audience</label>
-                      <select
-                        value={aiAudience}
-                        onChange={e => setAiAudience(e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                      >
-                        <option value="students">Students</option>
-                        <option value="faculty">Faculty</option>
-                        <option value="all">All</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-400 mb-1 block">Notice Type</label>
-                      <select
-                        value={aiNoticeType}
-                        onChange={e => setAiNoticeType(e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-violet-500"
-                      >
-                        <option value="GENERAL">General</option>
-                        <option value="ACADEMIC">Academic</option>
-                        <option value="PLACEMENT">Placement</option>
-                        <option value="FEE">Fee</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleAiGenerateNotice}
-                    disabled={aiLoading || !aiPrompt.trim()}
-                    className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-5 py-3 rounded-xl text-sm font-medium transition-all disabled:opacity-50 shadow-lg shadow-violet-500/20"
-                  >
-                    {aiLoading ? '🤖 Generating...' : '✨ Generate with AI'}
-                  </button>
-
-                  {/* Example prompts */}
-                  <div>
-                    <p className="text-xs text-slate-500 mb-2">Example prompts:</p>
-                    <div className="space-y-1.5">
-                      {[
-                        'IA-2 exam scheduled next Monday 10 AM Room 204, attendance mandatory',
-                        'Assignment submission deadline extended to next Friday for all students',
-                        'Guest lecture on AI/ML this Thursday by industry expert from Google'
-                      ].map(p => (
-                        <button key={p} onClick={() => setAiPrompt(p)}
-                          className="w-full text-left text-xs bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 text-slate-500 hover:text-slate-300 px-3 py-2 rounded-lg transition-colors">
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Output Panel */}
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 space-y-4">
-                  <h3 className="font-semibold text-slate-200">📋 AI Generated Notice</h3>
-
-                  {aiLoading && (
-                    <div className="flex items-center justify-center h-48">
-                      <div className="text-center">
-                        <div className="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                        <p className="text-sm text-slate-400">AI is drafting your notice...</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!aiResult && !aiLoading && (
-                    <div className="flex items-center justify-center h-48 border-2 border-dashed border-slate-700 rounded-xl">
-                      <p className="text-slate-600 text-sm">Generated notice will appear here</p>
-                    </div>
-                  )}
-
-                  {aiResult && !aiLoading && (
-                    <div className="space-y-4">
-                      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                        <p className="text-xs text-slate-500 mb-1">Title</p>
-                        <p className="text-slate-200 font-semibold">{aiResult.title}</p>
-                      </div>
-                      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                        <p className="text-xs text-slate-500 mb-1">Notice Body</p>
-                        <p className="text-slate-300 text-sm whitespace-pre-wrap">{aiResult.body}</p>
-                      </div>
-                      {aiResult.summary && (
-                        <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg p-3">
-                          <p className="text-xs text-violet-400 font-semibold mb-1">Summary</p>
-                          <p className="text-sm text-violet-300">{aiResult.summary}</p>
-                        </div>
-                      )}
-                      <button
-                        onClick={useAiNotice}
-                        className="w-full bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
-                      >
-                        ✓ Use This Notice → Send to Students
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-        </main>
-      </div>
+      </main>
     </div>
   )
 }
-
-export default FacultyDashboard
