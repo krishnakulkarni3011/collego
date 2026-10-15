@@ -59,6 +59,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/placement")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class PlacementController {
 
     private final PlacementService placementService;

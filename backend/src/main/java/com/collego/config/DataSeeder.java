@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 @Order(1)
+@SuppressWarnings("null")
 public class DataSeeder implements CommandLineRunner {
 
     private final UserRepository userRepository;

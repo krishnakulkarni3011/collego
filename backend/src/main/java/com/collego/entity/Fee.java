@@ -52,7 +52,7 @@ public class Fee {
     @OneToMany(mappedBy = "fee", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FeeItem> items = new ArrayList<>();
 
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

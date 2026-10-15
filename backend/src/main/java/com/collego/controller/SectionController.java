@@ -21,6 +21,7 @@ import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class SectionController {
 
     private final SectionService sectionService;

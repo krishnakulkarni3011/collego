@@ -26,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/question-papers")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class QuestionPaperController {
 
     private final QuestionPaperService questionPaperService;

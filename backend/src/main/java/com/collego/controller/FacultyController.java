@@ -21,6 +21,7 @@ import java.util.Map;
 @RequestMapping("/api/faculty")
 @PreAuthorize("hasRole('FACULTY')")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class FacultyController {
 
     private final FacultyPortalService facultyPortalService;

@@ -19,6 +19,7 @@ import java.util.*;
 @RequiredArgsConstructor
 @Slf4j
 @Order(2) // Run after DataSeeder (which creates bootstrap admin)
+@SuppressWarnings("null")
 public class AcademicDataSeeder implements CommandLineRunner {
 
     private final DepartmentRepository departmentRepository;

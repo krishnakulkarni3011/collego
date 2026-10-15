@@ -1,6 +1,5 @@
 package com.collego.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,7 +27,6 @@ import java.util.*;
 public class AiService {
 
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
 
     @Value("${collego.ai-service.url:http://localhost:8000}")
     private String aiServiceUrl;
@@ -115,7 +113,7 @@ public class AiService {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Object> entity = new HttpEntity<>(body, headers);
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     aiServiceUrl + path,
                     HttpMethod.POST,
                     entity,
@@ -132,7 +130,7 @@ public class AiService {
     @SuppressWarnings("unchecked")
     private Map<String, Object> get(String path) {
         try {
-            ResponseEntity<Map> response = restTemplate.getForEntity(aiServiceUrl + path, Map.class);
+            ResponseEntity<Map<String, Object>> response = restTemplate.getForEntity(aiServiceUrl + path, Map.class);
             return response.getBody() != null ? response.getBody() : Map.of("error", "Empty response");
         } catch (RestClientException e) {
             log.warn("AI service GET {} failed: {}", path, e.getMessage());

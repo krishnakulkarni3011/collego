@@ -47,11 +47,6 @@ public class AiController {
     // Repositories for fetching context data to pass to AI
     private final UserRepository userRepository;
     private final StudentProfileRepository studentProfileRepository;
-    private final EnrollmentRepository enrollmentRepository;
-    private final AttendanceRepository attendanceRepository;
-    private final InternalMarksRepository internalMarksRepository;
-    private final SemesterMarksRepository semesterMarksRepository;
-    private final SemesterRepository semesterRepository;
     private final QuestionPaperRepository questionPaperRepository;
 
     // ── Health ─────────────────────────────────────────────────────────────────

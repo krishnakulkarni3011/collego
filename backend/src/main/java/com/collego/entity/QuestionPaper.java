@@ -52,7 +52,7 @@ public class QuestionPaper {
     @Column(name = "download_count", nullable = false)
     private Long downloadCount = 0L;
 
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

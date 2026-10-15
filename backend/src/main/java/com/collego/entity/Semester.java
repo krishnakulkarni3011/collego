@@ -37,7 +37,7 @@ public class Semester {
     @Column(nullable = false)
     private boolean isActive = false;
 
-    @Column(nullable = false, updatable = false)
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

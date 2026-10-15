@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@SuppressWarnings("null")
 public class MarksheetService {
 
     private final StudentPortalService studentPortalService;
