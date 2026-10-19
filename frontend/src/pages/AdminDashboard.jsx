@@ -1,33 +1,32 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import {
-  LayoutDashboard, Users, BookOpen, Calendar, ClipboardCheck,
-  Award, DollarSign, Building2, Library, Bell, Sparkles,
-  BarChart3, Settings, HelpCircle, ChevronRight, ChevronLeft,
-  Search, LogOut, Menu, TrendingUp, TrendingDown, Plus,
-  GraduationCap, UserPlus, Megaphone, FileText, Shield,
-  Database, AlertTriangle, CheckCircle2, Clock, MapPin,
-  Activity, Target, BookMarked, Briefcase, X, ExternalLink,
-  ArrowUpRight, ArrowDownRight, Minus, RefreshCw, Download,
-  Upload, Eye, Edit, Trash2, Filter, MoreHorizontal, Star,
-  Trophy, Zap, Coffee, Heart, Grid3X3
+  LayoutDashboard, Users, BookOpen, ClipboardCheck,
+  Award, DollarSign, Building2, Library, Sparkles,
+  BarChart3, Settings, HelpCircle, Plus, GraduationCap,
+  Megaphone, FileText, CheckCircle2,
+  Clock, MapPin, Activity, BookMarked, Briefcase, X,
+  RefreshCw, Upload, Edit, Power, Filter, Trophy, Zap,
+  TrendingUp, Percent, XCircle, Wallet, Home, Landmark,
+  UsersRound, CalendarDays, ScrollText, Layers,
 } from 'lucide-react'
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, RadialBarChart, RadialBar
+  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { authService } from '../services/authService'
 import api from '../services/api'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card'
+import {
+  PortalSidebar, PortalTopbar, Toast, StatCard, Panel, PageTitle,
+  WelcomeBanner, ChartTooltip, EmptyState, AnimatedNumber, ACCENTS,
+} from '../components/dashboard/PortalUI'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtNum = (n, dp = 1) => (n == null ? '—' : Number(n).toFixed(dp))
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 const timeAgo = (ts) => {
   if (!ts) return ''
   const diff = Date.now() - new Date(ts).getTime()
@@ -41,44 +40,19 @@ const timeAgo = (ts) => {
   return `${d}d ago`
 }
 
-// ─── Toast ───────────────────────────────────────────────────────────────────
-function Toast({ message, onClose }) {
-  useEffect(() => {
-    if (message?.text) {
-      const t = setTimeout(onClose, 4000)
-      return () => clearTimeout(t)
-    }
-  }, [message, onClose])
-
-  return (
-    <AnimatePresence>
-      {message?.text && (
-        <motion.div
-          initial={{ opacity: 0, y: -20, x: 20 }}
-          animate={{ opacity: 1, y: 0, x: 0 }}
-          exit={{ opacity: 0, y: -20, x: 20 }}
-          className={cn(
-            'fixed top-4 right-4 z-[200] flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-medium shadow-2xl border',
-            message.type === 'error'
-              ? 'bg-red-950/90 text-red-300 border-red-500/30 backdrop-blur-xl'
-              : 'bg-emerald-950/90 text-emerald-300 border-emerald-500/30 backdrop-blur-xl'
-          )}
-        >
-          {message.type === 'error' ? <X size={16} /> : <CheckCircle2 size={16} />}
-          {message.text}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
+const PIE_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6']
+const RANK_COLORS = ['#f59e0b', '#94a3b8', '#cd7f32', '#6366f1', '#6366f1']
+const NOTICE_TYPES = {
+  ACADEMIC: { variant: 'info', label: 'Academic' },
+  FEE: { variant: 'warning', label: 'Fee' },
+  PLACEMENT: { variant: 'purple', label: 'Placement' },
+  EXAM: { variant: 'destructive', label: 'Exam' },
+  GENERAL: { variant: 'secondary', label: 'General' },
 }
+const EVENT_COLORS = { Placement: '#10b981', Academic: '#6366f1', Exam: '#ef4444', Event: '#f59e0b' }
 
-// ─── Sidebar Nav Items ────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
-  {
-    items: [
-      { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
-    ]
-  },
+  { items: [{ id: 'overview', label: 'Dashboard', icon: LayoutDashboard }] },
   {
     title: 'Management',
     items: [
@@ -88,7 +62,7 @@ const NAV_SECTIONS = [
       { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
       { id: 'examinations', label: 'Examinations', icon: BookMarked },
       { id: 'placements', label: 'Placements', icon: Briefcase },
-    ]
+    ],
   },
   {
     title: 'Finance & Admin',
@@ -97,961 +71,988 @@ const NAV_SECTIONS = [
       { id: 'hostel', label: 'Hostel & Facilities', icon: Building2 },
       { id: 'library', label: 'Library', icon: Library },
       { id: 'announcements', label: 'Notices & Events', icon: Megaphone },
-    ]
+    ],
   },
-  {
-    title: 'AI Assistant',
-    items: [
-      { id: 'aiAssistant', label: 'AI Assistant', icon: Sparkles },
-    ]
-  },
+  { title: 'AI Assistant', items: [{ id: 'aiAssistant', label: 'AI Assistant', icon: Sparkles }] },
   {
     title: 'Administration',
     items: [
-      { id: 'deptReports', label: 'Reports', icon: BarChart3 },
+      { id: 'reports', label: 'Reports', icon: BarChart3 },
       { id: 'settings', label: 'Settings', icon: Settings },
       { id: 'help', label: 'Help & Support', icon: HelpCircle },
-    ]
+    ],
   },
 ]
 
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
-function Sidebar({ activeTab, onTabChange, collapsed, onToggle }) {
+// ─── Overview ────────────────────────────────────────────────────────────────
+function OverviewTab({ overview, deptReports, attendanceSummary, placementStats, insights, semesters, onTabChange, onSemesterChange }) {
+  const now = new Date()
+  const hour = now.getHours()
+  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
+
+  const attendanceChartData = (attendanceSummary || [])
+    .slice(0, 6)
+    .map(d => ({ name: d.departmentName?.split(' ')[0] || d.departmentCode || 'N/A', attendance: Math.round(d.averageAttendancePercentage || 0) }))
+
+  const totalStudentsInDepts = (deptReports || []).reduce((s, d) => s + (d.totalStudents || 0), 0) || 1
+  const deptDistribution = (deptReports || [])
+    .slice(0, 6)
+    .map(d => ({ name: d.departmentCode || d.departmentName?.split(' ')[0] || '—', value: d.totalStudents || 0 }))
+    .filter(d => d.value > 0)
+
+  const topPerformers = insights?.topPerformers || []
+  const recentNotices = insights?.recentNotices || []
+  const upcomingEvents = insights?.upcomingEvents || []
+
+  const quickActions = [
+    { icon: GraduationCap, label: 'Add Student', tab: 'users', accent: 'blue' },
+    { icon: Users, label: 'Add Faculty', tab: 'faculty', accent: 'violet' },
+    { icon: Megaphone, label: 'Create Notice', tab: 'announcements', accent: 'amber' },
+    { icon: BarChart3, label: 'Generate Report', tab: 'reports', accent: 'indigo' },
+    { icon: BookOpen, label: 'Manage Courses', tab: 'academics', accent: 'emerald' },
+    { icon: ClipboardCheck, label: 'Take Attendance', tab: 'attendance', accent: 'emerald' },
+    { icon: BookMarked, label: 'Upload Marks', tab: 'examinations', accent: 'violet' },
+    { icon: Briefcase, label: 'Placement Records', tab: 'placements', accent: 'amber' },
+  ]
+
   return (
-    <aside className={cn('sidebar', collapsed && 'collapsed')}>
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-zinc-800/60 shrink-0">
-        <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 shadow-lg shadow-indigo-500/30">
-          <GraduationCap size={18} className="text-white" />
-        </div>
-        <AnimatePresence mode="wait">
-          {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.15 }}
-            >
-              <p className="text-sm font-bold text-white leading-tight">COLLEGO</p>
-              <p className="text-[10px] text-zinc-500 tracking-wider">College ERP</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+    <div className="space-y-6">
+      <WelcomeBanner
+        greeting={greeting}
+        name="Admin"
+        subtitle="Here's what's happening across your college today."
+        quote="Education transforms ideas into reality"
+        accent="indigo"
+      />
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard index={0} label="Total Students" value={overview?.totalStudents ?? 0} icon={GraduationCap} accent="blue"
+          sub={`across ${overview?.totalDepartments ?? 0} departments`} onClick={() => onTabChange('users')} />
+        <StatCard index={1} label="Faculty Members" value={overview?.totalFaculty ?? 0} icon={UsersRound} accent="violet"
+          sub={`${overview?.totalSections ?? 0} sections running`} onClick={() => onTabChange('faculty')} />
+        <StatCard index={2} label="Average Attendance" value={overview?.overallAverageAttendance ?? 0} decimals={1} suffix="%" icon={ClipboardCheck} accent="emerald"
+          sub="college-wide average" onClick={() => onTabChange('attendance')} />
+        <StatCard index={3} label="Placed Students" value={placementStats?.studentsPlaced ?? 0} icon={Trophy} accent="amber"
+          sub={`${placementStats?.totalOffersExtended ?? 0} offers extended`} onClick={() => onTabChange('placements')} />
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-3 scrollbar-hide px-2">
-        {NAV_SECTIONS.map((section, si) => (
-          <div key={si} className="mb-2">
-            {section.title && !collapsed && (
-              <p className="text-[9px] font-semibold text-zinc-600 uppercase tracking-widest px-3 pt-4 pb-1.5">
-                {section.title}
-              </p>
-            )}
-            {section.items.map(item => {
-              const Icon = item.icon
-              const isActive = activeTab === item.id
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onTabChange(item.id)}
-                  title={collapsed ? item.label : undefined}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-all duration-200 relative group mb-0.5',
-                    isActive ? 'nav-item-active' : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-200'
-                  )}
-                >
-                  <Icon size={16} className={cn('shrink-0', isActive ? 'text-indigo-400' : '')} />
-                  {!collapsed && (
-                    <span className="text-xs font-medium leading-none">{item.label}</span>
-                  )}
-                  {isActive && !collapsed && (
-                    <ChevronRight size={12} className="ml-auto text-indigo-400" />
-                  )}
-                  {/* Tooltip when collapsed */}
-                  {collapsed && (
-                    <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-zinc-900 text-zinc-200 text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl border border-zinc-800">
-                      {item.label}
+      {/* Charts row */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <Panel title="Attendance Overview" icon={BarChart3} accent="indigo" className="xl:col-span-5"
+          action={
+            <select
+              onChange={(e) => onSemesterChange(e.target.value || null)}
+              className="collego-input !w-auto text-xs py-1.5 pr-7"
+              defaultValue=""
+            >
+              <option value="">All semesters</option>
+              {(semesters || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          }
+        >
+          {attendanceChartData.length === 0 ? (
+            <EmptyState icon={BarChart3} title="No attendance data" description="Attendance will appear once records are marked." />
+          ) : (
+            <ResponsiveContainer width="100%" height={230}>
+              <BarChart data={attendanceChartData} barSize={26} margin={{ top: 6, right: 4, left: -18, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eef1f8" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8a94ad' }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#8a94ad' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip unit="%" />} cursor={{ fill: 'rgba(99,102,241,0.05)' }} />
+                <Bar dataKey="attendance" name="Attendance" radius={[8, 8, 0, 0]}>
+                  {attendanceChartData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </Panel>
+
+        <Panel title="Student Statistics" icon={Activity} accent="violet" className="xl:col-span-3">
+          {deptDistribution.length === 0 ? (
+            <EmptyState icon={Activity} title="No students yet" description="Department distribution will appear here." />
+          ) : (
+            <>
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={190}>
+                  <PieChart>
+                    <Pie data={deptDistribution} cx="50%" cy="50%" innerRadius={52} outerRadius={78} paddingAngle={3} dataKey="value">
+                      {deptDistribution.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <AnimatedNumber value={overview?.totalStudents ?? 0} className="text-2xl font-extrabold text-slate-900" />
+                  <p className="text-[10px] text-slate-400 font-medium">Students</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                {deptDistribution.map((d, i) => (
+                  <div key={d.name + i} className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                    <span className="text-[11px] text-slate-500 truncate">{d.name}</span>
+                    <span className="text-[11px] font-semibold text-slate-700 ml-auto">{Math.round((d.value / totalStudentsInDepts) * 100)}%</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </Panel>
+
+        <Panel title="Upcoming Events" icon={CalendarDays} accent="amber" className="xl:col-span-4"
+          action={<button onClick={() => onTabChange('announcements')} className="text-xs font-medium text-indigo-600 hover:text-indigo-700">View All</button>}
+        >
+          {upcomingEvents.length === 0 ? (
+            <EmptyState icon={CalendarDays} title="No upcoming events" description="New placement drives and activities will show up here." />
+          ) : (
+            <div className="space-y-1">
+              {upcomingEvents.map((ev) => {
+                const color = EVENT_COLORS[ev.category] || '#6366f1'
+                const date = ev.date ? new Date(ev.date) : null
+                return (
+                  <div key={ev.id} className="event-item">
+                    <div className="flex flex-col items-center justify-center w-11 h-11 rounded-xl shrink-0"
+                      style={{ background: `${color}14`, border: `1px solid ${color}30` }}>
+                      <span className="text-[9px] font-bold uppercase" style={{ color }}>
+                        {date ? date.toLocaleDateString('en-IN', { month: 'short' }) : '—'}
+                      </span>
+                      <span className="text-sm font-extrabold text-slate-800 leading-none">{date ? date.getDate() : '—'}</span>
                     </div>
-                  )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 truncate">{ev.title}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 truncate">
+                        <MapPin size={10} /> {ev.subtitle || ev.location}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0" style={{ color, background: `${color}14` }}>
+                      {ev.category}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      {/* Notices / performers / quick actions */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <Panel title="Recent Notices" icon={Megaphone} accent="amber" className="xl:col-span-4"
+          action={<button onClick={() => onTabChange('announcements')} className="text-xs font-medium text-indigo-600 hover:text-indigo-700">View All</button>}
+        >
+          {recentNotices.length === 0 ? (
+            <EmptyState icon={Megaphone} title="No notices yet" description="Notices broadcast to students will appear here." />
+          ) : (
+            <div className="space-y-2">
+              {recentNotices.map((n) => {
+                const cfg = NOTICE_TYPES[n.type] || NOTICE_TYPES.GENERAL
+                return (
+                  <div key={n.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer group">
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                      <FileText size={15} className="text-slate-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-700 truncate">{n.title}</p>
+                      <p className="text-[11px] text-slate-400">{timeAgo(n.createdAt)}</p>
+                    </div>
+                    <Badge variant={cfg.variant} className="text-[9px] px-2 py-0 shrink-0">{cfg.label}</Badge>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="Top Performers" icon={Trophy} accent="amber" className="xl:col-span-4"
+          action={<span className="text-[11px] text-slate-400">By attendance</span>}
+        >
+          {topPerformers.length === 0 ? (
+            <EmptyState icon={Trophy} title="No performance data" description="Rankings build up as attendance is recorded." />
+          ) : (
+            <div className="space-y-1">
+              {topPerformers.map((p, i) => (
+                <div key={p.studentId} className="performer-item">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 font-bold text-[10px]"
+                    style={{ background: `${RANK_COLORS[i]}1f`, color: RANK_COLORS[i], border: `1px solid ${RANK_COLORS[i]}40` }}>
+                    {i + 1}
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shrink-0">
+                    <span className="text-[11px] font-bold text-white">{p.studentName?.[0]}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-800 truncate">{p.studentName}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{p.departmentName}{p.semester ? ` · Sem ${p.semester}` : ''}</p>
+                  </div>
+                  <div className="flex flex-col items-end shrink-0">
+                    <span className="text-sm font-bold text-emerald-600">{fmtNum(p.attendancePercentage, 0)}%</span>
+                    <div className="w-12 progress-bar mt-1">
+                      <div className="progress-bar-fill bg-emerald-500" style={{ width: `${Math.min(p.attendancePercentage, 100)}%` }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="Quick Actions" icon={Zap} accent="amber" className="xl:col-span-4">
+          <div className="grid grid-cols-4 gap-2.5">
+            {quickActions.map((qa) => {
+              const Icon = qa.icon
+              const a = ACCENTS[qa.accent]
+              return (
+                <button key={qa.label} onClick={() => onTabChange(qa.tab)} className="quick-action">
+                  <span className={cn('w-9 h-9 rounded-xl flex items-center justify-center', a.softBg)}>
+                    <Icon size={16} className={a.text} />
+                  </span>
+                  <span className="text-[10px] text-slate-500 text-center leading-tight font-medium">{qa.label}</span>
                 </button>
               )
             })}
           </div>
-        ))}
-      </nav>
-
-      {/* Bottom - College Building Image */}
-      {!collapsed && (
-        <div className="mx-3 mb-3 rounded-xl overflow-hidden relative h-24 bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/20">
-          <div className="absolute inset-0 flex flex-col items-start justify-end p-3">
-            <p className="text-[10px] font-semibold text-indigo-300">Building Better</p>
-            <p className="text-[10px] text-zinc-500">Tomorrow</p>
-          </div>
-          <div className="absolute bottom-0 right-0 text-4xl opacity-20">🏫</div>
-          <button className="absolute top-2 right-2 w-5 h-5 bg-indigo-500/30 rounded-full flex items-center justify-center">
-            <ChevronRight size={10} className="text-indigo-400" />
-          </button>
-        </div>
-      )}
-
-      {/* Collapse toggle */}
-      <div className="border-t border-zinc-800/60 p-2 shrink-0">
-        <button
-          onClick={onToggle}
-          className="w-full flex items-center justify-center gap-2 py-2 text-zinc-500 hover:text-zinc-300 text-xs rounded-xl hover:bg-zinc-800/60 transition-colors"
-        >
-          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-          {!collapsed && <span className="text-xs">Collapse</span>}
-        </button>
-      </div>
-    </aside>
-  )
-}
-
-// ─── Top Navbar ───────────────────────────────────────────────────────────────
-function Topbar({ email, pendingCount, onLogout, sidebarWidth }) {
-  const now = new Date()
-  const dateStr = now.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'long', year: 'numeric' })
-  const hour = now.getHours()
-  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
-  const [showNotif, setShowNotif] = useState(false)
-  const [showProfile, setShowProfile] = useState(false)
-  const initials = email ? email.substring(0, 2).toUpperCase() : 'AD'
-
-  return (
-    <header
-      className="topbar px-5"
-      style={{ left: sidebarWidth }}
-    >
-      {/* Search */}
-      <div className="flex items-center gap-3 flex-1">
-        <div className="flex items-center gap-2 bg-zinc-900/80 border border-zinc-800 rounded-xl px-3.5 py-2.5 w-80 group focus-within:border-indigo-500/50 focus-within:shadow-[0_0_0_3px_rgba(99,102,241,0.1)] transition-all">
-          <Search size={14} className="text-zinc-600 group-focus-within:text-indigo-400 transition-colors shrink-0" />
-          <input
-            className="bg-transparent text-sm text-zinc-400 placeholder-zinc-600 outline-none w-full"
-            placeholder="Search students, faculty, courses, notices..."
-          />
-          <kbd className="text-[9px] text-zinc-700 bg-zinc-800 px-1.5 py-0.5 rounded font-mono hidden md:block shrink-0">Ctrl K</kbd>
-        </div>
-      </div>
-
-      {/* Right side */}
-      <div className="flex items-center gap-3">
-        {/* Date */}
-        <div className="hidden lg:flex items-center gap-2 bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-3 py-2">
-          <Calendar size={13} className="text-indigo-400" />
-          <p className="text-xs text-zinc-400">{dateStr}</p>
-        </div>
-
-        {/* Apps grid */}
-        <button className="p-2 rounded-xl text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-all">
-          <Grid3X3 size={17} />
-        </button>
-
-        {/* Notifications */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotif(!showNotif)}
-            className="relative p-2 rounded-xl text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-all"
-          >
-            <Bell size={17} />
-            {pendingCount > 0 && (
-              <span className="notification-dot" style={{ width: '7px', height: '7px', top: '7px', right: '7px' }} />
-            )}
-          </button>
-          {pendingCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4.5 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
-              {pendingCount > 9 ? '9+' : pendingCount}
-            </span>
-          )}
-        </div>
-
-        {/* Profile */}
-        <div className="relative">
-          <button
-            onClick={() => setShowProfile(!showProfile)}
-            className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-zinc-800/60 transition-all"
-          >
-            <div className="avatar-ring w-8 h-8 flex items-center justify-center">
-              <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-[11px] font-bold text-white">
-                {initials}
-              </div>
-            </div>
-            <div className="hidden md:block text-left">
-              <p className="text-xs font-semibold text-zinc-200">Admin User</p>
-              <p className="text-[10px] text-zinc-500">Administrator</p>
-            </div>
-            <ChevronRight size={12} className="text-zinc-600 hidden md:block" />
-          </button>
-
-          <AnimatePresence>
-            {showProfile && (
-              <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                className="absolute right-0 top-full mt-2 w-48 glass-card rounded-xl py-1 z-50"
-              >
-                <div className="px-4 py-3 border-b border-zinc-800/60">
-                  <p className="text-sm font-semibold text-zinc-200">Admin User</p>
-                  <p className="text-xs text-zinc-500 truncate">{email}</p>
-                </div>
-                <button
-                  onClick={onLogout}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-                >
-                  <LogOut size={14} />
-                  Sign out
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-    </header>
-  )
-}
-
-// ─── Stat Card Component ──────────────────────────────────────────────────────
-function StatCard({ label, value, icon: Icon, trend, trendLabel, iconColor, bgColor, onClick, index = 0 }) {
-  const isPositive = trend >= 0
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.08, duration: 0.4 }}
-      onClick={onClick}
-      className={cn(
-        'glass-card rounded-2xl p-5 flex items-center gap-4 transition-all duration-200',
-        onClick && 'cursor-pointer hover:scale-[1.01] hover:shadow-lg hover:shadow-indigo-500/10'
-      )}
-    >
-      <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center shrink-0', bgColor)}>
-        <Icon size={24} className={iconColor} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-zinc-500 font-medium mb-1">{label}</p>
-        <p className="text-2xl font-bold text-white leading-none">{value ?? '—'}</p>
-        {trend != null && (
-          <div className={cn('flex items-center gap-1 mt-1.5 text-xs font-medium', isPositive ? 'text-emerald-400' : 'text-red-400')}>
-            {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-            {Math.abs(trend)}% {trendLabel}
-          </div>
-        )}
-      </div>
-      {/* Mini sparkline placeholder */}
-      <div className="shrink-0 opacity-40">
-        {trend != null && (
-          <div className="flex items-end gap-0.5 h-8">
-            {[40, 60, 45, 70, 55, 80, 65, 90].map((h, i) => (
-              <div
-                key={i}
-                className={cn('w-1 rounded-sm', isPositive ? 'bg-emerald-500' : 'bg-red-500')}
-                style={{ height: `${h}%` }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </motion.div>
-  )
-}
-
-// ─── Custom Tooltip ──────────────────────────────────────────────────────────
-function CustomTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="glass-card rounded-xl px-3 py-2.5 border border-indigo-500/20">
-      <p className="text-xs font-semibold text-zinc-300 mb-1">{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} className="text-xs" style={{ color: p.color }}>
-          {p.name}: <span className="font-bold">{p.value}{p.unit || ''}</span>
-        </p>
-      ))}
-    </div>
-  )
-}
-
-// ─── Overview Dashboard Tab ───────────────────────────────────────────────────
-function OverviewTab({ overview, deptReports, attendanceSummary, pendingQPs, auditLogs, placementStats, onTabChange }) {
-  const email = authService.getEmail()
-  const now = new Date()
-  const hour = now.getHours()
-  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
-  const emoji = hour < 12 ? '☀️' : hour < 17 ? '👋' : '🌙'
-  const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  const quote = '"Education transforms ideas into reality"'
-
-  // Mock chart data from real API data
-  const attendanceChartData = (attendanceSummary || []).slice(0, 5).map(d => ({
-    name: d.departmentCode || d.departmentName?.substring(0, 3) || 'N/A',
-    attendance: Math.round(d.averageAttendancePercentage || 0),
-  }))
-
-  // Pie chart data for department distribution
-  const deptDistribution = (deptReports || []).slice(0, 5).map((d, i) => ({
-    name: d.departmentCode || d.departmentName?.substring(0, 3) || `D${i+1}`,
-    value: d.totalStudents || Math.floor(Math.random() * 600) + 100,
-  }))
-  const PIE_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b']
-
-  // Recent notices mock data (replace with real API when available)
-  const recentNotices = [
-    { id: 1, title: 'Mid-Semester Examination Schedule', dept: 'Examination Cell', time: '2 hours ago', badge: 'Important', badgeColor: 'destructive' },
-    { id: 2, title: 'Placement Drive Registration Open', dept: 'Placement Cell', time: '1 day ago', badge: 'New', badgeColor: 'success' },
-    { id: 3, title: 'Project Review Submission Deadline', dept: 'CSE Department', time: '2 days ago', badge: 'Academic', badgeColor: 'info' },
-    { id: 4, title: 'College Annual Day 2025', dept: 'Cultural Committee', time: '3 days ago', badge: 'Event', badgeColor: 'purple' },
-  ]
-
-  // Upcoming events
-  const upcomingEvents = [
-    { date: { day: '20', month: 'OCT' }, title: 'Mid-Semester Examination', time: '10:00 AM – 01:00 PM', location: 'Main Campus', color: '#ef4444' },
-    { date: { day: '22', month: 'OCT' }, title: 'Placement Drive (Infosys)', time: '09:00 AM – 05:00 PM', location: 'Seminar Hall', color: '#10b981' },
-    { date: { day: '25', month: 'OCT' }, title: 'Project Review Submission', time: 'Deadline: 11:59 PM', location: 'Online Portal', color: '#6366f1' },
-    { date: { day: '28', month: 'OCT' }, title: 'Tech Fest 2025', time: '09:30 AM – 06:00 PM', location: 'Auditorium', color: '#f59e0b' },
-  ]
-
-  // Top performers
-  const topPerformers = [
-    { rank: 1, name: 'Aarav Sharma', dept: 'CSE – 7th Sem', attendance: 98, color: '#fbbf24' },
-    { rank: 2, name: 'Sneha Rao', dept: 'ISE – 7th Sem', attendance: 96, color: '#94a3b8' },
-    { rank: 3, name: 'Priya Desai', dept: 'CSE – 7th Sem', attendance: 94, color: '#cd7f32' },
-    { rank: 4, name: 'Ananya Joshi', dept: 'CSE – 5th Sem', attendance: 92, color: '#6366f1' },
-    { rank: 5, name: 'Rahul Patil', dept: 'ECE – 5th Sem', attendance: 91, color: '#6366f1' },
-  ]
-
-  // Quick actions
-  const quickActions = [
-    { icon: '👨‍🎓', label: 'Add Student', onClick: () => onTabChange('users'), color: 'hover:bg-indigo-500/10' },
-    { icon: '👨‍🏫', label: 'Add Faculty', onClick: () => onTabChange('faculty'), color: 'hover:bg-purple-500/10' },
-    { icon: '📢', label: 'Create Notice', onClick: () => onTabChange('announcements'), color: 'hover:bg-red-500/10' },
-    { icon: '📊', label: 'Generate Report', onClick: () => onTabChange('deptReports'), color: 'hover:bg-amber-500/10' },
-    { icon: '📚', label: 'Manage Courses', onClick: () => onTabChange('academics'), color: 'hover:bg-teal-500/10' },
-    { icon: '✅', label: 'Take Attendance', onClick: () => onTabChange('attendance'), color: 'hover:bg-emerald-500/10' },
-    { icon: '📝', label: 'Upload Marks', onClick: () => onTabChange('examinations'), color: 'hover:bg-violet-500/10' },
-    { icon: '💼', label: 'Placement Records', onClick: () => onTabChange('placements'), color: 'hover:bg-orange-500/10' },
-  ]
-
-  // Bar chart colors
-  const BAR_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b']
-
-  return (
-    <div className="space-y-6">
-      {/* ── Header Banner ── */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative rounded-2xl overflow-hidden border border-indigo-500/10"
-        style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(168,85,247,0.05) 50%, rgba(6,182,212,0.03) 100%)' }}
-      >
-        <div className="flex items-center justify-between p-6">
-          <div>
-            <h2 className="text-2xl font-bold text-white">
-              {greeting}, Admin {emoji}
-            </h2>
-            <p className="text-zinc-500 text-sm mt-1">Here's what's happening at your college today.</p>
-          </div>
-          <div className="hidden md:flex flex-col items-end gap-1 text-right">
-            <div className="flex items-center gap-2 text-indigo-300">
-              <Calendar size={14} />
-              <span className="text-sm font-medium">{dateStr}</span>
-            </div>
-            <p className="text-xs text-zinc-600 italic">{quote}</p>
-          </div>
-        </div>
-        {/* Decorative background element */}
-        <div className="absolute right-0 top-0 w-64 h-full opacity-10 pointer-events-none">
-          <div className="absolute right-8 top-4 text-8xl">🏫</div>
-        </div>
-      </motion.div>
-
-      {/* ── Stat Cards Row ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard index={0} label="Total Students" value={overview?.totalStudents?.toLocaleString() ?? '2,450'} icon={GraduationCap} iconColor="text-indigo-400" bgColor="bg-indigo-500/10" trend={8.2} trendLabel="from last year" onClick={() => onTabChange('users')} />
-        <StatCard index={1} label="Faculty Members" value={overview?.totalFaculty ?? '186'} icon={Users} iconColor="text-purple-400" bgColor="bg-purple-500/10" trend={4.1} trendLabel="from last year" onClick={() => onTabChange('faculty')} />
-        <StatCard index={2} label="Average Attendance" value={overview?.overallAverageAttendance ? `${fmtNum(overview.overallAverageAttendance)}%` : '87.4%'} icon={ClipboardCheck} iconColor="text-teal-400" bgColor="bg-teal-500/10" trend={2.3} trendLabel="this month" />
-        <StatCard index={3} label="Placed Students" value={placementStats?.offersReceived ?? '324'} icon={Trophy} iconColor="text-amber-400" bgColor="bg-amber-500/10" trend={12.5} trendLabel="this year" onClick={() => onTabChange('placements')} />
-      </div>
-
-      {/* ── Charts + Events Row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Attendance Bar Chart */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="lg:col-span-4 glass-card rounded-2xl p-5"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                <BarChart3 size={15} className="text-indigo-400" />
-                Attendance Overview
-              </h3>
-            </div>
-            <Badge variant="secondary" className="text-[10px] px-2 py-0.5">This Semester</Badge>
-          </div>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={attendanceChartData.length > 0 ? attendanceChartData : [
-              { name: 'CSE', attendance: 92 }, { name: 'ISE', attendance: 88 },
-              { name: 'ECE', attendance: 85 }, { name: 'ME', attendance: 79 }, { name: 'Civil', attendance: 83 }
-            ]} barSize={22} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.08)" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="attendance" radius={[6, 6, 0, 0]}>
-                {(attendanceChartData.length > 0 ? attendanceChartData : [0,1,2,3,4]).map((_, i) => (
-                  <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        {/* Pie Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="lg:col-span-3 glass-card rounded-2xl p-5 flex flex-col"
-        >
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-4">
-            <Activity size={15} className="text-purple-400" />
-            Student Statistics
-          </h3>
-          <div className="flex-1 flex items-center justify-center relative">
-            <ResponsiveContainer width="100%" height={170}>
-              <PieChart>
-                <Pie
-                  data={deptDistribution.length > 0 ? deptDistribution : [
-                    { name: 'CSE', value: 32 }, { name: 'ISE', value: 24 },
-                    { name: 'ECE', value: 18 }, { name: 'ME', value: 14 }, { name: 'Civil', value: 12 }
-                  ]}
-                  cx="50%" cy="50%" innerRadius={45} outerRadius={65}
-                  dataKey="value" paddingAngle={3}
-                >
-                  {PIE_COLORS.map((c, i) => <Cell key={i} fill={c} />)}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-              <p className="text-xl font-bold text-white">{overview?.totalStudents?.toLocaleString() ?? '2,450'}</p>
-              <p className="text-[10px] text-zinc-500">Students</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-1.5 mt-2">
-            {['CSE', 'ISE', 'ECE', 'ME', 'Civil'].map((d, i) => (
-              <div key={d} className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full shrink-0" style={{ background: PIE_COLORS[i] }} />
-                <span className="text-[10px] text-zinc-500">{d} {[32,24,18,14,12][i]}%</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Upcoming Events */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-          className="lg:col-span-5 glass-card rounded-2xl p-5"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Calendar size={15} className="text-indigo-400" />
-              Upcoming Events
-            </h3>
-            <button className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">View All</button>
-          </div>
-          <div className="space-y-1">
-            {upcomingEvents.map((ev, i) => (
-              <div key={i} className="event-item">
-                <div className="flex flex-col items-center justify-center w-10 h-10 rounded-xl shrink-0" style={{ background: `${ev.color}15`, border: `1px solid ${ev.color}30` }}>
-                  <span className="text-[10px] font-bold" style={{ color: ev.color }}>{ev.date.month}</span>
-                  <span className="text-sm font-bold text-white leading-none">{ev.date.day}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-zinc-200 truncate">{ev.title}</p>
-                  <p className="text-[10px] text-zinc-600 mt-0.5 flex items-center gap-1">
-                    <Clock size={9} /> {ev.time}
-                  </p>
-                  <p className="text-[10px] text-zinc-600 flex items-center gap-1">
-                    <MapPin size={9} /> {ev.location}
-                  </p>
-                </div>
-                <ChevronRight size={12} className="text-zinc-700 shrink-0" />
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* ── Notices + Top Performers + Quick Actions ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Recent Notices */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="lg:col-span-4 glass-card rounded-2xl p-5"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Megaphone size={15} className="text-amber-400" />
-              Recent Notices
-            </h3>
-            <button onClick={() => onTabChange('announcements')} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">View All</button>
-          </div>
-          <div className="space-y-2">
-            {recentNotices.map(n => (
-              <div key={n.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.02] transition-colors cursor-pointer group">
-                <div className="w-8 h-8 rounded-xl bg-zinc-800/80 flex items-center justify-center shrink-0">
-                  <FileText size={14} className="text-zinc-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-zinc-200 truncate">{n.title}</p>
-                  <p className="text-[10px] text-zinc-600">{n.dept} · {n.time}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <Badge variant={n.badgeColor} className="text-[9px] px-2 py-0">{n.badge}</Badge>
-                  <ChevronRight size={10} className="text-zinc-700 group-hover:text-zinc-400 transition-colors" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Top Performers */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="lg:col-span-4 glass-card rounded-2xl p-5"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Trophy size={15} className="text-amber-400" />
-              Top Performers (Attendance)
-            </h3>
-            <button className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">View All</button>
-          </div>
-          <div className="space-y-1">
-            {topPerformers.map((p, i) => (
-              <div key={i} className="performer-item">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: `${p.color}20`, border: `1px solid ${p.color}40` }}>
-                  <span className="text-[10px] font-bold" style={{ color: p.color }}>{p.rank}</span>
-                </div>
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0">
-                  <span className="text-[10px] font-bold text-white">{p.name[0]}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-zinc-200 truncate">{p.name}</p>
-                  <p className="text-[10px] text-zinc-600">{p.dept}</p>
-                </div>
-                <div className="flex flex-col items-end shrink-0">
-                  <span className="text-sm font-bold text-emerald-400">{p.attendance}%</span>
-                  <div className="w-12 progress-bar mt-1">
-                    <div className="progress-bar-fill bg-emerald-500" style={{ width: `${p.attendance}%` }} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.45 }}
-          className="lg:col-span-4 glass-card rounded-2xl p-5"
-        >
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-4">
-            <Zap size={15} className="text-amber-400" />
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-4 gap-2">
-            {quickActions.map((qa, i) => (
-              <button
-                key={i}
-                onClick={qa.onClick}
-                className={cn('quick-action', qa.color)}
-              >
-                <span className="text-xl">{qa.icon}</span>
-                <span className="text-[9px] text-zinc-500 text-center leading-tight">{qa.label}</span>
-              </button>
-            ))}
-          </div>
-        </motion.div>
+        </Panel>
       </div>
     </div>
   )
 }
 
-// ─── Users Tab ────────────────────────────────────────────────────────────────
-function UsersTab({ users, departments, showCreateForm, setShowCreateForm, formData, setFormData, onCreateUser, editingUser, setEditingUser, editForm, setEditForm, onEditUser, onToggleActive, csvFile, setCsvFile, onCsvImport, importResult, loading }) {
+// ─── Directory (Students / Faculty) ──────────────────────────────────────────
+function DirectoryTab({
+  users, departments, loading, query, fixedRole, title, subtitle, icon,
+  onCreateUser, onEditUser, onToggleActive, onCsvImport, importResult,
+}) {
+  const [roleFilter, setRoleFilter] = useState(fixedRole || 'ALL')
+  const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', role: fixedRole || 'STUDENT', departmentId: '' })
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '' })
+
+  const filtered = useMemo(() => {
+    const q = (query || '').trim().toLowerCase()
+    return users.filter(u => {
+      if (roleFilter !== 'ALL' && u.role !== roleFilter) return false
+      if (!q) return true
+      return `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q)
+    })
+  }, [users, roleFilter, query])
+
+  const submitCreate = async (e) => {
+    e.preventDefault()
+    const ok = await onCreateUser({ ...form, departmentId: form.departmentId || null })
+    if (ok) {
+      setShowCreate(false)
+      setForm({ firstName: '', lastName: '', email: '', password: '', role: fixedRole || 'STUDENT', departmentId: '' })
+    }
+  }
+
+  const submitEdit = async () => {
+    if (!editing) return
+    const ok = await onEditUser(editing.id, editForm)
+    if (ok) setEditing(null)
+  }
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <GraduationCap size={20} className="text-indigo-400" />
-            User Management
-          </h2>
-          <p className="text-sm text-zinc-500 mt-0.5">Manage students, faculty and administrators</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 bg-zinc-800/80 border border-zinc-700 text-zinc-400 text-xs px-3 py-2 rounded-xl cursor-pointer hover:border-indigo-500/40 transition-colors">
-            <Upload size={13} />
-            <span>Import CSV</span>
-            <input type="file" accept=".csv" onChange={e => setCsvFile(e.target.files?.[0] || null)} className="hidden" />
-          </label>
-          {csvFile && (
-            <Button variant="outline" size="sm" onClick={onCsvImport} disabled={loading}>
-              <Upload size={13} /> Import
+      <PageTitle
+        icon={icon}
+        title={title}
+        subtitle={subtitle}
+        actions={
+          <>
+            <label className="flex items-center gap-2 bg-white border border-slate-200 text-slate-500 text-xs font-medium px-3 py-2 rounded-xl cursor-pointer hover:border-indigo-300 hover:text-indigo-600 transition-colors">
+              <Upload size={14} />
+              <span>Import CSV</span>
+              <input type="file" accept=".csv" onChange={e => e.target.files?.[0] && onCsvImport(e.target.files[0])} className="hidden" />
+            </label>
+            <Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}>
+              <Plus size={14} /> {showCreate ? 'Cancel' : 'Add User'}
             </Button>
-          )}
-          <Button variant="gradient" size="sm" onClick={() => setShowCreateForm(!showCreateForm)}>
-            <Plus size={14} />
-            {showCreateForm ? 'Cancel' : 'Create User'}
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {importResult && (
-        <div className="glass-card rounded-2xl p-4">
-          <div className="flex gap-4 text-sm">
-            <span className="text-emerald-400 flex items-center gap-1"><CheckCircle2 size={13} /> {importResult.successCount} success</span>
-            <span className="text-red-400 flex items-center gap-1"><X size={13} /> {importResult.failureCount} failed</span>
-            <span className="text-zinc-400">Total: {importResult.totalProcessed}</span>
-          </div>
-          {importResult.errors?.length > 0 && (
-            <div className="text-xs text-red-300 space-y-1 mt-2 max-h-24 overflow-y-auto">
-              {importResult.errors.map((e, i) => <div key={i}>{e}</div>)}
-            </div>
-          )}
+        <div className="glass-card p-4 flex flex-wrap items-center gap-4 text-sm">
+          <span className="text-emerald-600 flex items-center gap-1.5 font-medium"><CheckCircle2 size={15} /> {importResult.successCount} imported</span>
+          <span className="text-red-500 flex items-center gap-1.5 font-medium"><XCircle size={15} /> {importResult.failureCount} failed</span>
+          <span className="text-slate-400">Total {importResult.totalProcessed}</span>
         </div>
       )}
 
-      <AnimatePresence>
-        {showCreateForm && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-          >
-            <form onSubmit={onCreateUser} className="glass-card rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-zinc-300 mb-4 flex items-center gap-2"><Plus size={14} className="text-indigo-400" /> Create New User</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {['firstName', 'lastName', 'email', 'password'].map(field => (
-                  <div key={field}>
-                    <label className="text-xs text-zinc-500 mb-1.5 block capitalize">{field.replace(/([A-Z])/g, ' $1')}</label>
-                    <input
-                      type={field === 'password' ? 'password' : field === 'email' ? 'email' : 'text'}
-                      value={formData[field]}
-                      onChange={e => setFormData({ ...formData, [field]: e.target.value })}
-                      className="collego-input"
-                      required
-                    />
-                  </div>
-                ))}
-                <div>
-                  <label className="text-xs text-zinc-500 mb-1.5 block">Role</label>
-                  <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="collego-input">
-                    <option value="STUDENT">Student</option>
-                    <option value="FACULTY">Faculty</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-500 mb-1.5 block">Department</label>
-                  <select value={formData.departmentId} onChange={e => setFormData({ ...formData, departmentId: e.target.value })} className="collego-input">
-                    <option value="">Select Department</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
+      {showCreate && (
+        <motion.form
+          initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+          onSubmit={submitCreate}
+          className="glass-card p-5"
+        >
+          <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2"><Plus size={15} className="text-indigo-500" /> Create New User</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {['firstName', 'lastName', 'email', 'password'].map(field => (
+              <div key={field}>
+                <label className="text-xs text-slate-500 mb-1.5 block capitalize">{field.replace(/([A-Z])/g, ' $1')}</label>
+                <input
+                  type={field === 'password' ? 'password' : field === 'email' ? 'email' : 'text'}
+                  value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })}
+                  className="collego-input" required
+                />
               </div>
-              <Button type="submit" variant="gradient" size="sm" className="mt-4">Create User</Button>
-            </form>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            ))}
+            <div>
+              <label className="text-xs text-slate-500 mb-1.5 block">Role</label>
+              <select value={form.role} disabled={!!fixedRole} onChange={e => setForm({ ...form, role: e.target.value })} className="collego-input disabled:opacity-60">
+                <option value="STUDENT">Student</option>
+                <option value="FACULTY">Faculty</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1.5 block">Department</label>
+              <select value={form.departmentId} onChange={e => setForm({ ...form, departmentId: e.target.value })} className="collego-input">
+                <option value="">Select Department</option>
+                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <Button type="submit" variant="gradient" size="sm" className="mt-4" disabled={loading}>
+            {loading ? <><RefreshCw size={13} className="animate-spin" /> Creating...</> : <><Plus size={13} /> Create User</>}
+          </Button>
+        </motion.form>
+      )}
 
-      {editingUser && (
-        <div className="glass-card rounded-2xl p-5 border border-purple-500/20">
-          <h3 className="text-sm font-semibold text-purple-300 mb-3 flex items-center gap-2"><Edit size={13} /> Edit User #{editingUser.id}</h3>
-          <div className="grid grid-cols-3 gap-3">
-            <input value={editForm.firstName} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} placeholder="First Name" className="collego-input" />
-            <input value={editForm.lastName} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} placeholder="Last Name" className="collego-input" />
+      {editing && (
+        <div className="glass-card p-5 border-violet-200">
+          <h3 className="text-sm font-semibold text-violet-700 mb-3 flex items-center gap-2"><Edit size={14} /> Edit {editing.firstName} {editing.lastName}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input value={editForm.firstName} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} placeholder="First name" className="collego-input" />
+            <input value={editForm.lastName} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} placeholder="Last name" className="collego-input" />
             <input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} placeholder="Email" className="collego-input" />
           </div>
           <div className="flex gap-2 mt-3">
-            <Button onClick={onEditUser} variant="gradient" size="sm">Save Changes</Button>
-            <Button onClick={() => setEditingUser(null)} variant="outline" size="sm">Cancel</Button>
+            <Button onClick={submitEdit} variant="gradient" size="sm">Save Changes</Button>
+            <Button onClick={() => setEditing(null)} variant="outline" size="sm">Cancel</Button>
           </div>
         </div>
       )}
 
-      <div className="glass-card rounded-2xl overflow-hidden">
-        <table className="collego-table">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Name</th>
-              <th style={{ textAlign: 'center' }}>Role</th>
-              <th style={{ textAlign: 'center' }}>Status</th>
-              <th style={{ textAlign: 'center' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(u => (
-              <tr key={u.id}>
-                <td>{u.email}</td>
-                <td className="font-medium text-zinc-200">{u.firstName} {u.lastName}</td>
-                <td style={{ textAlign: 'center' }}>
-                  <Badge variant={u.role === 'ADMIN' ? 'destructive' : u.role === 'FACULTY' ? 'purple' : 'info'}>
-                    {u.role}
-                  </Badge>
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  <Badge variant={u.active ? 'success' : 'secondary'}>
-                    {u.active ? 'Active' : 'Inactive'}
-                  </Badge>
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  <div className="flex items-center justify-center gap-1">
-                    <button onClick={() => { setEditingUser(u); setEditForm({ firstName: u.firstName, lastName: u.lastName, email: u.email }) }} className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-zinc-500 hover:text-indigo-400 transition-colors">
-                      <Edit size={13} />
-                    </button>
-                    <button onClick={() => onToggleActive(u)} className="p-1.5 rounded-lg hover:bg-amber-500/10 text-zinc-500 hover:text-amber-400 transition-colors">
-                      {u.active ? <Eye size={13} /> : <Eye size={13} className="opacity-40" />}
-                    </button>
-                  </div>
-                </td>
+      {!fixedRole && (
+        <div className="flex items-center gap-2">
+          <Filter size={14} className="text-slate-400" />
+          {['ALL', 'STUDENT', 'FACULTY', 'ADMIN'].map(r => (
+            <button
+              key={r}
+              onClick={() => setRoleFilter(r)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-xs font-medium transition-colors border',
+                roleFilter === r ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'
+              )}
+            >
+              {r === 'ALL' ? 'All' : r.charAt(0) + r.slice(1).toLowerCase()}
+            </button>
+          ))}
+          <span className="text-xs text-slate-400 ml-auto">{filtered.length} users</span>
+        </div>
+      )}
+
+      <div className="glass-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="collego-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th style={{ textAlign: 'center' }}>Role</th>
+                <th style={{ textAlign: 'center' }}>Status</th>
+                <th style={{ textAlign: 'center' }}>Actions</th>
               </tr>
-            ))}
-            {users.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: 'center', color: '#52525b', padding: '2rem' }}>No users found.</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map(u => (
+                <tr key={u.id}>
+                  <td>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+                        {u.firstName?.[0]}{u.lastName?.[0]}
+                      </div>
+                      <span className="font-medium text-slate-800">{u.firstName} {u.lastName}</span>
+                    </div>
+                  </td>
+                  <td className="text-slate-500">{u.email}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <Badge variant={u.role === 'ADMIN' ? 'destructive' : u.role === 'FACULTY' ? 'purple' : 'info'}>{u.role}</Badge>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <Badge variant={u.active ? 'success' : 'secondary'}>{u.active ? 'Active' : 'Inactive'}</Badge>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => { setEditing(u); setEditForm({ firstName: u.firstName, lastName: u.lastName, email: u.email }) }}
+                        className="p-2 rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors" title="Edit"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        onClick={() => onToggleActive(u)}
+                        className={cn('p-2 rounded-lg transition-colors', u.active ? 'hover:bg-amber-50 text-slate-400 hover:text-amber-600' : 'hover:bg-emerald-50 text-slate-400 hover:text-emerald-600')}
+                        title={u.active ? 'Deactivate' : 'Activate'}
+                      >
+                        <Power size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={5} className="text-center text-slate-400 py-12">No users found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
 }
 
-// ─── Placeholder Tab ──────────────────────────────────────────────────────────
-function PlaceholderTab({ title, icon: Icon, description, color = 'indigo' }) {
+// ─── Academics ───────────────────────────────────────────────────────────────
+function AcademicsTab({ departments, overview, semesters, deptReports }) {
+  const stats = [
+    { label: 'Departments', value: overview?.totalDepartments ?? departments.length, icon: Layers, accent: 'blue' },
+    { label: 'Courses', value: overview?.totalCourses ?? 0, icon: BookOpen, accent: 'violet' },
+    { label: 'Sections', value: overview?.totalSections ?? 0, icon: UsersRound, accent: 'emerald' },
+    { label: 'Enrollments', value: overview?.totalEnrollments ?? 0, icon: ScrollText, accent: 'amber' },
+  ]
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center justify-center min-h-[60vh] text-center"
-    >
-      <div className={`w-20 h-20 rounded-2xl bg-${color}-500/10 border border-${color}-500/20 flex items-center justify-center mb-6`}>
-        <Icon size={36} className={`text-${color}-400`} />
+    <div className="space-y-5">
+      <PageTitle icon={BookOpen} title="Academic Management" subtitle="Departments, courses, sections, semesters and enrolments." />
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {stats.map((s, i) => <StatCard key={s.label} index={i} label={s.label} value={s.value} icon={s.icon} accent={s.accent} />)}
       </div>
-      <h2 className="text-2xl font-bold text-white mb-2">{title}</h2>
-      <p className="text-zinc-500 max-w-sm">{description}</p>
-      <Badge variant="info" className="mt-4">Fully implemented — UI coming from backend</Badge>
-    </motion.div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Panel title="Departments" icon={Building2} accent="blue" className="xl:col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {(deptReports || []).map(d => (
+              <div key={d.departmentId} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50/60">
+                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-bold text-xs text-indigo-600 shrink-0">
+                  {d.departmentCode}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{d.departmentName}</p>
+                  <p className="text-[11px] text-slate-400">{d.totalStudents} students · {d.totalFaculty} faculty · {d.totalCourses} courses</p>
+                </div>
+              </div>
+            ))}
+            {(!deptReports || deptReports.length === 0) && <EmptyState icon={Building2} title="No departments" />}
+          </div>
+        </Panel>
+        <Panel title="Semesters" icon={CalendarDays} accent="violet">
+          <div className="space-y-2">
+            {(semesters || []).map(s => (
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">{s.name}</p>
+                  <p className="text-[11px] text-slate-400">{s.academicYear}</p>
+                </div>
+                <Badge variant={s.active ? 'success' : 'secondary'}>{s.active ? 'Active' : 'Inactive'}</Badge>
+              </div>
+            ))}
+            {(!semesters || semesters.length === 0) && <EmptyState icon={CalendarDays} title="No semesters" />}
+          </div>
+        </Panel>
+      </div>
+    </div>
   )
 }
 
-// ─── Main Admin Dashboard ─────────────────────────────────────────────────────
+// ─── Attendance ──────────────────────────────────────────────────────────────
+function AttendanceTab({ attendanceSummary, overview }) {
+  const chartData = (attendanceSummary || []).map(d => ({
+    name: d.departmentName?.split(' ')[0] || 'N/A',
+    attendance: Math.round(d.averageAttendancePercentage || 0),
+  }))
+  const totals = (attendanceSummary || []).reduce((acc, d) => ({
+    students: acc.students + (d.totalStudents || 0),
+    above75: acc.above75 + (d.studentsAbove75 || 0),
+    below75: acc.below75 + (d.studentsBelow75 || 0),
+    below50: acc.below50 + (d.studentsBelow50 || 0),
+  }), { students: 0, above75: 0, below75: 0, below50: 0 })
+
+  return (
+    <div className="space-y-5">
+      <PageTitle icon={ClipboardCheck} title="Attendance Management" subtitle="Department-wise attendance health and at-risk students." />
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard index={0} label="Average Attendance" value={overview?.overallAverageAttendance ?? 0} decimals={1} suffix="%" icon={Percent} accent="emerald" />
+        <StatCard index={1} label="Above 75%" value={totals.above75} icon={CheckCircle2} accent="blue" />
+        <StatCard index={2} label="50% – 75%" value={totals.below75} icon={Activity} accent="amber" />
+        <StatCard index={3} label="Below 50%" value={totals.below50} icon={XCircle} accent="violet" />
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <Panel title="Attendance by Department" icon={BarChart3} accent="indigo">
+          {chartData.length === 0 ? <EmptyState icon={BarChart3} title="No data" /> : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={chartData} barSize={28} margin={{ top: 6, right: 4, left: -18, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eef1f8" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8a94ad' }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#8a94ad' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip unit="%" />} cursor={{ fill: 'rgba(99,102,241,0.05)' }} />
+                <Bar dataKey="attendance" name="Attendance" radius={[8, 8, 0, 0]}>
+                  {chartData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </Panel>
+        <Panel title="Department Breakdown" icon={Layers} accent="violet">
+          <div className="overflow-x-auto">
+            <table className="collego-table">
+              <thead><tr><th>Department</th><th style={{ textAlign: 'center' }}>Students</th><th style={{ textAlign: 'center' }}>Avg %</th><th style={{ textAlign: 'center' }}>&lt;75%</th></tr></thead>
+              <tbody>
+                {(attendanceSummary || []).map(d => (
+                  <tr key={d.departmentId}>
+                    <td className="font-medium text-slate-800">{d.departmentName}</td>
+                    <td style={{ textAlign: 'center' }}>{d.totalStudents}</td>
+                    <td style={{ textAlign: 'center' }}><Badge variant={d.averageAttendancePercentage >= 75 ? 'success' : d.averageAttendancePercentage >= 50 ? 'warning' : 'destructive'}>{fmtNum(d.averageAttendancePercentage, 1)}%</Badge></td>
+                    <td style={{ textAlign: 'center' }} className="text-amber-600 font-semibold">{d.studentsBelow75}</td>
+                  </tr>
+                ))}
+                {(!attendanceSummary || attendanceSummary.length === 0) && <tr><td colSpan={4} className="text-center text-slate-400 py-10">No attendance data.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      </div>
+    </div>
+  )
+}
+
+// ─── Examinations ────────────────────────────────────────────────────────────
+function ExaminationsTab({ pendingQPs, onApprove, onReject, loading }) {
+  return (
+    <div className="space-y-5">
+      <PageTitle icon={BookMarked} title="Examinations & Marks" subtitle="Approve question papers and monitor examination readiness." />
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard index={0} label="Pending Approvals" value={pendingQPs.length} icon={Clock} accent="amber" />
+        <StatCard index={1} label="Approved" value={pendingQPs.filter(q => q.status === 'APPROVED').length} icon={CheckCircle2} accent="emerald" />
+        <StatCard index={2} label="Rejected" value={pendingQPs.filter(q => q.status === 'REJECTED').length} icon={XCircle} accent="violet" />
+        <StatCard index={3} label="Total Papers" value={pendingQPs.length} icon={FileText} accent="blue" />
+      </div>
+      <Panel title="Question Papers Awaiting Approval" icon={FileText} accent="indigo">
+        {pendingQPs.length === 0 ? (
+          <EmptyState icon={CheckCircle2} title="All caught up" description="No question papers are pending approval." />
+        ) : (
+          <div className="space-y-2">
+            {pendingQPs.map(qp => (
+              <div key={qp.id} className="flex flex-wrap items-center gap-3 p-3.5 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+                  <FileText size={17} className="text-indigo-600" />
+                </div>
+                <div className="flex-1 min-w-[180px]">
+                  <p className="text-sm font-semibold text-slate-800">{qp.courseName} <span className="text-slate-400 font-normal">({qp.courseCode})</span></p>
+                  <p className="text-[11px] text-slate-400">{qp.examType} · {qp.year} · Sem {qp.semesterNumber} · {qp.uploadedByName}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="success" size="sm" disabled={loading} onClick={() => onApprove(qp.id)}><CheckCircle2 size={13} /> Approve</Button>
+                  <Button variant="destructive" size="sm" disabled={loading} onClick={() => onReject(qp.id)}><X size={13} /> Reject</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+    </div>
+  )
+}
+
+// ─── Placements ──────────────────────────────────────────────────────────────
+function PlacementsTab({ placementStats }) {
+  const s = placementStats
+  const deptData = s?.departmentBreakdown || []
+  return (
+    <div className="space-y-5">
+      <PageTitle icon={Briefcase} title="Placement Management" subtitle="Company drives, applications and placement analytics." />
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard index={0} label="Students Placed" value={s?.studentsPlaced ?? 0} icon={Trophy} accent="emerald" />
+        <StatCard index={1} label="Offers Extended" value={s?.totalOffersExtended ?? 0} icon={Award} accent="amber" />
+        <StatCard index={2} label="Open Postings" value={s?.openJobPostings ?? 0} icon={Briefcase} accent="blue" />
+        <StatCard index={3} label="Placement Rate" value={s?.placementRate ?? 0} decimals={1} suffix="%" icon={TrendingUp} accent="violet" />
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Panel title="Department Placements" icon={Layers} accent="indigo" className="xl:col-span-2">
+          {deptData.length === 0 ? <EmptyState icon={Briefcase} title="No placement data" /> : (
+            <div className="overflow-x-auto">
+              <table className="collego-table">
+                <thead><tr><th>Department</th><th style={{ textAlign: 'center' }}>Students</th><th style={{ textAlign: 'center' }}>Applied</th><th style={{ textAlign: 'center' }}>Placed</th><th style={{ textAlign: 'center' }}>Rate</th></tr></thead>
+                <tbody>
+                  {deptData.map(d => (
+                    <tr key={d.departmentCode}>
+                      <td className="font-medium text-slate-800">{d.departmentName}</td>
+                      <td style={{ textAlign: 'center' }}>{d.totalStudents}</td>
+                      <td style={{ textAlign: 'center' }}>{d.studentsApplied}</td>
+                      <td style={{ textAlign: 'center' }} className="font-semibold text-emerald-600">{d.studentsPlaced}</td>
+                      <td style={{ textAlign: 'center' }}><Badge variant="info">{fmtNum(d.placementRate, 1)}%</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+        <Panel title="Top Recruiters" icon={Award} accent="amber">
+          <div className="space-y-2">
+            {(s?.topCompanies || []).map((c, i) => (
+              <div key={c.companyId} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100">
+                <div className="w-7 h-7 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{c.companyName}</p>
+                  <p className="text-[11px] text-slate-400">Highest {c.highestPackage || '—'}</p>
+                </div>
+                <span className="text-sm font-bold text-slate-700">{c.offersExtended}</span>
+              </div>
+            ))}
+            {(!s?.topCompanies || s.topCompanies.length === 0) && <EmptyState icon={Award} title="No recruiters yet" />}
+          </div>
+        </Panel>
+      </div>
+    </div>
+  )
+}
+
+// ─── Reports ─────────────────────────────────────────────────────────────────
+function ReportsTab({ deptReports, subjectReports }) {
+  const [view, setView] = useState('department')
+  return (
+    <div className="space-y-5">
+      <PageTitle
+        icon={BarChart3}
+        title="Reports & Analytics"
+        subtitle="Department performance, pass percentages and subject-level outcomes."
+        actions={
+          <div className="flex bg-white border border-slate-200 rounded-xl p-1">
+            {[['department', 'Departments'], ['subject', 'Subjects']].map(([id, label]) => (
+              <button key={id} onClick={() => setView(id)}
+                className={cn('px-4 py-1.5 rounded-lg text-xs font-medium transition-all', view === id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-800')}>
+                {label}
+              </button>
+            ))}
+          </div>
+        }
+      />
+      <div className="glass-card overflow-hidden">
+        <div className="overflow-x-auto">
+          {view === 'department' ? (
+            <table className="collego-table">
+              <thead><tr><th>Department</th><th style={{ textAlign: 'center' }}>Students</th><th style={{ textAlign: 'center' }}>Faculty</th><th style={{ textAlign: 'center' }}>Courses</th><th style={{ textAlign: 'center' }}>Attendance</th><th style={{ textAlign: 'center' }}>Pass %</th></tr></thead>
+              <tbody>
+                {(deptReports || []).map(d => (
+                  <tr key={d.departmentId}>
+                    <td className="font-medium text-slate-800">{d.departmentName} <span className="text-slate-400">({d.departmentCode})</span></td>
+                    <td style={{ textAlign: 'center' }}>{d.totalStudents}</td>
+                    <td style={{ textAlign: 'center' }}>{d.totalFaculty}</td>
+                    <td style={{ textAlign: 'center' }}>{d.totalCourses}</td>
+                    <td style={{ textAlign: 'center' }}><Badge variant={d.averageAttendance >= 75 ? 'success' : 'warning'}>{fmtNum(d.averageAttendance, 1)}%</Badge></td>
+                    <td style={{ textAlign: 'center' }}><Badge variant={d.averagePassPercentage >= 60 ? 'success' : 'warning'}>{fmtNum(d.averagePassPercentage, 1)}%</Badge></td>
+                  </tr>
+                ))}
+                {(!deptReports || deptReports.length === 0) && <tr><td colSpan={6} className="text-center text-slate-400 py-12">No department reports.</td></tr>}
+              </tbody>
+            </table>
+          ) : (
+            <table className="collego-table">
+              <thead><tr><th>Course</th><th>Section</th><th>Faculty</th><th style={{ textAlign: 'center' }}>Enrolled</th><th style={{ textAlign: 'center' }}>Avg Marks</th><th style={{ textAlign: 'center' }}>Attendance</th><th style={{ textAlign: 'center' }}>Pass %</th></tr></thead>
+              <tbody>
+                {(subjectReports || []).map(sr => (
+                  <tr key={sr.sectionId}>
+                    <td className="font-medium text-slate-800">{sr.courseName} <span className="text-slate-400 font-mono text-xs">{sr.courseCode}</span></td>
+                    <td>{sr.sectionName}</td>
+                    <td className="text-slate-500">{sr.facultyName || '—'}</td>
+                    <td style={{ textAlign: 'center' }}>{sr.totalEnrolled}</td>
+                    <td style={{ textAlign: 'center' }}>{sr.averageMarks != null ? fmtNum(sr.averageMarks, 1) : '—'}</td>
+                    <td style={{ textAlign: 'center' }}><Badge variant={sr.averageAttendance >= 75 ? 'success' : 'warning'}>{fmtNum(sr.averageAttendance, 1)}%</Badge></td>
+                    <td style={{ textAlign: 'center' }}><Badge variant={sr.passPercentage >= 60 ? 'success' : 'destructive'}>{fmtNum(sr.passPercentage, 1)}%</Badge></td>
+                  </tr>
+                ))}
+                {(!subjectReports || subjectReports.length === 0) && <tr><td colSpan={7} className="text-center text-slate-400 py-12">No subject reports.</td></tr>}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Notices & Events ────────────────────────────────────────────────────────
+function NoticesTab({ insights }) {
+  const notices = insights?.recentNotices || []
+  const events = insights?.upcomingEvents || []
+  return (
+    <div className="space-y-5">
+      <PageTitle icon={Megaphone} title="Notices & Events" subtitle="Latest broadcasts and the campus activity calendar." />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <Panel title="Recent Notices" icon={Megaphone} accent="amber">
+          <div className="space-y-3">
+            {notices.map(n => {
+              const cfg = NOTICE_TYPES[n.type] || NOTICE_TYPES.GENERAL
+              return (
+                <div key={n.id} className="p-4 rounded-2xl border border-slate-100">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>
+                    <span className="text-[11px] text-slate-400">{timeAgo(n.createdAt)}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800">{n.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
+                </div>
+              )
+            })}
+            {notices.length === 0 && <EmptyState icon={Megaphone} title="No notices yet" />}
+          </div>
+        </Panel>
+        <Panel title="Upcoming Events" icon={CalendarDays} accent="indigo">
+          <div className="space-y-2">
+            {events.map(ev => {
+              const color = EVENT_COLORS[ev.category] || '#6366f1'
+              const date = ev.date ? new Date(ev.date) : null
+              return (
+                <div key={ev.id} className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-100">
+                  <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl shrink-0" style={{ background: `${color}14`, border: `1px solid ${color}30` }}>
+                    <span className="text-[9px] font-bold uppercase" style={{ color }}>{date ? date.toLocaleDateString('en-IN', { month: 'short' }) : '—'}</span>
+                    <span className="text-base font-extrabold text-slate-800 leading-none">{date ? date.getDate() : '—'}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{ev.title}</p>
+                    <p className="text-[11px] text-slate-400 flex items-center gap-1"><MapPin size={10} /> {ev.subtitle || ev.location}</p>
+                  </div>
+                </div>
+              )
+            })}
+            {events.length === 0 && <EmptyState icon={CalendarDays} title="No upcoming events" />}
+          </div>
+        </Panel>
+      </div>
+    </div>
+  )
+}
+
+// ─── Coming soon / informational ─────────────────────────────────────────────
+const COMING_SOON = {
+  fees: { title: 'Fees & Finance', icon: Wallet, accent: 'amber', copy: 'Student fee structures, payment tracking, receipts and financial reports will be managed here.' },
+  hostel: { title: 'Hostel & Facilities', icon: Home, accent: 'violet', copy: 'Hostel allocation, room availability, facility bookings and complaint tracking.' },
+  library: { title: 'Library', icon: Landmark, accent: 'blue', copy: 'Book catalogue, issue and return workflow, fines and resource reservations.' },
+  aiAssistant: { title: 'AI Assistant', icon: Sparkles, accent: 'violet', copy: 'AI-powered insights, risk detection, smart search and automated decision support are available across portals.' },
+  settings: { title: 'System Settings', icon: Settings, accent: 'indigo', copy: 'Configure roles, permissions, academic sessions, notifications and system preferences.' },
+  help: { title: 'Help & Support', icon: HelpCircle, accent: 'emerald', copy: 'Documentation, FAQs and support contacts for administrators and staff.' },
+}
+
+function ComingSoonTab({ id }) {
+  const cfg = COMING_SOON[id] || COMING_SOON.settings
+  const a = ACCENTS[cfg.accent] || ACCENTS.indigo
+  return (
+    <div className="space-y-5">
+      <PageTitle icon={cfg.icon} title={cfg.title} subtitle="Planned module" />
+      <div className="glass-card p-10 flex flex-col items-center text-center">
+        <div className={cn('w-20 h-20 rounded-3xl flex items-center justify-center mb-5', a.softBg)}>
+          <cfg.icon size={34} className={a.text} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-900">{cfg.title}</h3>
+        <p className="text-sm text-slate-500 max-w-md mt-2">{cfg.copy}</p>
+        <Badge variant="info" className="mt-4">Backend-ready · UI rolling out</Badge>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const navigate = useNavigate()
-  const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [toast, setToast] = useState({ text: '', type: 'success' })
   const [loading, setLoading] = useState(false)
+  const [query, setQuery] = useState('')
 
-  // API data states
   const [overview, setOverview] = useState(null)
   const [users, setUsers] = useState([])
   const [departments, setDepartments] = useState([])
   const [deptReports, setDeptReports] = useState([])
+  const [subjectReports, setSubjectReports] = useState([])
   const [attendanceSummary, setAttendanceSummary] = useState([])
   const [pendingQPs, setPendingQPs] = useState([])
-  const [auditLogs, setAuditLogs] = useState([])
   const [placementStats, setPlacementStats] = useState(null)
-
-  // User form state
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '', role: 'STUDENT', departmentId: '' })
-  const [editingUser, setEditingUser] = useState(null)
-  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '' })
-  const [csvFile, setCsvFile] = useState(null)
+  const [insights, setInsights] = useState(null)
+  const [semesters, setSemesters] = useState([])
   const [importResult, setImportResult] = useState(null)
 
-  const sidebarWidth = collapsed ? 68 : 240
+  const sidebarWidth = collapsed ? 76 : 248
+  const showMsg = useCallback((text, type = 'success') => setToast({ text, type }), [])
 
-  const showMsg = useCallback((text, type = 'success') => {
-    setToast({ text, type })
+  const loadUsers = useCallback(async () => {
+    try {
+      const res = await api.get('/api/admin/users')
+      setUsers(Array.isArray(res.data) ? res.data : res.data?.content || [])
+    } catch { /* ignore */ }
   }, [])
 
-  const handleLogout = () => {
-    authService.clearTokens()
-    navigate('/login')
-  }
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [ovRes, usRes, dpRes, drRes, asSummary, qpRes, alRes, psRes] = await Promise.allSettled([
-          api.get('/api/admin/dashboard/overview'),
-          api.get('/api/admin/users'),
-          api.get('/api/admin/departments'),
-          api.get('/api/admin/reports/departments'),
-          api.get('/api/admin/reports/attendance-summary'),
-          api.get('/api/admin/question-papers/pending'),
-          api.get('/api/admin/audit-logs?page=0&size=8'),
-          api.get('/api/admin/placements/stats'),
-        ])
-        if (ovRes.status === 'fulfilled') setOverview(ovRes.value.data)
-        if (usRes.status === 'fulfilled') setUsers(Array.isArray(usRes.value.data) ? usRes.value.data : usRes.value.data.content || [])
-        if (dpRes.status === 'fulfilled') setDepartments(Array.isArray(dpRes.value.data) ? dpRes.value.data : [])
-        if (drRes.status === 'fulfilled') setDeptReports(Array.isArray(drRes.value.data) ? drRes.value.data : [])
-        if (asSummary.status === 'fulfilled') setAttendanceSummary(Array.isArray(asSummary.value.data) ? asSummary.value.data : [])
-        if (qpRes.status === 'fulfilled') setPendingQPs(Array.isArray(qpRes.value.data) ? qpRes.value.data : [])
-        if (alRes.status === 'fulfilled') setAuditLogs(Array.isArray(alRes.value.data) ? alRes.value.data : alRes.value.data.content || [])
-        if (psRes.status === 'fulfilled') setPlacementStats(psRes.value.data)
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    load()
+  const loadAll = useCallback(async () => {
+    const [ovRes, usRes, dpRes, drRes, srRes, asRes, qpRes, psRes, inRes, semRes] = await Promise.allSettled([
+      api.get('/api/admin/overview'),
+      api.get('/api/admin/users'),
+      api.get('/api/departments'),
+      api.get('/api/admin/reports/departments'),
+      api.get('/api/admin/reports/subjects'),
+      api.get('/api/admin/reports/attendance'),
+      api.get('/api/admin/question-papers/pending'),
+      api.get('/api/placement/stats'),
+      api.get('/api/admin/dashboard/insights'),
+      api.get('/api/semesters'),
+    ])
+    if (ovRes.status === 'fulfilled') setOverview(ovRes.value.data)
+    if (usRes.status === 'fulfilled') setUsers(Array.isArray(usRes.value.data) ? usRes.value.data : usRes.value.data?.content || [])
+    if (dpRes.status === 'fulfilled') setDepartments(Array.isArray(dpRes.value.data) ? dpRes.value.data : [])
+    if (drRes.status === 'fulfilled') setDeptReports(Array.isArray(drRes.value.data) ? drRes.value.data : [])
+    if (srRes.status === 'fulfilled') setSubjectReports(Array.isArray(srRes.value.data) ? srRes.value.data : [])
+    if (asRes.status === 'fulfilled') setAttendanceSummary(Array.isArray(asRes.value.data) ? asRes.value.data : [])
+    if (qpRes.status === 'fulfilled') setPendingQPs(Array.isArray(qpRes.value.data) ? qpRes.value.data : [])
+    if (psRes.status === 'fulfilled') setPlacementStats(psRes.value.data)
+    if (inRes.status === 'fulfilled') setInsights(inRes.value.data)
+    if (semRes.status === 'fulfilled') setSemesters(Array.isArray(semRes.value.data) ? semRes.value.data : [])
   }, [])
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault()
+  useEffect(() => { loadAll() }, [loadAll])
+
+  const handleLogout = () => { authService.clearTokens(); navigate('/login') }
+
+  const handleCreateUser = async (payload) => {
     setLoading(true)
     try {
-      await api.post('/api/admin/users', { ...formData, departmentId: formData.departmentId || null })
-      showMsg('User created successfully!')
-      setShowCreateForm(false)
-      setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'STUDENT', departmentId: '' })
-      const res = await api.get('/api/admin/users')
-      setUsers(Array.isArray(res.data) ? res.data : res.data.content || [])
+      await api.post('/api/admin/users', payload)
+      showMsg('User created successfully.')
+      await loadUsers()
+      return true
     } catch (e) {
       showMsg(e.response?.data?.message || 'Failed to create user.', 'error')
+      return false
     } finally { setLoading(false) }
   }
 
-  const handleEditUser = async () => {
-    if (!editingUser) return
+  const handleEditUser = async (id, payload) => {
     setLoading(true)
     try {
-      await api.put(`/api/admin/users/${editingUser.id}`, editForm)
-      showMsg('User updated successfully!')
-      setEditingUser(null)
-      const res = await api.get('/api/admin/users')
-      setUsers(Array.isArray(res.data) ? res.data : res.data.content || [])
+      await api.put(`/api/admin/users/${id}`, payload)
+      showMsg('User updated successfully.')
+      await loadUsers()
+      return true
     } catch (e) {
       showMsg(e.response?.data?.message || 'Failed to update user.', 'error')
+      return false
     } finally { setLoading(false) }
   }
 
   const handleToggleActive = async (user) => {
     try {
-      const endpoint = user.active ? `/api/admin/users/${user.id}/deactivate` : `/api/admin/users/${user.id}/activate`
-      await api.patch(endpoint)
+      await api.put(`/api/admin/users/${user.id}/${user.active ? 'deactivate' : 'activate'}`)
       showMsg(`User ${user.active ? 'deactivated' : 'activated'}.`)
-      const res = await api.get('/api/admin/users')
-      setUsers(Array.isArray(res.data) ? res.data : res.data.content || [])
+      await loadUsers()
     } catch (e) {
       showMsg(e.response?.data?.message || 'Action failed.', 'error')
     }
   }
 
-  const handleCsvImport = async () => {
-    if (!csvFile) return
+  const handleCsvImport = async (file) => {
     setLoading(true)
     try {
-      const fd = new FormData(); fd.append('file', csvFile)
+      const fd = new FormData(); fd.append('file', file)
       const res = await api.post('/api/admin/users/import', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       setImportResult(res.data)
       showMsg(`Import complete: ${res.data.successCount} users created.`)
-      setCsvFile(null)
-      const usRes = await api.get('/api/admin/users')
-      setUsers(Array.isArray(usRes.data) ? usRes.data : usRes.data.content || [])
+      await loadUsers()
     } catch (e) {
       showMsg(e.response?.data?.message || 'CSV import failed.', 'error')
     } finally { setLoading(false) }
   }
 
+  const handleApproveQP = async (id) => {
+    setLoading(true)
+    try {
+      await api.put(`/api/admin/question-papers/${id}/approve`)
+      showMsg('Question paper approved.')
+      setPendingQPs(prev => prev.filter(q => q.id !== id))
+    } catch (e) { showMsg(e.response?.data?.message || 'Approval failed.', 'error') }
+    finally { setLoading(false) }
+  }
+
+  const handleRejectQP = async (id) => {
+    setLoading(true)
+    try {
+      await api.put(`/api/admin/question-papers/${id}/reject`)
+      showMsg('Question paper rejected.')
+      setPendingQPs(prev => prev.filter(q => q.id !== id))
+    } catch (e) { showMsg(e.response?.data?.message || 'Rejection failed.', 'error') }
+    finally { setLoading(false) }
+  }
+
   const renderTab = () => {
     switch (activeTab) {
       case 'overview':
-        return <OverviewTab
-          overview={overview} deptReports={deptReports} attendanceSummary={attendanceSummary}
-          pendingQPs={pendingQPs} auditLogs={auditLogs} placementStats={placementStats}
-          onTabChange={setActiveTab}
-        />
+        return <OverviewTab overview={overview} deptReports={deptReports} attendanceSummary={attendanceSummary}
+          placementStats={placementStats} insights={insights} semesters={semesters}
+          onTabChange={setActiveTab} onSemesterChange={() => loadAll()} />
       case 'users':
-        return <UsersTab
-          users={users} departments={departments} showCreateForm={showCreateForm} setShowCreateForm={setShowCreateForm}
-          formData={formData} setFormData={setFormData} onCreateUser={handleCreateUser}
-          editingUser={editingUser} setEditingUser={setEditingUser} editForm={editForm} setEditForm={setEditForm}
-          onEditUser={handleEditUser} onToggleActive={handleToggleActive}
-          csvFile={csvFile} setCsvFile={setCsvFile} onCsvImport={handleCsvImport} importResult={importResult} loading={loading}
-        />
+        return <DirectoryTab users={users} departments={departments} loading={loading} query={query}
+          title="Student Directory" subtitle="Manage student accounts, profiles and access." icon={GraduationCap}
+          onCreateUser={handleCreateUser} onEditUser={handleEditUser} onToggleActive={handleToggleActive}
+          onCsvImport={handleCsvImport} importResult={importResult} />
       case 'faculty':
-        return <PlaceholderTab title="Faculty Management" icon={Users} description="Manage faculty profiles, course assignments and performance." color="purple" />
+        return <DirectoryTab users={users} departments={departments} loading={loading} query={query} fixedRole="FACULTY"
+          title="Faculty Directory" subtitle="Manage faculty accounts and department assignments." icon={Users}
+          onCreateUser={handleCreateUser} onEditUser={handleEditUser} onToggleActive={handleToggleActive}
+          onCsvImport={handleCsvImport} importResult={importResult} />
       case 'academics':
-        return <PlaceholderTab title="Academic Management" icon={BookOpen} description="Manage departments, courses, semesters, sections, and timetables." color="blue" />
+        return <AcademicsTab departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} />
       case 'attendance':
-        return <PlaceholderTab title="Attendance Management" icon={ClipboardCheck} description="Track and manage student attendance across all departments." color="teal" />
+        return <AttendanceTab attendanceSummary={attendanceSummary} overview={overview} />
       case 'examinations':
-        return <PlaceholderTab title="Examinations & Marks" icon={BookMarked} description="Internal marks, semester results, grade management." color="amber" />
+        return <ExaminationsTab pendingQPs={pendingQPs} onApprove={handleApproveQP} onReject={handleRejectQP} loading={loading} />
       case 'placements':
-        return <PlaceholderTab title="Placement Management" icon={Briefcase} description="Company drives, student applications, placement analytics." color="emerald" />
-      case 'fees':
-        return <PlaceholderTab title="Fees & Finance" icon={DollarSign} description="Student fee management, payment tracking and reports." color="orange" />
-      case 'hostel':
-        return <PlaceholderTab title="Hostel & Facilities" icon={Building2} description="Hostel allocation, facilities management and complaints." color="red" />
-      case 'library':
-        return <PlaceholderTab title="Library Management" icon={Library} description="Book catalog, issue/return tracking, fine management." color="cyan" />
+        return <PlacementsTab placementStats={placementStats} />
+      case 'reports':
+        return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} />
       case 'announcements':
-        return <PlaceholderTab title="Notices & Events" icon={Megaphone} description="Create and manage college announcements and events." color="indigo" />
+        return <NoticesTab insights={insights} />
+      case 'fees':
+      case 'hostel':
+      case 'library':
       case 'aiAssistant':
-        return <PlaceholderTab title="AI Assistant" icon={Sparkles} description="AI-powered chat, insights, and automated decision support." color="purple" />
-      case 'deptReports':
-        return <PlaceholderTab title="Reports & Analytics" icon={BarChart3} description="Department-wise reports, attendance summaries, academic analytics." color="violet" />
       case 'settings':
-        return <PlaceholderTab title="System Settings" icon={Settings} description="Configure system preferences, roles, and access control." color="zinc" />
       case 'help':
-        return <PlaceholderTab title="Help & Support" icon={HelpCircle} description="Documentation, FAQs, and support contact." color="teal" />
+        return <ComingSoonTab id={activeTab} />
       default:
-        return <OverviewTab overview={overview} deptReports={deptReports} attendanceSummary={attendanceSummary} pendingQPs={pendingQPs} auditLogs={auditLogs} placementStats={placementStats} onTabChange={setActiveTab} />
+        return null
     }
   }
 
   return (
-    <div className="min-h-screen bg-mesh" style={{ background: 'rgb(9, 9, 11)' }}>
+    <div className="min-h-screen portal-bg">
       <Toast message={toast} onClose={() => setToast({ text: '', type: 'success' })} />
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
-      <Topbar email={authService.getEmail()} pendingCount={pendingQPs.length} onLogout={handleLogout} sidebarWidth={sidebarWidth} />
+      <PortalSidebar
+        collapsed={collapsed} onToggle={() => setCollapsed(c => !c)}
+        navSections={NAV_SECTIONS} activeTab={activeTab} onTabChange={setActiveTab}
+        accent="indigo" portalLabel="Admin Portal"
+      />
 
-      <main
-        className="main-content"
-        style={{ marginLeft: sidebarWidth }}
-      >
-        <div className="p-6 bg-mesh">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-            >
-              {renderTab()}
-            </motion.div>
-          </AnimatePresence>
+      <PortalTopbar
+        sidebarWidth={sidebarWidth} accent="indigo"
+        user={{ name: 'Admin User', role: 'Administrator', email: authService.getEmail() || 'admin@collego.edu' }}
+        placeholder="Search users, courses, notices..."
+        notificationCount={pendingQPs.length}
+        notifications={(insights?.recentNotices || []).map(n => ({ id: n.id, title: n.title, message: n.message }))}
+        onLogout={handleLogout}
+        searchValue={query} onSearchChange={setQuery}
+      />
+
+      <main className="main-content" style={{ marginLeft: sidebarWidth }}>
+        <div className="p-5 md:p-6 max-w-[1600px] mx-auto">
+          <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
+            {renderTab()}
+          </motion.div>
         </div>
       </main>
     </div>

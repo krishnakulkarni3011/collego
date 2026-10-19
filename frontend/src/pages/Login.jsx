@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, ChevronRight, ChevronLeft, Eye, EyeOff,
   Mail, Lock, AlertCircle, CheckCircle2, Sparkles,
-  Shield, BookOpen, Users, BarChart3, Zap
+  Shield, BookOpen, BarChart3, Zap
 } from 'lucide-react'
 import { authService } from '../services/authService'
 import { cn } from '../lib/utils'
+import hero from '../assets/hero.png'
 
 const ROLES = [
   {
@@ -17,11 +18,11 @@ const ROLES = [
     icon: GraduationCap,
     gradient: 'from-emerald-500 to-teal-500',
     glow: 'shadow-emerald-500/25',
-    activeBorder: 'border-emerald-500/60',
-    activeBg: 'bg-emerald-500/8',
-    activeText: 'text-emerald-300',
-    iconBg: 'bg-emerald-500/15',
-    iconColor: 'text-emerald-400',
+    activeBorder: 'border-emerald-400',
+    activeBg: 'bg-emerald-50',
+    activeText: 'text-emerald-600',
+    iconBg: 'bg-emerald-100',
+    iconColor: 'text-emerald-600',
     badgeColor: 'bg-emerald-500',
   },
   {
@@ -31,11 +32,11 @@ const ROLES = [
     icon: BookOpen,
     gradient: 'from-violet-500 to-fuchsia-500',
     glow: 'shadow-violet-500/25',
-    activeBorder: 'border-violet-500/60',
-    activeBg: 'bg-violet-500/8',
-    activeText: 'text-violet-300',
-    iconBg: 'bg-violet-500/15',
-    iconColor: 'text-violet-400',
+    activeBorder: 'border-violet-400',
+    activeBg: 'bg-violet-50',
+    activeText: 'text-violet-600',
+    iconBg: 'bg-violet-100',
+    iconColor: 'text-violet-600',
     badgeColor: 'bg-violet-500',
   },
   {
@@ -45,22 +46,22 @@ const ROLES = [
     icon: Shield,
     gradient: 'from-indigo-500 to-blue-500',
     glow: 'shadow-indigo-500/25',
-    activeBorder: 'border-indigo-500/60',
-    activeBg: 'bg-indigo-500/8',
-    activeText: 'text-indigo-300',
-    iconBg: 'bg-indigo-500/15',
-    iconColor: 'text-indigo-400',
+    activeBorder: 'border-indigo-400',
+    activeBg: 'bg-indigo-50',
+    activeText: 'text-indigo-600',
+    iconBg: 'bg-indigo-100',
+    iconColor: 'text-indigo-600',
     badgeColor: 'bg-indigo-500',
   },
 ]
 
 // ─── Floating particles for ambient effect ────────────────────────────────────
 function Particles() {
-  const particles = Array.from({ length: 20 }, (_, i) => ({
+  const particles = Array.from({ length: 18 }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
     y: Math.random() * 100,
-    size: Math.random() * 3 + 1,
+    size: Math.random() * 4 + 2,
     duration: Math.random() * 8 + 6,
     delay: Math.random() * 4,
   }))
@@ -70,9 +71,9 @@ function Particles() {
       {particles.map(p => (
         <motion.div
           key={p.id}
-          className="absolute rounded-full bg-indigo-400/20"
+          className="absolute rounded-full bg-indigo-300/30"
           style={{ left: `${p.x}%`, top: `${p.y}%`, width: p.size, height: p.size }}
-          animate={{ y: [-20, 20, -20], opacity: [0.1, 0.4, 0.1] }}
+          animate={{ y: [-20, 20, -20], opacity: [0.15, 0.5, 0.15] }}
           transition={{ duration: p.duration, delay: p.delay, repeat: Infinity, ease: 'easeInOut' }}
         />
       ))}
@@ -116,10 +117,10 @@ export default function Login() {
         return
       }
 
-      const activeRole = returnedRole || normalizedSelected
-      if (activeRole === 'STUDENT') navigate('/student')
-      else if (activeRole === 'FACULTY') navigate('/faculty')
-      else if (activeRole === 'ADMIN') navigate('/admin')
+      const active = returnedRole || normalizedSelected
+      if (active === 'STUDENT') navigate('/student')
+      else if (active === 'FACULTY') navigate('/faculty')
+      else if (active === 'ADMIN') navigate('/admin')
       else navigate('/')
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid email or password.')
@@ -136,72 +137,80 @@ export default function Login() {
   const progress = step === 'role' ? 50 : 100
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'rgb(7, 7, 10)' }}>
+    <div className="min-h-screen flex portal-bg">
       <Particles />
 
       {/* ── Left Panel (feature showcase) ── */}
-      <div className="hidden lg:flex lg:w-[45%] xl:w-1/2 flex-col relative overflow-hidden">
-        {/* Gradient background */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.1) 50%, rgba(6,182,212,0.08) 100%)' }} />
+      <div className="hidden lg:flex lg:w-[46%] xl:w-1/2 flex-col relative overflow-hidden">
+        {/* Soft gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-violet-50 to-cyan-50" />
         <div className="absolute inset-0 bg-mesh" />
-
-        {/* Top glow */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute bottom-0 right-0 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
+        <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-200/40 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-violet-200/40 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
 
         <div className="relative z-10 flex flex-col h-full p-12">
           {/* Logo */}
-          <div className="flex items-center gap-3 mb-16">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <GraduationCap size={20} className="text-white" />
+          <div className="flex items-center gap-3 mb-14">
+            <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
+              <GraduationCap size={22} className="text-white" />
             </div>
             <div>
-              <p className="text-base font-bold text-white tracking-wide">COLLEGO</p>
-              <p className="text-[10px] text-zinc-500 tracking-widest uppercase">College ERP</p>
+              <p className="text-lg font-extrabold text-slate-900 tracking-wide">COLLEGO</p>
+              <p className="text-[10px] text-slate-400 tracking-[0.2em] uppercase font-medium">College ERP</p>
             </div>
           </div>
 
           {/* Headline */}
-          <div className="flex-1 flex flex-col justify-center max-w-md">
+          <div className="flex-1 flex flex-col justify-center max-w-lg">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.6 }}
             >
-              <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-4">
+              <h1 className="text-4xl xl:text-5xl font-extrabold text-slate-900 leading-tight mb-4">
                 The future of{' '}
-                <span style={{ background: 'linear-gradient(135deg, #818cf8, #a78bfa, #38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-500 bg-clip-text text-transparent">
                   college management
                 </span>
               </h1>
-              <p className="text-zinc-400 text-base leading-relaxed mb-10">
+              <p className="text-slate-500 text-base leading-relaxed mb-8">
                 AI-powered ERP system for modern educational institutions. From attendance to placement — everything in one place.
               </p>
             </motion.div>
 
+            {/* Hero image */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2, duration: 0.6 }}
+              className="hidden xl:block mb-8 rounded-3xl overflow-hidden border border-white shadow-xl shadow-indigo-500/10"
+            >
+              <img src={hero} alt="Campus" className="w-full h-40 object-cover" />
+            </motion.div>
+
             {/* Feature cards */}
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               {[
-                { icon: Sparkles, title: 'AI-Powered Insights', desc: 'Performance prediction, risk detection, smart search', color: 'text-violet-400', bg: 'bg-violet-500/8' },
-                { icon: BarChart3, title: 'Real-time Analytics', desc: 'Attendance, marks, placements — all visualized', color: 'text-indigo-400', bg: 'bg-indigo-500/8' },
-                { icon: Zap, title: 'Instant Operations', desc: 'Bulk uploads, PDF generation, AI notice drafting', color: 'text-amber-400', bg: 'bg-amber-500/8' },
-                { icon: Shield, title: 'Secure Role-Based Access', desc: 'Granular RBAC for students, faculty and admins', color: 'text-emerald-400', bg: 'bg-emerald-500/8' },
+                { icon: Sparkles, title: 'AI Insights', desc: 'Prediction & risk detection', color: 'text-violet-600', bg: 'bg-violet-100' },
+                { icon: BarChart3, title: 'Real-time Analytics', desc: 'Attendance, marks, placements', color: 'text-indigo-600', bg: 'bg-indigo-100' },
+                { icon: Zap, title: 'Instant Operations', desc: 'Bulk uploads & PDF generation', color: 'text-amber-600', bg: 'bg-amber-100' },
+                { icon: Shield, title: 'Secure RBAC', desc: 'Role-based access control', color: 'text-emerald-600', bg: 'bg-emerald-100' },
               ].map((f, i) => {
                 const Icon = f.icon
                 return (
                   <motion.div
                     key={f.title}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 + i * 0.1, duration: 0.5 }}
-                    className={cn('flex items-start gap-3.5 p-3.5 rounded-xl border border-zinc-800/40', f.bg)}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 + i * 0.08, duration: 0.5 }}
+                    className="flex items-start gap-3 p-3.5 rounded-2xl border border-white/80 bg-white/70 backdrop-blur-sm shadow-sm"
                   >
-                    <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', f.bg, 'border border-zinc-700/40')}>
-                      <Icon size={16} className={f.color} />
+                    <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center shrink-0', f.bg)}>
+                      <Icon size={15} className={f.color} />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-zinc-200">{f.title}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{f.desc}</p>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-slate-800">{f.title}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">{f.desc}</p>
                     </div>
                   </motion.div>
                 )
@@ -211,7 +220,7 @@ export default function Login() {
 
           {/* Footer */}
           <div className="mt-10">
-            <p className="text-xs text-zinc-700">© {new Date().getFullYear()} Collego · AI-Powered College ERP · Built with ❤️</p>
+            <p className="text-xs text-slate-400">© {new Date().getFullYear()} Collego · AI-Powered College ERP</p>
           </div>
         </div>
       </div>
@@ -222,10 +231,10 @@ export default function Login() {
 
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-3 justify-center mb-8">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <GraduationCap size={20} className="text-white" />
+            <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
+              <GraduationCap size={22} className="text-white" />
             </div>
-            <p className="text-xl font-bold text-white">COLLEGO</p>
+            <p className="text-xl font-extrabold text-slate-900">COLLEGO</p>
           </div>
 
           {/* Card */}
@@ -233,13 +242,12 @@ export default function Login() {
             initial={{ opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.5 }}
-            className="relative rounded-2xl overflow-hidden"
-            style={{ background: 'rgba(15, 15, 20, 0.9)', border: '1px solid rgba(63, 63, 70, 0.6)', backdropFilter: 'blur(24px)', boxShadow: '0 25px 60px rgba(0,0,0,0.5)' }}
+            className="relative rounded-3xl overflow-hidden bg-white border border-slate-200/80 shadow-xl shadow-slate-900/5"
           >
             {/* Progress bar */}
-            <div className="h-0.5 bg-zinc-800/60">
+            <div className="h-1 bg-slate-100">
               <motion.div
-                className="h-full"
+                className="h-full rounded-r-full"
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.5, ease: 'easeInOut' }}
                 style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }}
@@ -259,8 +267,8 @@ export default function Login() {
                     transition={{ duration: 0.25 }}
                   >
                     <div className="mb-7">
-                      <h2 className="text-2xl font-bold text-white mb-1">Welcome back</h2>
-                      <p className="text-zinc-500 text-sm">Select your role to sign in to Collego</p>
+                      <h2 className="text-2xl font-extrabold text-slate-900 mb-1">Welcome back</h2>
+                      <p className="text-slate-400 text-sm">Select your role to sign in to Collego</p>
                     </div>
 
                     <div className="grid grid-cols-3 gap-3 mb-6">
@@ -276,7 +284,7 @@ export default function Login() {
                               'relative flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all duration-200 focus:outline-none group',
                               isActive
                                 ? `${role.activeBorder} ${role.activeBg}`
-                                : 'border-zinc-800/80 hover:border-zinc-700 bg-zinc-900/40 hover:bg-zinc-900/60'
+                                : 'border-slate-200 hover:border-slate-300 bg-slate-50/60 hover:bg-slate-50'
                             )}
                           >
                             {isActive && (
@@ -289,12 +297,12 @@ export default function Login() {
                                 <CheckCircle2 size={10} className="text-white" />
                               </motion.div>
                             )}
-                            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-all', isActive ? role.iconBg : 'bg-zinc-800/60 group-hover:bg-zinc-800')}>
-                              <Icon size={20} className={isActive ? role.iconColor : 'text-zinc-500 group-hover:text-zinc-400'} />
+                            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-all', isActive ? role.iconBg : 'bg-white border border-slate-200 group-hover:border-slate-300')}>
+                              <Icon size={19} className={isActive ? role.iconColor : 'text-slate-400 group-hover:text-slate-500'} />
                             </div>
                             <div className="text-center">
-                              <p className={cn('text-sm font-semibold', isActive ? role.activeText : 'text-zinc-400 group-hover:text-zinc-300')}>{role.label}</p>
-                              <p className="text-[10px] text-zinc-600 mt-0.5 leading-tight">{role.description}</p>
+                              <p className={cn('text-sm font-semibold', isActive ? role.activeText : 'text-slate-500 group-hover:text-slate-700')}>{role.label}</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">{role.description}</p>
                             </div>
                           </button>
                         )
@@ -305,7 +313,7 @@ export default function Login() {
                       <motion.div
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center gap-2.5 bg-red-500/8 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm mb-4"
+                        className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-4"
                       >
                         <AlertCircle size={14} className="shrink-0" />
                         {error}
@@ -315,23 +323,23 @@ export default function Login() {
                     <button
                       id="btn-continue-role"
                       onClick={handleRoleContinue}
-                      className="w-full py-3 rounded-xl font-semibold text-white transition-all active:scale-[0.98] mb-4"
-                      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.3)' }}
+                      className="w-full flex items-center justify-center gap-1 py-3 rounded-xl font-semibold text-white transition-all active:scale-[0.98] mb-4 hover:shadow-lg hover:shadow-indigo-500/25"
+                      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
                     >
                       Continue
-                      <ChevronRight size={16} className="inline ml-1" />
+                      <ChevronRight size={16} />
                     </button>
 
                     <div className="relative flex items-center gap-3 my-4">
-                      <div className="flex-1 h-px bg-zinc-800" />
-                      <span className="text-xs text-zinc-600">or</span>
-                      <div className="flex-1 h-px bg-zinc-800" />
+                      <div className="flex-1 h-px bg-slate-200" />
+                      <span className="text-xs text-slate-400">or</span>
+                      <div className="flex-1 h-px bg-slate-200" />
                     </div>
 
                     <button
                       id="btn-google-signin"
                       onClick={handleGoogleSignIn}
-                      className="w-full flex items-center justify-center gap-3 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-700 py-3 rounded-xl text-sm font-medium text-zinc-300 hover:text-white transition-all active:scale-[0.98]"
+                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 py-3 rounded-xl text-sm font-medium text-slate-600 hover:text-slate-800 transition-all active:scale-[0.98]"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -358,7 +366,7 @@ export default function Login() {
                       <button
                         id="btn-back-to-role"
                         onClick={() => { setStep('role'); setError(''); setEmail(''); setPassword('') }}
-                        className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-all"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
                       >
                         <ChevronLeft size={16} />
                       </button>
@@ -374,16 +382,16 @@ export default function Login() {
                     </div>
 
                     <div className="mb-6">
-                      <h2 className="text-2xl font-bold text-white mb-1">Sign in</h2>
-                      <p className="text-zinc-500 text-sm">Enter your credentials to access your portal</p>
+                      <h2 className="text-2xl font-extrabold text-slate-900 mb-1">Sign in</h2>
+                      <p className="text-slate-400 text-sm">Enter your credentials to access your portal</p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                       {/* Email */}
                       <div>
-                        <label htmlFor="login-email" className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Email Address</label>
+                        <label htmlFor="login-email" className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
                         <div className="relative">
-                          <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-600" />
+                          <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                           <input
                             id="login-email"
                             type="email"
@@ -399,9 +407,9 @@ export default function Login() {
 
                       {/* Password */}
                       <div>
-                        <label htmlFor="login-password" className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Password</label>
+                        <label htmlFor="login-password" className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Password</label>
                         <div className="relative">
-                          <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-600" />
+                          <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                           <input
                             id="login-password"
                             type={showPass ? 'text' : 'password'}
@@ -415,7 +423,7 @@ export default function Login() {
                             type="button"
                             id="btn-toggle-password"
                             onClick={() => setShowPass(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400 transition-colors p-0.5"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-0.5"
                           >
                             {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
                           </button>
@@ -426,7 +434,7 @@ export default function Login() {
                         <motion.div
                           initial={{ opacity: 0, y: -8 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="flex items-start gap-2.5 bg-red-500/8 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm"
+                          className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm"
                         >
                           <AlertCircle size={14} className="mt-0.5 shrink-0" />
                           <p>{error}</p>
@@ -437,14 +445,12 @@ export default function Login() {
                         id="btn-login-submit"
                         type="submit"
                         disabled={loading}
-                        className={cn(
-                          'w-full py-3 rounded-xl font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed mt-2',
-                        )}
+                        className="w-full py-3 rounded-xl font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed mt-2 hover:shadow-lg"
                         style={{
                           background: activeRole
                             ? `linear-gradient(135deg, ${activeRole.id === 'STUDENT' ? '#10b981, #0d9488' : activeRole.id === 'FACULTY' ? '#8b5cf6, #d946ef' : '#6366f1, #3b82f6'})`
                             : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                          boxShadow: `0 4px 20px ${activeRole?.id === 'STUDENT' ? 'rgba(16,185,129,0.3)' : activeRole?.id === 'FACULTY' ? 'rgba(139,92,246,0.3)' : 'rgba(99,102,241,0.3)'}`
+                          boxShadow: `0 8px 24px ${activeRole?.id === 'STUDENT' ? 'rgba(16,185,129,0.25)' : activeRole?.id === 'FACULTY' ? 'rgba(139,92,246,0.25)' : 'rgba(99,102,241,0.25)'}`
                         }}
                       >
                         {loading ? (
@@ -460,15 +466,15 @@ export default function Login() {
                     </form>
 
                     <div className="relative flex items-center gap-3 my-5">
-                      <div className="flex-1 h-px bg-zinc-800" />
-                      <span className="text-xs text-zinc-600">or</span>
-                      <div className="flex-1 h-px bg-zinc-800" />
+                      <div className="flex-1 h-px bg-slate-200" />
+                      <span className="text-xs text-slate-400">or</span>
+                      <div className="flex-1 h-px bg-slate-200" />
                     </div>
 
                     <button
                       id="btn-google-signin-step2"
                       onClick={handleGoogleSignIn}
-                      className="w-full flex items-center justify-center gap-3 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-700 py-3 rounded-xl text-sm font-medium text-zinc-300 hover:text-white transition-all active:scale-[0.98]"
+                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 py-3 rounded-xl text-sm font-medium text-slate-600 hover:text-slate-800 transition-all active:scale-[0.98]"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -485,7 +491,7 @@ export default function Login() {
           </motion.div>
 
           {/* Footer text */}
-          <p className="text-center text-zinc-700 text-xs mt-6">
+          <p className="text-center text-slate-400 text-xs mt-6">
             © {new Date().getFullYear()} Collego · AI-Powered College ERP
           </p>
         </div>

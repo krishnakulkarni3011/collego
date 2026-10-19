@@ -148,6 +148,11 @@ public class AdminController {
         return ResponseEntity.ok(adminPortalService.getSystemOverview());
     }
 
+    @GetMapping("/dashboard/insights")
+    public ResponseEntity<AdminDashboardInsightsResponse> getDashboardInsights() {
+        return ResponseEntity.ok(adminPortalService.getDashboardInsights());
+    }
+
     // ==================== Reports (Phase 5) ====================
 
     @GetMapping("/reports/departments")

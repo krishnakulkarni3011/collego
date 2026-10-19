@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,6 +37,8 @@ public class AdminPortalService {
     private final AttendanceRepository attendanceRepository;
     private final SemesterMarksRepository semesterMarksRepository;
     private final QuestionPaperRepository questionPaperRepository;
+    private final NotificationRepository notificationRepository;
+    private final PlacementNoticeRepository placementNoticeRepository;
     private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
     private final QuestionPaperService questionPaperService;
@@ -228,6 +231,79 @@ public class AdminPortalService {
                 .overallAverageAttendance(overallAttendance)
                 .overallPassPercentage(overallPass)
                 .build();
+    }
+
+    // ==================== Dashboard Insights (Phase 10) ====================
+
+    /**
+     * Aggregated, real-data payload powering the redesigned Admin overview:
+     * ranked top performers, the latest distinct notices and the next placement events.
+     */
+    public AdminDashboardInsightsResponse getDashboardInsights() {
+        return AdminDashboardInsightsResponse.builder()
+                .topPerformers(buildTopPerformers(5))
+                .recentNotices(buildRecentNotices(5))
+                .upcomingEvents(buildUpcomingEvents(6))
+                .build();
+    }
+
+    private List<AdminDashboardInsightsResponse.TopPerformer> buildTopPerformers(int limit) {
+        List<Map.Entry<StudentProfile, Double>> scored = new ArrayList<>();
+        for (StudentProfile sp : studentProfileRepository.findAll()) {
+            List<Enrollment> enrollments = enrollmentRepository.findByStudentId(sp.getId());
+            if (enrollments.isEmpty()) continue;
+            double pct = calculateStudentOverallAttendance(sp.getId(), enrollments);
+            if (pct <= 0) continue;
+            scored.add(new AbstractMap.SimpleEntry<>(sp, pct));
+        }
+        scored.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+
+        return scored.stream().limit(limit).map(entry -> {
+            StudentProfile sp = entry.getKey();
+            User u = sp.getUser();
+            return AdminDashboardInsightsResponse.TopPerformer.builder()
+                    .studentId(sp.getId())
+                    .studentName(u.getFirstName() + " " + u.getLastName())
+                    .enrollmentNumber(sp.getEnrollmentNumber())
+                    .departmentName(sp.getDepartment() != null ? sp.getDepartment().getName() : null)
+                    .semester(sp.getSemester())
+                    .attendancePercentage(round(entry.getValue()))
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    private List<AdminDashboardInsightsResponse.NoticeItem> buildRecentNotices(int limit) {
+        Set<String> seen = new HashSet<>();
+        List<AdminDashboardInsightsResponse.NoticeItem> items = new ArrayList<>();
+        for (Notification n : notificationRepository.findTop30ByOrderByCreatedAtDesc()) {
+            String key = n.getTitle() == null ? "" : n.getTitle().trim().toLowerCase();
+            if (!seen.add(key)) continue;
+            items.add(AdminDashboardInsightsResponse.NoticeItem.builder()
+                    .id(n.getId())
+                    .title(n.getTitle())
+                    .message(n.getMessage())
+                    .type(n.getType() != null ? n.getType().name() : "GENERAL")
+                    .createdAt(n.getCreatedAt())
+                    .build());
+            if (items.size() >= limit) break;
+        }
+        return items;
+    }
+
+    private List<AdminDashboardInsightsResponse.EventItem> buildUpcomingEvents(int limit) {
+        return placementNoticeRepository
+                .findByIsActiveTrueAndLastDateGreaterThanEqualOrderByLastDateAsc(LocalDate.now())
+                .stream()
+                .limit(limit)
+                .map(p -> AdminDashboardInsightsResponse.EventItem.builder()
+                        .id(p.getId())
+                        .title(p.getTitle())
+                        .category("Placement")
+                        .location(p.getDepartment() != null ? p.getDepartment().getName() : "Placement Cell")
+                        .subtitle(p.getCompanyName())
+                        .date(p.getLastDate())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     // ==================== Department Reports ====================
