@@ -38,7 +38,7 @@ const timeAgo = (ts) => {
 
 const GRADE_COLORS = { O: '#10b981', 'A+': '#059669', A: '#06b6d4', 'B+': '#3b82f6', B: '#6366f1', C: '#f59e0b', P: '#f59e0b', F: '#ef4444' }
 const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
-const DAY_COLORS = { MONDAY: '#6366f1', TUESDAY: '#8b5cf6', WEDNESDAY: '#06b6d4', THURSDAY: '#10b981', FRIDAY: '#f59e0b', SATURDAY: '#ef4444' }
+const DAY_COLORS = { MONDAY: '#4f46e5', TUESDAY: '#8b5cf6', WEDNESDAY: '#06b6d4', THURSDAY: '#10b981', FRIDAY: '#f59e0b', SATURDAY: '#ef4444' }
 
 const NAV_SECTIONS = [
   { items: [{ id: 'overview', label: 'Dashboard', icon: LayoutDashboard }] },
@@ -68,11 +68,11 @@ const NAV_SECTIONS = [
   },
 ]
 
-// ─── Sparkline ───────────────────────────────────────────────────────────────
+// ─── Sparkline (premium area) ─────────────────────────────────────────────────
 function Sparkline({ data, color }) {
   const gid = `sg${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   return (
-    <ResponsiveContainer width="100%" height={40}>
+    <ResponsiveContainer width="100%" height={44}>
       <AreaChart data={data} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
@@ -80,7 +80,7 @@ function Sparkline({ data, color }) {
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <Area type="monotone" dataKey="v" stroke={color} fill={`url(#${gid})`} strokeWidth={1.6} dot={false} />
+        <Area type="monotone" dataKey="v" stroke={color} fill={`url(#${gid})`} strokeWidth={1.8} dot={false} />
       </AreaChart>
     </ResponsiveContainer>
   )
@@ -92,7 +92,7 @@ function AttBadge({ pct }) {
   return <Badge variant="destructive">{pct}%</Badge>
 }
 
-// ─── Overview ────────────────────────────────────────────────────────────────
+// ─── Overview Tab ─────────────────────────────────────────────────────────────
 function OverviewTab({ profile, overall, subjects, cgpa, fees, notifications, placements, timetable, onTabChange }) {
   const now = new Date()
   const hour = now.getHours()
@@ -107,17 +107,17 @@ function OverviewTab({ profile, overall, subjects, cgpa, fees, notifications, pl
   const statCards = [
     { label: 'Overall Attendance', value: overallPct, decimals: 1, suffix: '%', icon: ClipboardCheck, accent: 'emerald',
       sub: `${overall?.totalPresent ?? 0}/${overall?.totalClasses ?? 0} classes`, onClick: () => onTabChange('attendance'),
-      spark: <Sparkline data={attData} color="#10b981" /> },
+      spark: <Sparkline data={attData} color="#10b981" />, glow: true },
     { label: 'Current CGPA', value: cgpa?.cumulativeCgpa ?? 0, decimals: 2, icon: GraduationCap, accent: 'violet',
       sub: `${cgpa?.totalCreditsAllSemesters?.toFixed(0) ?? 0} total credits`, onClick: () => onTabChange('marks'),
-      spark: <Sparkline data={sgpaData.length ? sgpaData : [{ v: 0 }]} color="#8b5cf6" /> },
+      spark: <Sparkline data={sgpaData.length ? sgpaData : [{ v: 0 }]} color="#8b5cf6" />, glow: true },
     { label: 'Fee Status', value: pendingFees.length === 0 ? 'Clear' : `${pendingFees.length} Pending`, icon: Wallet,
       accent: pendingFees.length === 0 ? 'emerald' : 'amber',
       sub: pendingFees.length === 0 ? 'All paid' : 'Action required', onClick: () => onTabChange('fees'),
-      spark: <Sparkline data={[{ v: 80 }, { v: 60 }, { v: 90 }]} color="#f59e0b" /> },
+      spark: <Sparkline data={[{ v: 80 }, { v: 60 }, { v: 90 }]} color="#f59e0b" />, glow: true },
     { label: 'Notifications', value: unread, icon: Bell, accent: 'blue',
       sub: `${notifications.length} total`, onClick: () => onTabChange('notifications'),
-      spark: <Sparkline data={[{ v: 3 }, { v: 5 }, { v: 2 }, { v: 7 }, { v: 4 }]} color="#3b82f6" /> },
+      spark: <Sparkline data={[{ v: 3 }, { v: 5 }, { v: 2 }, { v: 7 }, { v: 4 }]} color="#3b82f6" />, glow: true },
   ]
 
   const today = DAY_ORDER[now.getDay() === 0 ? 5 : now.getDay() - 1]
@@ -125,7 +125,7 @@ function OverviewTab({ profile, overall, subjects, cgpa, fees, notifications, pl
   const upcomingPlacements = (placements || []).filter(p => !p.lastDate || new Date(p.lastDate) >= new Date()).slice(0, 3)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <WelcomeBanner
         greeting={greeting}
         name={profile?.firstName || 'Student'}
@@ -138,22 +138,25 @@ function OverviewTab({ profile, overall, subjects, cgpa, fees, notifications, pl
         {statCards.map((c, i) => <StatCard key={c.label} index={i} {...c} />)}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         <Panel title="Subject-wise Attendance" icon={ClipboardCheck} accent="emerald" className="xl:col-span-5"
-          action={<button onClick={() => onTabChange('attendance')} className="text-xs font-medium text-emerald-600 hover:text-emerald-700">Details</button>}>
+          action={<button onClick={() => onTabChange('attendance')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 px-2 py-1 rounded-lg transition-colors">Details</button>}>
           {subjects.length === 0 ? (
             <EmptyState icon={ClipboardCheck} title="No attendance data" accent="emerald" description="Your subject attendance will appear once classes are marked." />
           ) : (
             <div className="space-y-3.5">
               {subjects.slice(0, 6).map((s, i) => (
-                <motion.div key={s.sectionId || i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
-                  <div className="flex justify-between items-center mb-1.5 gap-3">
-                    <span className="text-xs text-slate-600 truncate">{s.courseName}</span>
-                    <AttBadge pct={Math.round(s.percentage || 0)} />
+                <motion.div key={s.sectionId || i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                  className="flex items-start gap-3 p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-all group">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-800 truncate leading-tight">{s.courseName}</p>
+                    <p className="text-[9px] text-slate-400 font-mono">{s.courseCode}</p>
                   </div>
-                  <div className="progress-bar">
-                    <div className={cn('progress-bar-fill', s.percentage >= 75 ? 'bg-emerald-500' : s.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500')}
-                      style={{ width: `${Math.min(s.percentage || 0, 100)}%` }} />
+                  <AttBadge pct={Math.round(s.percentage || 0)} />
+                  <div className="w-24 mt-0.5">
+                    <div className="progress-bar">
+                      <div className={cn('progress-bar-fill', s.percentage >= 75 ? 'bg-emerald-500' : s.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500')} style={{ width: `${Math.min(s.percentage || 0, 100)}%` }} />
+                    </div>
                   </div>
                 </motion.div>
               ))}
@@ -163,17 +166,17 @@ function OverviewTab({ profile, overall, subjects, cgpa, fees, notifications, pl
 
         <Panel title="SGPA History" icon={GraduationCap} accent="violet" className="xl:col-span-4">
           {sgpaData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={sgpaData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={sgpaData} margin={{ top: 8, right: 8, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="sgpaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.32} />
+                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
                     <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef1f8" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#8a94ad' }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 9, fill: '#8a94ad' }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} />
                 <Area type="monotone" dataKey="v" stroke="#8b5cf6" fill="url(#sgpaGrad)" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 3 }} name="SGPA" />
               </AreaChart>
@@ -181,27 +184,32 @@ function OverviewTab({ profile, overall, subjects, cgpa, fees, notifications, pl
           ) : (
             <EmptyState icon={GraduationCap} title="No results yet" accent="violet" description="SGPA trend appears after semester results." />
           )}
-          <div className="mt-3 p-3 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-between">
-            <span className="text-xs text-slate-500">Cumulative CGPA</span>
-            <span className="text-xl font-bold text-violet-600">{fmtNum(cgpa?.cumulativeCgpa)}</span>
+          <div className="mt-4 p-3 rounded-2xl border border-violet-100 bg-violet-50/40 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Cumulative CGPA</p>
+              <span className="text-2xl font-bold text-violet-600">{fmtNum(cgpa?.cumulativeCgpa)}</span>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-white/70 flex items-center justify-center text-violet-600 border border-violet-200">
+              <GraduationCap size={14} />
+            </div>
           </div>
         </Panel>
 
         <Panel title="Today's Schedule" icon={Calendar} accent="blue" className="xl:col-span-3"
-          action={<button onClick={() => onTabChange('timetable')} className="text-xs font-medium text-indigo-600 hover:text-indigo-700">Full</button>}>
+          action={<button onClick={() => onTabChange('timetable')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 px-2 py-1 rounded-lg transition-colors">Full</button>}>
           {todaySlots.length === 0 ? (
             <EmptyState icon={Calendar} title="No classes today" accent="blue" description="Enjoy your day off!" />
           ) : (
             <div className="space-y-2">
               {todaySlots.map(slot => (
-                <div key={slot.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-100">
+                <div key={slot.id} className="flex items-center gap-3 p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-all group">
                   <div className="text-center shrink-0 w-16">
-                    <p className="text-xs font-bold text-indigo-600 font-mono">{slot.startTime}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">{slot.endTime}</p>
+                    <p className="text-xs font-bold font-mono text-indigo-600">{slot.startTime}</p>
+                    <p className="text-[9px] font-mono text-slate-400">{slot.endTime}</p>
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-slate-800 truncate">{slot.courseName}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{slot.roomNumber} · {slot.facultyName || 'TBD'}</p>
+                    <p className="text-[9px] text-slate-400 truncate">{slot.roomNumber} · {slot.facultyName || 'TBD'}</p>
                   </div>
                 </div>
               ))}
@@ -210,49 +218,51 @@ function OverviewTab({ profile, overall, subjects, cgpa, fees, notifications, pl
         </Panel>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Panel title="Recent Notifications" icon={Bell} accent="blue"
-          action={<button onClick={() => onTabChange('notifications')} className="text-xs font-medium text-indigo-600 hover:text-indigo-700">View All</button>}>
+          action={<button onClick={() => onTabChange('notifications')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 px-2 py-1 rounded-lg transition-colors">View All</button>}>
           {notifications.slice(0, 4).length === 0 ? (
             <EmptyState icon={Bell} title="No notifications" accent="blue" />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {notifications.slice(0, 4).map(n => (
-                <div key={n.id} className={cn('rounded-xl p-3 border flex items-start gap-3', !n.read ? 'bg-indigo-50/60 border-indigo-100' : 'bg-white border-slate-100')}>
-                  {!n.read && <span className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0" />}
+                <motion.div key={n.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                  className={cn('rounded-xl p-3.5 border flex items-start gap-3 transition-all', !n.read ? 'bg-indigo-50/60 border-indigo-100' : 'bg-white/80 border-white/60 cursor-pointer group hover:bg-white/90')}>
+                  {!n.read && <span className="w-2 h-2 rounded-full bg-indigo-500 mt-1 shrink-0" />}
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-slate-800 truncate">{n.title}</p>
-                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{n.message}</p>
+                    <p className="text-xs font-semibold text-slate-800 truncate leading-tight">{n.title}</p>
+                    <p className="text-[10px] text-slate-500 line-clamp-2 mt-0.5">{n.message}</p>
                   </div>
-                  <span className="text-[10px] text-slate-400 shrink-0">{timeAgo(n.createdAt)}</span>
-                </div>
+                  <span className="text-[9px] text-slate-400 shrink-0">{timeAgo(n.createdAt)}</span>
+                </motion.div>
               ))}
             </div>
           )}
         </Panel>
 
         <Panel title="Upcoming Placements" icon={Briefcase} accent="emerald"
-          action={<button onClick={() => onTabChange('placements')} className="text-xs font-medium text-emerald-600 hover:text-emerald-700">View All</button>}>
+          action={<button onClick={() => onTabChange('placements')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 px-2 py-1 rounded-lg transition-colors">View All</button>}>
           {upcomingPlacements.length === 0 ? (
             <EmptyState icon={Briefcase} title="No active drives" accent="emerald" description="New placement notices will appear here." />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {upcomingPlacements.map(p => (
-                <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                <motion.div key={p.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-all group">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-500/10">
                     <Briefcase size={16} className="text-emerald-600" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-slate-800 truncate">{p.title}</p>
-                    <p className="text-[11px] text-emerald-600 truncate">{p.companyName}</p>
+                    <p className="text-[10px] text-emerald-600 font-medium truncate">{p.companyName}</p>
                   </div>
                   {p.lastDate && (
                     <div className="text-right shrink-0">
-                      <p className="text-[10px] text-slate-400">Last date</p>
-                      <p className="text-xs font-semibold text-slate-700">{fmtDate(p.lastDate)}</p>
+                      <p className="text-[9px] text-slate-400 uppercase tracking-wider font-medium">Last date</p>
+                      <p className="text-xs font-bold text-slate-700">{fmtDate(p.lastDate)}</p>
                     </div>
                   )}
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
@@ -267,7 +277,7 @@ function AttendanceTab({ overall, subjects, semesters, onSemesterChange, loading
   const pct = overall?.overallPercentage || 0
   const overallAccent = pct >= 75 ? 'emerald' : pct >= 50 ? 'amber' : 'violet'
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={ClipboardCheck} title="Attendance" subtitle="Your attendance across enrolled subjects." accent="emerald"
         actions={
           <select onChange={e => onSemesterChange(e.target.value || null)} className="collego-input !w-auto text-xs py-2 pr-8">
@@ -277,15 +287,15 @@ function AttendanceTab({ overall, subjects, semesters, onSemesterChange, loading
         }
       />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard index={0} label="Total Classes" value={overall?.totalClasses ?? 0} icon={Layers} accent="blue" />
-        <StatCard index={1} label="Classes Present" value={overall?.totalPresent ?? 0} icon={CheckCircle2} accent="emerald" />
-        <StatCard index={2} label="Overall %" value={pct} decimals={1} suffix="%" icon={TrendingUp} accent={overallAccent} />
+        <StatCard index={0} label="Total Classes" value={overall?.totalClasses ?? 0} icon={Layers} accent="blue" glow />
+        <StatCard index={1} label="Classes Present" value={overall?.totalPresent ?? 0} icon={CheckCircle2} accent="emerald" glow />
+        <StatCard index={2} label="Overall %" value={pct} decimals={1} suffix="%" icon={TrendingUp} accent={overallAccent} glow />
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Spinner className="border-emerald-500" /></div>
+        <div className="flex items-center justify-center py-16"><Spinner color="emerald" /></div>
       ) : (
-        <div className="glass-card overflow-hidden">
+        <div className="glass-card overflow-hidden border border-white/60">
           <div className="overflow-x-auto">
             <table className="collego-table">
               <thead>
@@ -300,9 +310,9 @@ function AttendanceTab({ overall, subjects, semesters, onSemesterChange, loading
               </thead>
               <tbody>
                 {subjects.map(s => (
-                  <tr key={s.sectionId}>
+                  <tr key={s.sectionId} className="hover:bg-white/30 transition-colors">
                     <td className="text-slate-800 font-medium">{s.courseName}</td>
-                    <td><code className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{s.courseCode}</code></td>
+                    <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.courseCode}</code></td>
                     <td style={{ textAlign: 'center' }}>{s.totalClasses}</td>
                     <td style={{ textAlign: 'center', color: '#059669', fontWeight: 600 }}>{s.present}</td>
                     <td style={{ textAlign: 'center', color: '#dc2626', fontWeight: 600 }}>{s.absent}</td>
@@ -315,7 +325,7 @@ function AttendanceTab({ overall, subjects, semesters, onSemesterChange, loading
                   </tr>
                 ))}
                 {subjects.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: '#8a94ad' }}>No attendance data found.</td></tr>
+                  <tr><td colSpan={7} className="text-center text-slate-400 py-14">No attendance data found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -330,12 +340,12 @@ function AttendanceTab({ overall, subjects, semesters, onSemesterChange, loading
 function MarksTab({ internalMarks, cgpa }) {
   const [view, setView] = useState('cgpa')
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={BookMarked} title="Marks & Results" subtitle="Semester grades, CGPA and internal assessment marks." accent="violet"
         actions={
-          <div className="flex bg-white border border-slate-200 rounded-xl p-1">
+          <div className="flex bg-white border border-white/60 rounded-2xl p-1 backdrop-blur-sm">
             {[['cgpa', 'CGPA / SGPA'], ['internal', 'Internal Marks']].map(([id, label]) => (
-              <button key={id} onClick={() => setView(id)} className={cn('px-4 py-1.5 rounded-lg text-xs font-medium transition-all', view === id ? 'bg-violet-600 text-white' : 'text-slate-500 hover:text-slate-800')}>{label}</button>
+              <button key={id} onClick={() => setView(id)} className={cn('px-4 py-2 rounded-xl text-xs font-medium transition-all', view === id ? 'bg-violet-600 text-white shadow-sm shadow-violet-500/20' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50')}>{label}</button>
             ))}
           </div>
         }
@@ -343,15 +353,15 @@ function MarksTab({ internalMarks, cgpa }) {
       {view === 'cgpa' ? (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <StatCard index={0} label="Cumulative CGPA" value={cgpa?.cumulativeCgpa ?? 0} decimals={2} icon={GraduationCap} accent="violet" sub="Across all semesters" />
-            <StatCard index={1} label="Total Credits" value={cgpa?.totalCreditsAllSemesters ?? 0} icon={Award} accent="blue" sub="Credits earned" />
+            <StatCard index={0} label="Cumulative CGPA" value={cgpa?.cumulativeCgpa ?? 0} decimals={2} icon={GraduationCap} accent="violet" sub="Across all semesters" glow />
+            <StatCard index={1} label="Total Credits" value={cgpa?.totalCreditsAllSemesters ?? 0} icon={Award} accent="blue" sub="Credits earned" glow />
           </div>
           {(cgpa?.semesters || []).map(sem => (
-            <div key={sem.semesterId} className="glass-card overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <div key={sem.semesterId} className="glass-card overflow-hidden border border-white/60">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/60 bg-white/30">
                 <div>
                   <p className="font-semibold text-slate-800">{sem.semesterName}</p>
-                  <p className="text-xs text-slate-400">{sem.academicYear} · {sem.totalCredits?.toFixed(0)} credits</p>
+                  <p className="text-[10px] text-slate-400">{sem.academicYear} · {sem.totalCredits?.toFixed(0)} credits</p>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-violet-600">{fmtNum(sem.sgpa)}</p>
@@ -363,7 +373,7 @@ function MarksTab({ internalMarks, cgpa }) {
                   <thead><tr><th>Subject</th><th style={{ textAlign: 'center' }}>Credits</th><th style={{ textAlign: 'center' }}>Marks</th><th style={{ textAlign: 'center' }}>Grade</th><th style={{ textAlign: 'center' }}>GP</th></tr></thead>
                   <tbody>
                     {(sem.subjects || []).map(sub => (
-                      <tr key={sub.sectionId}>
+                      <tr key={sub.sectionId} className="hover:bg-white/30 transition-colors">
                         <td><p className="text-slate-800">{sub.courseName}</p><p className="text-[10px] text-slate-400 font-mono">{sub.courseCode}</p></td>
                         <td style={{ textAlign: 'center', color: '#64748b' }}>{sub.credits}</td>
                         <td style={{ textAlign: 'center' }}>{sub.obtainedMarks != null ? `${sub.obtainedMarks}/${sub.maxMarks}` : '—'}</td>
@@ -379,19 +389,19 @@ function MarksTab({ internalMarks, cgpa }) {
           {!cgpa?.semesters?.length && <EmptyState icon={GraduationCap} title="No results yet" accent="violet" description="Your semester results will appear here." />}
         </div>
       ) : (
-        <div className="glass-card overflow-hidden">
+        <div className="glass-card overflow-hidden border border-white/60">
           <div className="overflow-x-auto">
             <table className="collego-table">
               <thead><tr><th>Subject</th><th style={{ textAlign: 'center' }}>IA-1 (Obtained / Max)</th><th style={{ textAlign: 'center' }}>IA-2 (Obtained / Max)</th></tr></thead>
               <tbody>
                 {(internalMarks || []).map(m => (
-                  <tr key={m.sectionId}>
+                  <tr key={m.sectionId} className="hover:bg-white/30 transition-colors">
                     <td><p className="text-slate-800">{m.courseName}</p><p className="text-[10px] text-slate-400 font-mono">{m.courseCode}</p></td>
                     <td style={{ textAlign: 'center' }}>{m.ia1ObtainedMarks != null ? <span className="text-violet-600 font-semibold">{m.ia1ObtainedMarks} / {m.ia1MaxMarks}</span> : <span className="text-slate-300">—</span>}</td>
                     <td style={{ textAlign: 'center' }}>{m.ia2ObtainedMarks != null ? <span className="text-violet-600 font-semibold">{m.ia2ObtainedMarks} / {m.ia2MaxMarks}</span> : <span className="text-slate-300">—</span>}</td>
                   </tr>
                 ))}
-                {!internalMarks?.length && <tr><td colSpan={3} style={{ textAlign: 'center', padding: '3rem', color: '#8a94ad' }}>No internal marks found.</td></tr>}
+                {!internalMarks?.length && <tr><td colSpan={3} className="text-center text-slate-400 py-14">No internal marks found.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -405,27 +415,27 @@ function MarksTab({ internalMarks, cgpa }) {
 function TimetableTab({ timetable, loading }) {
   const days = timetable?.weeklySchedule ? DAY_ORDER.filter(d => timetable.weeklySchedule[d]?.length > 0) : []
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={Calendar} title="Timetable" subtitle="Your weekly class schedule." accent="blue" />
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Spinner className="border-blue-500" /></div>
+        <div className="flex items-center justify-center py-16"><Spinner color="blue" /></div>
       ) : days.length === 0 ? (
-        <div className="glass-card p-12"><EmptyState icon={Calendar} title="No timetable" accent="blue" description="No timetable data found for active enrollments." /></div>
+        <div className="glass-card p-12 border border-white/60"><EmptyState icon={Calendar} title="No timetable" accent="blue" description="No timetable data found for active enrollments." /></div>
       ) : (
         <div className="space-y-4">
           {DAY_ORDER.map(day => {
             const slots = timetable?.weeklySchedule?.[day] || []
             if (!slots.length) return null
-            const color = DAY_COLORS[day] || '#6366f1'
+            const color = DAY_COLORS[day] || '#4f46e5'
             return (
-              <motion.div key={day} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3" style={{ background: `${color}10` }}>
+              <motion.div key={day} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card overflow-hidden border border-white/60">
+                <div className="px-5 py-3.5 border-b border-white/50 flex items-center gap-3" style={{ background: `${color}0d` }}>
                   <div className="w-1.5 h-5 rounded-full" style={{ background: color }} />
                   <h3 className="text-sm font-semibold" style={{ color }}>{day.charAt(0) + day.slice(1).toLowerCase()}</h3>
                 </div>
                 <div>
                   {slots.slice().sort((a, b) => a.startTime?.localeCompare(b.startTime)).map(slot => (
-                    <div key={slot.id} className="flex items-center px-5 py-4 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
+                    <div key={slot.id} className="flex items-center px-5 py-4 hover:bg-white/30 transition-colors border-b border-white/30 last:border-0">
                       <div className="w-24 shrink-0">
                         <p className="text-sm font-mono font-semibold" style={{ color }}>{slot.startTime}</p>
                         <p className="text-xs font-mono text-slate-400">{slot.endTime}</p>
@@ -454,26 +464,26 @@ function TimetableTab({ timetable, loading }) {
 function FeesTab({ fees, loading }) {
   const totalDue = fees.filter(f => f.status !== 'PAID').reduce((s, f) => s + Number(f.totalAmount || 0), 0)
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={Wallet} title="Fee Status" subtitle="Your semester fee structure and payment history." accent="amber" />
       {fees.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard index={0} label="Total Records" value={fees.length} icon={ScrollText} accent="blue" />
-          <StatCard index={1} label="Outstanding" value={totalDue} prefix="₹" icon={Wallet} accent={totalDue > 0 ? 'amber' : 'emerald'} />
-          <StatCard index={2} label="Paid Semesters" value={fees.filter(f => f.status === 'PAID').length} icon={CheckCircle2} accent="emerald" />
+          <StatCard index={0} label="Total Records" value={fees.length} icon={ScrollText} accent="blue" glow />
+          <StatCard index={1} label="Outstanding" value={totalDue} prefix="₹" icon={Wallet} accent={totalDue > 0 ? 'amber' : 'emerald'} sub="Due amount" glow />
+          <StatCard index={2} label="Paid Semesters" value={fees.filter(f => f.status === 'PAID').length} icon={CheckCircle2} accent="emerald" glow />
         </div>
       )}
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Spinner className="border-amber-500" /></div>
+        <div className="flex items-center justify-center py-16"><Spinner color="amber" /></div>
       ) : fees.length === 0 ? (
-        <div className="glass-card p-12"><EmptyState icon={Wallet} title="No fee records" accent="amber" description="Fee details will appear here once published." /></div>
+        <div className="glass-card p-12 border border-white/60"><EmptyState icon={Wallet} title="No fee records" accent="amber" description="Fee details will appear here once published." /></div>
       ) : (
         <div className="space-y-4">
           {fees.map(fee => {
             const isPaid = fee.status === 'PAID'
             return (
-              <motion.div key={fee.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card overflow-hidden">
-                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
+              <motion.div key={fee.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card overflow-hidden border border-white/60 hover:border-white/80 transition-all">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-white/50">
                   <div>
                     <p className="font-semibold text-slate-800">{fee.semesterName}</p>
                     <p className="text-xs text-slate-400">Due: {fmtDate(fee.dueDate)}</p>
@@ -487,14 +497,14 @@ function FeesTab({ fees, loading }) {
                   </div>
                 </div>
                 {fee.items?.map((item, i) => (
-                  <div key={i} className="flex justify-between items-center px-5 py-2.5 text-sm border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                  <div key={i} className="flex justify-between items-center px-5 py-3 text-sm border-b border-white/30 last:border-0 hover:bg-white/30 transition-colors">
                     <span className="text-slate-500">{item.description}</span>
                     <span className="text-slate-700 font-medium">₹{Number(item.amount).toLocaleString('en-IN')}</span>
                   </div>
                 ))}
                 {isPaid && (
-                  <div className="px-5 py-3 bg-emerald-50 border-t border-emerald-100">
-                    <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 size={11} /> Paid on {fmtDate(fee.paidAt)}{fee.transactionRef && <span className="ml-2 text-slate-400">Ref: {fee.transactionRef}</span>}</p>
+                  <div className="px-5 py-3 bg-emerald-50/40 border-t border-emerald-100/50">
+                    <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 size={11} /> Paid on {fmtDate(fee.paidAt)}{fee.transactionRef && <span className="ml-2 text-slate-400 text-[10px]">Ref: {fee.transactionRef}</span>}</p>
                   </div>
                 )}
               </motion.div>
@@ -509,25 +519,25 @@ function FeesTab({ fees, loading }) {
 // ─── Placements ──────────────────────────────────────────────────────────────
 function PlacementsTab({ notices }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={Briefcase} title="Placement Notices" subtitle="Active campus drives and internship opportunities." accent="emerald" />
       {(!notices || notices.length === 0) ? (
-        <div className="glass-card p-12"><EmptyState icon={Briefcase} title="No placement notices" accent="emerald" description="New drives will be announced here." /></div>
+        <div className="glass-card p-12 border border-white/60"><EmptyState icon={Briefcase} title="No placement notices" accent="emerald" description="New drives will be announced here." /></div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {notices.map(notice => {
             const isExpired = notice.lastDate && new Date(notice.lastDate) < new Date()
             return (
               <motion.div key={notice.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                className={cn('glass-card p-5', isExpired ? 'opacity-60' : 'glass-card-hover')}>
+                className={cn('glass-card p-5 border border-white/60 hover:border-white/80 hover:-translate-y-1 transition-all', isExpired ? 'opacity-70' : '')}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-2">
                       <h3 className="font-semibold text-slate-800 truncate">{notice.title}</h3>
                       {isExpired && <Badge variant="secondary">Expired</Badge>}
                     </div>
-                    <p className="text-sm text-emerald-600 font-medium mb-2 flex items-center gap-1.5"><Briefcase size={13} /> {notice.companyName}</p>
-                    <p className="text-sm text-slate-500 mb-3 line-clamp-3">{notice.description}</p>
+                    <p className="text-sm text-emerald-600 font-medium mb-2.5 flex items-center gap-1.5"><Briefcase size={13} /> {notice.companyName}</p>
+                    <p className="text-sm text-slate-500 mb-4 line-clamp-3">{notice.description}</p>
                     <div className="flex flex-wrap gap-2">
                       {notice.eligibilityCriteria && <Badge variant="secondary">{notice.eligibilityCriteria}</Badge>}
                       {notice.packageOffered && <Badge variant="success">₹ {notice.packageOffered}</Badge>}
@@ -536,7 +546,7 @@ function PlacementsTab({ notices }) {
                   </div>
                   {notice.lastDate && (
                     <div className={cn('text-right shrink-0', isExpired ? 'text-slate-400' : 'text-amber-600')}>
-                      <p className="text-xs font-semibold">Last Date</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider">Last Date</p>
                       <p className="text-sm font-bold">{fmtDate(notice.lastDate)}</p>
                     </div>
                   )}
@@ -555,30 +565,30 @@ const NOTIF_TYPES = { ACADEMIC: { v: 'info', label: 'Academic' }, FEE: { v: 'war
 
 function NotificationsTab({ notifications, onMarkRead }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={Bell} title="Notifications" subtitle="Announcements and updates from your college." accent="blue" />
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {(notifications || []).map(n => {
           const cfg = NOTIF_TYPES[n.type] || NOTIF_TYPES.GENERAL
           return (
             <motion.div key={n.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-              className={cn('glass-card p-4 flex items-start gap-4', !n.read ? 'border-indigo-100' : 'opacity-75')}>
-              <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-                <Bell size={15} className="text-indigo-600" />
+              className={cn('glass-card p-4 flex items-start gap-4 border border-white/60 hover:border-white/80 transition-all', !n.read ? 'bg-indigo-50/50 border-indigo-100/50' : 'bg-white/60')}>
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/10">
+                <Bell size={16} className="text-indigo-600" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <Badge variant={cfg.v} className="text-[10px]">{cfg.label}</Badge>
+                  <Badge variant={cfg.v} className="text-[10px] px-2 py-0.5">{cfg.label}</Badge>
                   <span className="text-[10px] text-slate-400">{fmtDate(n.createdAt)}</span>
                 </div>
                 <p className="text-sm font-semibold text-slate-800">{n.title}</p>
                 <p className="text-sm text-slate-500 mt-0.5">{n.message}</p>
               </div>
-              {!n.read && <Button variant="outline" size="sm" onClick={() => onMarkRead(n.id)} className="shrink-0">Mark read</Button>}
+              {!n.read && <Button variant="outline" size="sm" onClick={() => onMarkRead(n.id)} className="shrink-0 px-3">Mark read</Button>}
             </motion.div>
           )
         })}
-        {!notifications?.length && <div className="glass-card p-12"><EmptyState icon={Bell} title="No notifications" accent="blue" description="You're all caught up." /></div>}
+        {!notifications?.length && <div className="glass-card p-12 border border-white/60"><EmptyState icon={Bell} title="No notifications" accent="blue" description="You're all caught up." /></div>}
       </div>
     </div>
   )
@@ -595,8 +605,7 @@ function DocumentsTab({ cgpa, showMessage }) {
       const a = document.createElement('a'); a.href = url; a.download = `marksheet_${semName.replace(/ /g, '_')}.pdf`; a.click()
       window.URL.revokeObjectURL(url)
       showMessage(`Downloaded marksheet for ${semName}`)
-    } catch (err) { showMessage(err.response?.data?.message || `No marks data for ${semName}`, 'error')
-    } finally { setDownloading(null) }
+    } catch (err) { showMessage(err.response?.data?.message || `No marks data for ${semName}`, 'error') } finally { setDownloading(null) }
   }
   const downloadTranscript = async () => {
     try {
@@ -606,37 +615,36 @@ function DocumentsTab({ cgpa, showMessage }) {
       const a = document.createElement('a'); a.href = url; a.download = 'academic_transcript.pdf'; a.click()
       window.URL.revokeObjectURL(url)
       showMessage('Transcript downloaded')
-    } catch { showMessage('No academic data for transcript yet', 'error')
-    } finally { setDownloading(null) }
+    } catch { showMessage('No academic data for transcript yet', 'error') } finally { setDownloading(null) }
   }
   const sems = cgpa?.semesters || []
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={FileText} title="Academic Documents" subtitle="Download your marksheets and official transcript." accent="violet" />
-      <div className="glass-card p-6 flex flex-wrap items-center justify-between gap-4" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(6,182,212,0.03) 100%)' }}>
+      <div className="glass-card p-6 flex flex-wrap items-center justify-between gap-5 border border-white/60">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/30">
-            <ScrollText size={22} />
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/25">
+            <ScrollText size={24} />
           </div>
           <div>
             <h3 className="font-semibold text-slate-800 mb-0.5">Full Academic Transcript</h3>
             <p className="text-sm text-slate-500">Complete academic history across all semesters with CGPA.</p>
           </div>
         </div>
-        <Button variant="gradient" onClick={downloadTranscript} disabled={downloading === 'transcript'}>
+        <Button variant="gradient" onClick={downloadTranscript} disabled={downloading === 'transcript'} className="px-5">
           <Download size={14} /> {downloading === 'transcript' ? 'Generating...' : 'Download Transcript'}
         </Button>
       </div>
       <div>
-        <h3 className="text-sm font-semibold text-slate-500 mb-3">Semester Marksheets</h3>
+        <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Semester Marksheets</h3>
         <div className="space-y-3">
           {sems.map(sem => (
-            <div key={sem.semesterId} className="glass-card p-5 flex items-center justify-between hover:border-violet-200 transition-colors">
+            <div key={sem.semesterId} className="glass-card p-5 flex items-center justify-between border border-white/60 hover:border-white/80 transition-all">
               <div>
                 <p className="font-semibold text-slate-800">{sem.semesterName}</p>
                 <p className="text-xs text-slate-400 mt-0.5">{sem.academicYear} · {sem.subjects?.length} subjects · SGPA {fmtNum(sem.sgpa)}</p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => downloadMarksheet(sem.semesterId, sem.semesterName)} disabled={downloading === `sem-${sem.semesterId}`}>
+              <Button variant="outline" size="sm" onClick={() => downloadMarksheet(sem.semesterId, sem.semesterName)} disabled={downloading === `sem-${sem.semesterId}`} className="px-4">
                 <Download size={13} /> {downloading === `sem-${sem.semesterId}` ? 'Generating...' : 'Download PDF'}
               </Button>
             </div>
@@ -671,42 +679,42 @@ function AiAssistantTab({ overall, cgpa, fees }) {
   const quickPrompts = ['What is my current attendance?', 'Show my CGPA', 'Any pending fees?', 'What placements are available?', 'Show my timetable']
 
   return (
-    <div className="space-y-4 flex flex-col h-[calc(100vh-140px)]">
+    <div className="space-y-4 flex flex-col h-[calc(100vh-160px)]">
       <PageTitle icon={Sparkles} title="AI College Assistant" subtitle="Your 24/7 academic companion." accent="violet"
         actions={<Badge variant="purple">AI Powered</Badge>} />
-      <div className="flex-1 glass-card overflow-hidden flex flex-col min-h-[400px]">
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 glass-card overflow-hidden flex flex-col min-h-[400px] border border-white/60">
+        <div className="flex-1 overflow-y-auto p-5 space-y-3.5 pr-3">
           {messages.map((msg, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
               {msg.role === 'assistant' && (
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center mr-2 shrink-0 self-end mb-1">
-                  <Bot size={13} className="text-white" />
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center mr-2 shrink-0 self-end mb-1 shadow-sm shadow-violet-500/20">
+                  <Bot size={14} className="text-white" />
                 </div>
               )}
-              <div className={cn('max-w-[80%] px-4 py-3 rounded-2xl text-sm', msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-slate-100 text-slate-700 rounded-bl-sm')}>
-                {msg.role === 'assistant' && <p className="text-[10px] text-violet-600 font-semibold mb-1">Collego AI</p>}
+              <div className={cn('max-w-[85%] px-4 py-3 rounded-2xl text-sm', msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-sm shadow-sm shadow-indigo-500/20' : 'bg-slate-50/60 text-slate-700 rounded-bl-sm border border-white/60')}>
+                {msg.role === 'assistant' && <p className="text-[10px] text-violet-600 font-semibold mb-1 uppercase tracking-wider">Collego AI</p>}
                 <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
               </div>
             </motion.div>
           ))}
           {loading && (
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shrink-0"><Bot size={13} className="text-white" /></div>
-              <div className="bg-slate-100 px-4 py-3 rounded-2xl rounded-bl-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shrink-0"><Bot size={14} className="text-white" /></div>
+              <div className="bg-slate-100/60 px-4 py-3 rounded-2xl rounded-bl-sm">
                 <div className="flex gap-1">{[0, 1, 2].map(i => <div key={i} className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}</div>
               </div>
             </div>
           )}
         </div>
-        <div className="border-t border-slate-100 p-3 flex gap-2">
+        <div className="border-t border-white/60 p-4 flex gap-2">
           <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
             placeholder="Ask about attendance, marks, fees, placements..." className="collego-input flex-1" />
-          <Button variant="gradient" size="sm" onClick={sendMessage} disabled={loading || !input.trim()}><Send size={14} /> Send</Button>
+          <Button variant="gradient" size="sm" onClick={sendMessage} disabled={loading || !input.trim()} className="px-5"><Send size={14} /> Send</Button>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
         {quickPrompts.map(p => (
-          <button key={p} onClick={() => setInput(p)} className="text-xs bg-white hover:bg-violet-50 border border-slate-200 hover:border-violet-200 text-slate-500 hover:text-violet-600 px-3 py-1.5 rounded-lg transition-colors">{p}</button>
+          <button key={p} onClick={() => setInput(p)} className="text-xs bg-white border border-white/60 hover:border-violet-200 hover:text-violet-600 text-slate-500 px-3 py-1.5 rounded-xl font-medium transition-all active:scale-95">{p}</button>
         ))}
       </div>
     </div>
@@ -733,23 +741,23 @@ function AiPredictionTab() {
 
   const RISK = { LOW: { v: 'success', label: 'Low Risk' }, MEDIUM: { v: 'warning', label: 'Medium Risk' }, HIGH: { v: 'destructive', label: 'High Risk' } }
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={Target} title="AI Performance Prediction" subtitle="CGPA/SGPA projection from your academic history using trend analysis." accent="indigo"
         actions={<Badge variant="purple">AI Powered</Badge>} />
-      {loading && <div className="flex justify-center py-12"><Spinner /></div>}
-      {error && <div className="glass-card p-5 border-red-100"><p className="text-red-600 text-sm">{error}</p></div>}
+      {loading && <div className="flex justify-center py-16"><Spinner color="indigo" /></div>}
+      {error && <div className="glass-card p-5 border-red-100/50 bg-red-50/10"><p className="text-red-600 text-sm">{error}</p></div>}
       {data && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatCard index={0} label="Predicted SGPA" value={data.predictedSgpa ?? 0} decimals={2} icon={TrendingUp} accent="indigo" />
-          <div className="glass-card p-5">
-            <p className="text-xs text-slate-500">Risk Level</p>
-            <div className="flex items-center gap-2 mt-2">
+          <StatCard index={0} label="Predicted SGPA" value={data.predictedSgpa ?? 0} decimals={2} icon={TrendingUp} accent="indigo" glow />
+          <div className="glass-card p-6 border border-white/60">
+            <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-4">Risk Level</p>
+            <div className="flex items-center gap-2">
               <Badge variant={RISK[data.riskLevel]?.v ?? 'secondary'}>{RISK[data.riskLevel]?.label ?? data.riskLevel}</Badge>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2">Based on attendance & past performance</p>
+            <p className="text-[10px] text-slate-400 mt-4">Based on attendance & past performance</p>
           </div>
-          <div className="glass-card p-5">
-            <p className="text-xs text-slate-500">Trend</p>
+          <div className="glass-card p-6 border border-white/60">
+            <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-4">Trend</p>
             <p className="text-sm font-semibold text-slate-700 mt-2">{data.trend}</p>
           </div>
         </div>
@@ -859,9 +867,9 @@ export default function StudentDashboard() {
         onLogout={() => { authService.clearTokens(); navigate('/login') }}
       />
       <main className="main-content" style={{ marginLeft: sidebarWidth }}>
-        <div className="p-5 md:p-6 max-w-[1600px] mx-auto">
+        <div className="p-5 md:p-7 max-w-[1700px] mx-auto">
           <AnimatePresence mode="wait">
-            <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+            <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
               {renderTab()}
             </motion.div>
           </AnimatePresence>

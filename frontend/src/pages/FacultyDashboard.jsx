@@ -23,7 +23,7 @@ import {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 const fmtNum = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
-const PIE_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+const PIE_COLORS = ['#4f46e5', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
 
 function AttBadge({ pct }) {
   if (pct >= 75) return <Badge variant="success">{pct}%</Badge>
@@ -56,7 +56,7 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <WelcomeBanner
         greeting={greeting}
         name="Professor"
@@ -67,14 +67,14 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
 
       {overviewData && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatCard index={0} label="Sections Assigned" value={overviewData.totalSections} icon={Layers} accent="violet" />
-          <StatCard index={1} label="Total Students" value={overviewData.totalStudents} icon={Users} accent="blue" />
-          <StatCard index={2} label="Unique Courses" value={overviewData.courses.length} icon={BookMarked} accent="emerald" />
-          <StatCard index={3} label="Semesters" value={overviewData.semesters.length} icon={GraduationCap} accent="amber" />
+          <StatCard index={0} label="Sections Assigned" value={overviewData.totalSections} icon={Layers} accent="violet" glow />
+          <StatCard index={1} label="Total Students" value={overviewData.totalStudents} icon={Users} accent="blue" glow />
+          <StatCard index={2} label="Unique Courses" value={overviewData.courses.length} icon={BookMarked} accent="emerald" glow />
+          <StatCard index={3} label="Semesters" value={overviewData.semesters.length} icon={GraduationCap} accent="amber" glow />
         </div>
       )}
 
-      <Panel title="My Teaching Sections" icon={BookOpen} accent="violet" bodyClassName="!flex-none">
+      <Panel title="My Teaching Sections" icon={BookOpen} accent="violet" bodyClassName="!flex-none" hover>
         {sections.length === 0 ? (
           <EmptyState icon={BookOpen} title="No sections assigned" accent="violet" description="Sections will appear once the admin assigns you courses." />
         ) : (
@@ -86,30 +86,30 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.06 }}
                 onClick={() => onSectionSelect(sec)}
-                className="text-left rounded-2xl p-5 border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-violet-200 hover:shadow-lg hover:shadow-violet-500/10 transition-all group"
+                className="text-left rounded-2xl p-5 border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white hover:border-white/80 hover:shadow-xl hover:shadow-indigo-500/10 transition-all group"
               >
-                <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start justify-between mb-4">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-slate-800 group-hover:text-violet-600 transition-colors truncate">{sec.courseName}</h4>
-                    <p className="text-xs text-slate-400 font-mono mt-0.5">{sec.courseCode}</p>
+                    <h4 className="font-bold text-slate-800 group-hover:text-violet-600 transition-colors leading-tight">{sec.courseName}</h4>
+                    <p className="text-[10px] text-slate-400 font-mono mt-1">{sec.courseCode}</p>
                   </div>
-                  <div className="w-8 h-8 rounded-xl shrink-0 ml-2 flex items-center justify-center text-sm font-bold" style={{ background: `${PIE_COLORS[i % PIE_COLORS.length]}1f`, color: PIE_COLORS[i % PIE_COLORS.length] }}>
+                  <div className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center text-sm font-bold shadow-sm" style={{ background: `${PIE_COLORS[i % PIE_COLORS.length]}15`, color: PIE_COLORS[i % PIE_COLORS.length] }}>
                     {sec.sectionName}
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
-                  <span className="flex items-center gap-1"><Users size={10} /> {sec.enrolledStudents} students</span>
+                  <span className="flex items-center gap-1.5"><Users size={10} /> {sec.enrolledStudents} students</span>
                   <span>{sec.semesterName}</span>
                   <span>{sec.credits} credits</span>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between pt-3 border-t border-white/60">
                   <div className="flex gap-1">
                     {SECTION_TABS.slice(0, 4).map(tab => {
                       const Icon = tab.icon
-                      return <div key={tab.id} className="w-6 h-6 rounded-lg bg-white border border-slate-100 flex items-center justify-center"><Icon size={10} className="text-slate-400" /></div>
+                      return <div key={tab.id} className="w-6 h-6 rounded-lg bg-white border border-white/60 flex items-center justify-center shadow-xs"><Icon size={10} className="text-slate-400" /></div>
                     })}
                   </div>
-                  <span className="text-xs text-violet-600 group-hover:text-violet-700 transition-colors flex items-center gap-1 font-medium">Manage <ChevronRight size={11} /></span>
+                  <span className="text-xs text-violet-600 group-hover:text-violet-700 transition-colors flex items-center gap-1 font-semibold">Manage <ChevronRight size={11} /></span>
                 </div>
               </motion.button>
             ))}
@@ -117,8 +117,8 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
         )}
       </Panel>
 
-      <Panel title="Available Features" icon={Zap} accent="amber">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+      <Panel title="Available Features" icon={Zap} accent="amber" hover>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
             { icon: ClipboardCheck, label: 'Mark Attendance', desc: 'Bulk per-session entry', accent: 'emerald' },
             { icon: BookMarked, label: 'Internal Marks', desc: 'IA-1, IA-2, IA-3 upload', accent: 'violet' },
@@ -130,13 +130,13 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
             const Icon = f.icon
             const a = ACCENTS[f.accent]
             return (
-              <div key={f.label} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', a.softBg)}>
-                  <Icon size={15} className={a.text} />
+              <div key={f.label} className="flex items-start gap-3 p-4 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white hover:border-white/80 transition-all group">
+                <span className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', a.softBg, a.shadow)}>
+                  <Icon size={16} className={a.text} />
                 </span>
-                <div>
-                  <p className="text-xs font-semibold text-slate-700">{f.label}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{f.desc}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">{f.label}</p>
+                  <p className="text-[10px] text-slate-500 mt-1">{f.desc}</p>
                 </div>
               </div>
             )
@@ -150,16 +150,16 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
 // ─── Section Header ──────────────────────────────────────────────────────────
 function SectionHeader({ section, activeTab, onTabChange, onBack }) {
   return (
-    <div className="mb-5">
-      <div className="flex items-center gap-2 mb-3">
-        <button onClick={onBack} className="p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-all">
+    <div className="mb-6">
+      <div className="flex items-center gap-3 mb-4">
+        <button onClick={onBack} className="p-2 rounded-xl text-slate-400 hover:text-violet-600 hover:bg-white/60 transition-all">
           <ArrowLeft size={15} />
         </button>
         <h2 className="text-lg font-bold text-slate-900">{section.courseName}</h2>
-        <Badge variant="purple" className="text-[10px]">{section.courseCode}</Badge>
-        <p className="text-xs text-slate-400 ml-1 hidden sm:block">Section {section.sectionName} · {section.semesterName} · {section.enrolledStudents} students</p>
+        <Badge variant="purple" className="text-[10px] px-2.5 py-0.5">{section.courseCode}</Badge>
+        <p className="text-xs text-slate-400 ml-3 hidden sm:block">{section.sectionName} · {section.semesterName} · {section.enrolledStudents} students</p>
       </div>
-      <div className="flex gap-1 bg-white rounded-2xl p-1 border border-slate-200 overflow-x-auto scrollbar-hide">
+      <div className="flex gap-1 bg-white border border-white/60 rounded-2xl p-1 backdrop-blur-sm overflow-x-auto scrollbar-hide">
         {SECTION_TABS.map(tab => {
           const Icon = tab.icon
           return (
@@ -187,13 +187,13 @@ function AttendanceTab({ attendanceDate, setAttendanceDate, attendanceRecords, t
   const pct = attendanceRecords.length > 0 ? Math.round((present / attendanceRecords.length) * 100) : 0
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <input type="date" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} className="collego-input !w-auto" />
-        <Button variant="success" size="sm" onClick={() => attendanceRecords.forEach((_, i) => toggleAttendance(i, 'PRESENT'))}>
+        <Button variant="success" size="sm" onClick={() => attendanceRecords.forEach((_, i) => toggleAttendance(i, 'PRESENT'))} className="px-4">
           <CheckCircle2 size={13} /> All Present
         </Button>
-        <Button variant="destructive" size="sm" onClick={() => attendanceRecords.forEach((_, i) => toggleAttendance(i, 'ABSENT'))}>
+        <Button variant="destructive" size="sm" onClick={() => attendanceRecords.forEach((_, i) => toggleAttendance(i, 'ABSENT'))} className="px-4">
           <X size={13} /> All Absent
         </Button>
         <div className="ml-auto flex items-center gap-3 text-xs">
@@ -209,22 +209,22 @@ function AttendanceTab({ attendanceDate, setAttendanceDate, attendanceRecords, t
           { v: absent, l: 'Absent', c: 'text-red-500' },
           { v: `${pct}%`, l: 'Attendance', c: pct >= 75 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-red-500' },
         ].map(s => (
-          <div key={s.l} className="glass-card p-4 text-center">
+          <div key={s.l} className="glass-card p-4 text-center border border-white/60">
             <p className={cn('text-2xl font-bold', s.c)}>{s.v}</p>
-            <p className="text-xs text-slate-400">{s.l}</p>
+            <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">{s.l}</p>
           </div>
         ))}
       </div>
 
-      <div className="glass-card overflow-hidden">
+      <div className="glass-card overflow-hidden border border-white/60">
         <div className="overflow-x-auto">
           <table className="collego-table">
             <thead><tr><th>#</th><th>Enrollment</th><th>Student Name</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
             <tbody>
               {attendanceRecords.map((r, i) => (
-                <tr key={r.studentId}>
+                <tr key={r.studentId} className="hover:bg-white/30 transition-colors">
                   <td className="text-slate-400">{i + 1}</td>
-                  <td><code className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{r.enrollmentNumber}</code></td>
+                  <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{r.enrollmentNumber}</code></td>
                   <td className="text-slate-800 font-medium">{r.studentName}</td>
                   <td style={{ textAlign: 'center' }}>
                     <button
@@ -241,14 +241,14 @@ function AttendanceTab({ attendanceDate, setAttendanceDate, attendanceRecords, t
                   </td>
                 </tr>
               ))}
-              {attendanceRecords.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: '#8a94ad' }}>No students enrolled in this section.</td></tr>}
+              {attendanceRecords.length === 0 && <tr><td colSpan={4} className="text-center text-slate-400 py-14">No students enrolled in this section.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
 
       {attendanceRecords.length > 0 && (
-        <Button variant="gradient" onClick={onSubmit} disabled={loading}>
+        <Button variant="gradient" onClick={onSubmit} disabled={loading} className="px-6">
           {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><CheckCircle2 size={14} /> Save Attendance</>}
         </Button>
       )}
@@ -259,29 +259,29 @@ function AttendanceTab({ attendanceDate, setAttendanceDate, attendanceRecords, t
 // ─── Internal Marks Tab ──────────────────────────────────────────────────────
 function InternalMarksTab({ examName, setExamName, maxMarks, setMaxMarks, marksEntries, setMarksEntries, onSubmit, sectionMarks, loading }) {
   return (
-    <div className="space-y-5">
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2"><Plus size={14} className="text-violet-600" /> Enter Internal Marks</h3>
-        <div className="grid grid-cols-2 gap-3 mb-4">
+    <div className="space-y-6">
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={14} className="text-violet-500" /> Enter Internal Marks</h3>
+        <div className="grid grid-cols-2 gap-4 mb-5">
           <div>
-            <label className="text-xs text-slate-500 mb-1.5 block">Exam Name</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Exam Name</label>
             <select value={examName} onChange={e => setExamName(e.target.value)} className="collego-input">
               {['IA-1', 'IA-2', 'IA-3', 'Mid-Sem', 'Quiz-1', 'Quiz-2'].map(n => <option key={n}>{n}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1.5 block">Max Marks</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Max Marks</label>
             <input type="number" value={maxMarks} onChange={e => setMaxMarks(e.target.value)} className="collego-input" min="1" />
           </div>
         </div>
-        <div className="rounded-xl overflow-hidden border border-slate-100 mb-4">
+        <div className="rounded-xl overflow-hidden border border-white/60 mb-5">
           <div className="overflow-x-auto">
             <table className="collego-table">
               <thead><tr><th>Enrollment</th><th>Student</th><th style={{ textAlign: 'center' }}>Marks / {maxMarks}</th></tr></thead>
               <tbody>
                 {marksEntries.map((entry, i) => (
-                  <tr key={entry.studentId}>
-                    <td><code className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{entry.enrollmentNumber}</code></td>
+                  <tr key={entry.studentId} className="hover:bg-white/30 transition-colors">
+                    <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{entry.enrollmentNumber}</code></td>
                     <td className="text-slate-800">{entry.studentName}</td>
                     <td style={{ textAlign: 'center' }}>
                       <input type="number" value={entry.obtainedMarks} min="0" max={maxMarks}
@@ -294,20 +294,20 @@ function InternalMarksTab({ examName, setExamName, maxMarks, setMaxMarks, marksE
             </table>
           </div>
         </div>
-        <Button variant="gradient" onClick={onSubmit} disabled={loading}>
+        <Button variant="gradient" onClick={onSubmit} disabled={loading} className="px-6">
           {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><Upload size={14} /> Upload Marks</>}
         </Button>
       </div>
 
       {sectionMarks.length > 0 && (
-        <div className="glass-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-700">Recorded Marks</h3></div>
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="px-5 py-4 border-b border-white/50"><h3 className="text-sm font-semibold text-slate-800">Recorded Marks</h3></div>
           <div className="overflow-x-auto">
             <table className="collego-table">
               <thead><tr><th>Student</th><th>Exam</th><th style={{ textAlign: 'center' }}>Obtained</th><th style={{ textAlign: 'center' }}>Max</th></tr></thead>
               <tbody>
                 {sectionMarks.map(m => (
-                  <tr key={m.id}>
+                  <tr key={m.id} className="hover:bg-white/30 transition-colors">
                     <td><p className="text-slate-800">{m.studentName}</p><code className="text-[10px] text-slate-400">{m.enrollmentNumber}</code></td>
                     <td><Badge variant="secondary">{m.examName}</Badge></td>
                     <td style={{ textAlign: 'center', color: '#7c3aed', fontWeight: 600 }}>{m.obtainedMarks}</td>
@@ -326,21 +326,21 @@ function InternalMarksTab({ examName, setExamName, maxMarks, setMaxMarks, marksE
 // ─── Semester Marks Tab ──────────────────────────────────────────────────────
 function SemesterMarksTab({ semMaxMarks, setSemMaxMarks, semMarksEntries, setSemMarksEntries, onSubmit, loading }) {
   return (
-    <div className="space-y-5">
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2"><GraduationCap size={14} className="text-blue-600" /> Upload Semester Marks</h3>
-        <div className="mb-4">
-          <label className="text-xs text-slate-500 mb-1.5 block">Max Marks</label>
+    <div className="space-y-6">
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><GraduationCap size={14} className="text-blue-500" /> Upload Semester Marks</h3>
+        <div className="mb-5">
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Max Marks</label>
           <input type="number" value={semMaxMarks} onChange={e => setSemMaxMarks(e.target.value)} className="collego-input !w-32" min="1" />
         </div>
-        <div className="rounded-xl overflow-hidden border border-slate-100 mb-4">
+        <div className="rounded-xl overflow-hidden border border-white/60 mb-5">
           <div className="overflow-x-auto">
             <table className="collego-table">
               <thead><tr><th>Enrollment</th><th>Student</th><th style={{ textAlign: 'center' }}>Marks / {semMaxMarks}</th></tr></thead>
               <tbody>
                 {semMarksEntries.map((entry, i) => (
-                  <tr key={entry.studentId}>
-                    <td><code className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{entry.enrollmentNumber}</code></td>
+                  <tr key={entry.studentId} className="hover:bg-white/30 transition-colors">
+                    <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{entry.enrollmentNumber}</code></td>
                     <td className="text-slate-800">{entry.studentName}</td>
                     <td style={{ textAlign: 'center' }}>
                       <input type="number" value={entry.obtainedMarks} min="0" max={semMaxMarks}
@@ -353,7 +353,7 @@ function SemesterMarksTab({ semMaxMarks, setSemMaxMarks, semMarksEntries, setSem
             </table>
           </div>
         </div>
-        <Button variant="gradient" onClick={onSubmit} disabled={loading}>
+        <Button variant="gradient" onClick={onSubmit} disabled={loading} className="px-6">
           {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><Upload size={14} /> Upload Semester Marks</>}
         </Button>
       </div>
@@ -364,12 +364,12 @@ function SemesterMarksTab({ semMaxMarks, setSemMaxMarks, semMarksEntries, setSem
 // ─── Student Performance Tab ─────────────────────────────────────────────────
 function StudentPerformanceTab({ data, loading }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <PageTitle icon={Users} title="Student Performance" subtitle="Attendance and internal marks per student." accent="emerald" />
       {loading ? (
-        <div className="flex justify-center py-12"><Spinner className="border-violet-500" /></div>
+        <div className="flex justify-center py-16"><Spinner color="violet" /></div>
       ) : (
-        <div className="glass-card overflow-hidden">
+        <div className="glass-card overflow-hidden border border-white/60">
           <div className="overflow-x-auto">
             <table className="collego-table">
               <thead><tr><th>Student</th><th>Enrollment</th><th style={{ textAlign: 'center' }}>Attendance %</th><th style={{ textAlign: 'center' }}>IA-1</th><th style={{ textAlign: 'center' }}>IA-2</th></tr></thead>
@@ -377,16 +377,16 @@ function StudentPerformanceTab({ data, loading }) {
                 {data.map(s => {
                   const attPct = s.attendance ? Math.round((s.attendance.presentClasses / (s.attendance.totalClasses || 1)) * 100) : null
                   return (
-                    <tr key={s.studentId}>
+                    <tr key={s.studentId} className="hover:bg-white/30 transition-colors">
                       <td className="text-slate-800 font-medium">{s.studentName}</td>
-                      <td><code className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{s.enrollmentNumber}</code></td>
+                      <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.enrollmentNumber}</code></td>
                       <td style={{ textAlign: 'center' }}>{attPct != null ? <AttBadge pct={attPct} /> : <span className="text-slate-300">—</span>}</td>
                       <td style={{ textAlign: 'center', color: '#7c3aed' }}>{s.ia1ObtainedMarks ?? '—'}</td>
                       <td style={{ textAlign: 'center', color: '#7c3aed' }}>{s.ia2ObtainedMarks ?? '—'}</td>
                     </tr>
                   )
                 })}
-                {data.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: '#8a94ad' }}>No performance data found.</td></tr>}
+                {data.length === 0 && <tr><td colSpan={5} className="text-center text-slate-400 py-14">No performance data found.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -399,27 +399,30 @@ function StudentPerformanceTab({ data, loading }) {
 // ─── Assignments Tab ─────────────────────────────────────────────────────────
 function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, onSubmit, assignments, loading }) {
   return (
-    <div className="space-y-5">
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2"><Plus size={14} className="text-amber-600" /> Create Assignment</h3>
+    <div className="space-y-6">
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={14} className="text-amber-500" /> Create Assignment</h3>
         <div className="space-y-3">
-          <div><label className="text-xs text-slate-500 mb-1.5 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Assignment title" className="collego-input" /></div>
-          <div><label className="text-xs text-slate-500 mb-1.5 block">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="Assignment description..." className="collego-input resize-none" /></div>
-          <div><label className="text-xs text-slate-500 mb-1.5 block">Due Date (optional)</label><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="collego-input !w-48" /></div>
+          <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Assignment title" className="collego-input" /></div>
+          <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="Assignment description..." className="collego-input resize-none" /></div>
+          <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Due Date (optional)</label><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="collego-input !w-48" /></div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-4" onClick={onSubmit} disabled={loading || !title.trim()}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim()}>
           {loading ? <><RefreshCw size={13} className="animate-spin" /> Creating...</> : <><Plus size={13} /> Create Assignment</>}
         </Button>
       </div>
       {assignments.length > 0 && (
-        <div className="glass-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-700">Existing Assignments</h3></div>
-          <div className="divide-y divide-slate-100">
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="px-5 py-4 border-b border-white/50"><h3 className="text-sm font-semibold text-slate-800">Existing Assignments</h3></div>
+          <div className="divide-y divide-white/30">
             {assignments.map(a => (
-              <div key={a.id} className="px-5 py-4 hover:bg-slate-50 transition-colors">
+              <div key={a.id} className="px-5 py-4 hover:bg-white/30 transition-colors">
                 <div className="flex items-start justify-between gap-4">
-                  <div><p className="text-sm font-semibold text-slate-800">{a.title}</p><p className="text-xs text-slate-500 mt-0.5">{a.description}</p></div>
-                  {a.dueDate && <span className="text-xs text-amber-600 shrink-0 flex items-center gap-1"><Clock size={11} /> {fmtDate(a.dueDate)}</span>}
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{a.title}</p>
+                    <p className="text-xs text-slate-500 mt-1">{a.description}</p>
+                  </div>
+                  {a.dueDate && <span className="text-xs text-amber-600 shrink-0 flex items-center gap-1.5"><Clock size={11} /> {fmtDate(a.dueDate)}</span>}
                 </div>
               </div>
             ))}
@@ -434,31 +437,31 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, o
 function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit, materials, loading }) {
   const MATERIAL_TYPES = ['NOTES', 'SLIDES', 'REFERENCE', 'VIDEO', 'ASSIGNMENT', 'OTHER']
   return (
-    <div className="space-y-5">
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2"><Plus size={14} className="text-teal-600" /> Add Course Material</h3>
+    <div className="space-y-6">
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={14} className="text-teal-500" /> Add Course Material</h3>
         <div className="space-y-3">
-          <div><label className="text-xs text-slate-500 mb-1.5 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Material title" className="collego-input" /></div>
-          <div><label className="text-xs text-slate-500 mb-1.5 block">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} placeholder="Description..." className="collego-input resize-none" /></div>
+          <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Material title" className="collego-input" /></div>
+          <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} placeholder="Description..." className="collego-input resize-none" /></div>
           <div>
-            <label className="text-xs text-slate-500 mb-1.5 block">Type</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Type</label>
             <select value={type} onChange={e => setType(e.target.value)} className="collego-input !w-48">
               {MATERIAL_TYPES.map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-4" onClick={onSubmit} disabled={loading || !title.trim()}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim()}>
           {loading ? <><RefreshCw size={13} className="animate-spin" /> Adding...</> : <><Plus size={13} /> Add Material</>}
         </Button>
       </div>
       {materials.length > 0 && (
-        <div className="glass-card overflow-hidden">
+        <div className="glass-card overflow-hidden border border-white/60">
           <div className="overflow-x-auto">
             <table className="collego-table">
               <thead><tr><th>Title</th><th>Type</th><th>Description</th></tr></thead>
               <tbody>
                 {materials.map(m => (
-                  <tr key={m.id}>
+                  <tr key={m.id} className="hover:bg-white/30 transition-colors">
                     <td className="text-slate-800 font-medium">{m.title}</td>
                     <td><Badge variant="info">{m.materialType}</Badge></td>
                     <td className="text-slate-500 text-xs max-w-xs truncate">{m.description || '—'}</td>
@@ -482,17 +485,17 @@ function AnalyticsTab({ analytics, loading }) {
   ] : []
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {loading ? (
-        <div className="flex justify-center py-12"><Spinner className="border-violet-500" /></div>
+        <div className="flex justify-center py-16"><Spinner color="violet" /></div>
       ) : !analytics ? (
-        <div className="glass-card p-12"><EmptyState icon={BarChart3} title="No analytics data" accent="violet" description="Analytics will appear once attendance and marks are recorded." /></div>
+        <div className="glass-card p-12 border border-white/60"><EmptyState icon={BarChart3} title="No analytics data" accent="violet" description="Analytics will appear once attendance and marks are recorded." /></div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Panel title="Attendance Distribution" icon={BarChart3} accent="violet">
-            <ResponsiveContainer width="100%" height={210}>
+            <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={attData} cx="50%" cy="50%" outerRadius={72} dataKey="value" label={entry => `${entry.name}: ${entry.value}`} labelLine={false}>
+                <Pie data={attData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={entry => `${entry.name}: ${entry.value}`} labelLine={false}>
                   {['#ef4444', '#f59e0b', '#10b981'].map((c, i) => <Cell key={i} fill={c} />)}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} />
@@ -509,7 +512,7 @@ function AnalyticsTab({ analytics, loading }) {
                 { label: 'Avg Internal Marks', value: fmtNum(analytics.averageInternalMarks), color: 'text-violet-600' },
                 { label: 'Pass Rate', value: `${fmtNum(analytics.passPercentage, 1)}%`, color: 'text-blue-600' },
               ].map(item => (
-                <div key={item.label} className="flex justify-between items-center py-1">
+                <div key={item.label} className="flex justify-between items-center py-2">
                   <span className="text-xs text-slate-500">{item.label}</span>
                   <span className={cn('text-sm font-bold', item.color)}>{item.value}</span>
                 </div>
@@ -525,46 +528,46 @@ function AnalyticsTab({ analytics, loading }) {
 // ─── Question Papers Tab ─────────────────────────────────────────────────────
 function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fileName, setFileName, selectedSectionId, setSelectedSectionId, onSubmit, papers, loading }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={FileText} title="Question Papers" subtitle="Upload and track question papers for admin approval." accent="violet" />
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2"><Upload size={14} className="text-blue-600" /> Upload Question Paper</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Upload size={14} className="text-blue-500" /> Upload Question Paper</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-slate-500 mb-1.5 block">Course / Section</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course / Section</label>
             <select value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="collego-input">
               <option value="">Select course</option>
               {sections.map(s => <option key={s.sectionId} value={s.sectionId}>{s.courseName} (Sec {s.sectionName})</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1.5 block">Exam Type</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Exam Type</label>
             <select value={examType} onChange={e => setExamType(e.target.value)} className="collego-input">
               {['END_TERM', 'MID_TERM', 'INTERNAL', 'QUIZ'].map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1.5 block">Year</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Year</label>
             <input type="number" value={year} onChange={e => setYear(e.target.value)} className="collego-input" min="2000" max="2100" />
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1.5 block">File Name (optional)</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">File Name (optional)</label>
             <input value={fileName} onChange={e => setFileName(e.target.value)} placeholder="e.g., CS101_EndTerm_2026.pdf" className="collego-input" />
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-4" onClick={onSubmit} disabled={loading || !selectedSectionId}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !selectedSectionId}>
           {loading ? <><RefreshCw size={13} className="animate-spin" /> Uploading...</> : <><Upload size={13} /> Submit for Approval</>}
         </Button>
       </div>
       {papers.length > 0 && (
-        <div className="glass-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-700">My Uploaded Papers</h3></div>
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="px-5 py-4 border-b border-white/50"><h3 className="text-sm font-semibold text-slate-800">My Uploaded Papers</h3></div>
           <div className="overflow-x-auto">
             <table className="collego-table">
               <thead><tr><th>Course</th><th>Exam Type</th><th>Year</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
               <tbody>
                 {papers.map(p => (
-                  <tr key={p.id}>
+                  <tr key={p.id} className="hover:bg-white/30 transition-colors">
                     <td className="text-slate-800">{p.courseName}</td>
                     <td><Badge variant="info">{p.examType}</Badge></td>
                     <td className="text-slate-500">{p.year}</td>
@@ -586,22 +589,22 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
 function NoticesTab({ title, setTitle, message, setMessage, type, setType, deptId, setDeptId, departments, onSubmit, sentNotices, loading }) {
   const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'FEE', 'EXAM']
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={Megaphone} title="Notices" subtitle="Broadcast announcements to students across departments." accent="amber" />
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2"><Megaphone size={14} className="text-amber-600" /> Broadcast Notice</h3>
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Megaphone size={14} className="text-amber-500" /> Broadcast Notice</h3>
         <div className="space-y-3">
-          <div><label className="text-xs text-slate-500 mb-1.5 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Notice title" className="collego-input" /></div>
-          <div><label className="text-xs text-slate-500 mb-1.5 block">Message</label><textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} placeholder="Notice message..." className="collego-input resize-none" /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Notice title" className="collego-input" /></div>
+          <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Message</label><textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} placeholder="Notice message..." className="collego-input resize-none" /></div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-slate-500 mb-1.5 block">Type</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Type</label>
               <select value={type} onChange={e => setType(e.target.value)} className="collego-input">
                 {TYPE_OPTIONS.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1.5 block">Department (optional)</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Department (optional)</label>
               <select value={deptId} onChange={e => setDeptId(e.target.value)} className="collego-input">
                 <option value="">All departments</option>
                 {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -609,18 +612,21 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, deptI
             </div>
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-4" onClick={onSubmit} disabled={loading || !title.trim() || !message.trim()}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim() || !message.trim()}>
           {loading ? <><RefreshCw size={13} className="animate-spin" /> Sending...</> : <><Send size={13} /> Send Notice</>}
         </Button>
       </div>
       {sentNotices.length > 0 && (
-        <div className="glass-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-700">Sent Notices</h3></div>
-          <div className="divide-y divide-slate-100">
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="px-5 py-4 border-b border-white/50"><h3 className="text-sm font-semibold text-slate-800">Sent Notices</h3></div>
+          <div className="divide-y divide-white/30">
             {sentNotices.map((n, i) => (
               <div key={i} className="px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
-                  <div><p className="text-sm font-semibold text-slate-800">{n.title}</p><p className="text-xs text-slate-500 mt-1">{n.message}</p></div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{n.title}</p>
+                    <p className="text-xs text-slate-500 mt-1">{n.message}</p>
+                  </div>
                   <div className="text-right shrink-0">
                     <Badge variant="info">{n.type}</Badge>
                     <p className="text-[10px] text-slate-400 mt-1">{n.recipientCount} recipients</p>
@@ -638,30 +644,30 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, deptI
 // ─── AI Notice Generator ─────────────────────────────────────────────────────
 function AiNoticeGenTab({ prompt, setPrompt, audience, setAudience, noticeType, setNoticeType, onGenerate, result, loading, onUse }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageTitle icon={Sparkles} title="AI Notice Generator" subtitle="Describe the notice briefly and AI drafts a complete, professional version." accent="violet"
         actions={<Badge variant="purple">AI Powered</Badge>} />
-      <div className="glass-card p-5 border-violet-100">
-        <h3 className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2"><Sparkles size={15} className="text-violet-600" /> Generate a Notice</h3>
-        <p className="text-xs text-slate-400 mb-4">The AI will create a polished notice you can send to students.</p>
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-1 flex items-center gap-2"><Sparkles size={15} className="text-violet-500" /> Generate a Notice</h3>
+        <p className="text-xs text-slate-500 mb-4">The AI will create a polished notice you can send to students.</p>
         <div className="space-y-3">
-          <div><label className="text-xs text-slate-500 mb-1.5 block">Your Prompt</label><textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={3} placeholder="e.g., 'Inform students about mid-semester exam schedule starting next week'" className="collego-input resize-none" /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Your Prompt</label><textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={3} placeholder="e.g., 'Inform students about mid-semester exam schedule starting next week'" className="collego-input resize-none" /></div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-slate-500 mb-1.5 block">Audience</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Audience</label>
               <select value={audience} onChange={e => setAudience(e.target.value)} className="collego-input">
                 {['students', 'faculty', 'all'].map(a => <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1.5 block">Notice Type</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Notice Type</label>
               <select value={noticeType} onChange={e => setNoticeType(e.target.value)} className="collego-input">
                 {['GENERAL', 'ACADEMIC', 'EXAM', 'PLACEMENT', 'FEE'].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-4" onClick={onGenerate} disabled={loading || !prompt.trim()}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onGenerate} disabled={loading || !prompt.trim()}>
           {loading ? (
             <><span className="flex gap-0.5">{[0, 1, 2].map(i => <span key={i} className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}</span> Generating...</>
           ) : (
@@ -671,23 +677,23 @@ function AiNoticeGenTab({ prompt, setPrompt, audience, setAudience, noticeType, 
       </div>
 
       {result && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 border-violet-200">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 border border-violet-100/50 bg-violet-50/30">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-violet-700 flex items-center gap-2"><Bot size={14} /> AI Generated Notice</h3>
-            <Button variant="gradient" size="sm" onClick={onUse}><CheckCircle2 size={13} /> Use this Notice</Button>
+            <Button variant="gradient" size="sm" onClick={onUse} className="px-4"><CheckCircle2 size={13} /> Use this Notice</Button>
           </div>
           <div className="space-y-3">
             <div>
-              <p className="text-xs text-slate-500 mb-1">Title</p>
-              <p className="text-sm font-semibold text-slate-800 bg-slate-50 border border-slate-100 px-3 py-2 rounded-lg">{result.title}</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Title</p>
+              <p className="text-sm font-semibold text-slate-800 bg-white border border-white/60 px-3 py-2 rounded-xl">{result.title}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-500 mb-1">Body</p>
-              <p className="text-sm text-slate-700 bg-slate-50 border border-slate-100 px-3 py-3 rounded-lg leading-relaxed whitespace-pre-wrap">{result.body}</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Body</p>
+              <p className="text-sm text-slate-700 bg-white border border-white/60 px-3 py-3 rounded-xl leading-relaxed whitespace-pre-wrap">{result.body}</p>
             </div>
             {result.summary && (
               <div>
-                <p className="text-xs text-slate-500 mb-1">Summary</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Summary</p>
                 <p className="text-xs text-slate-500 italic">{result.summary}</p>
               </div>
             )}
@@ -1032,7 +1038,7 @@ export default function FacultyDashboard() {
       />
 
       <main className="main-content" style={{ marginLeft: sidebarWidth }}>
-        <div className="p-5 md:p-6 max-w-[1600px] mx-auto">
+        <div className="p-5 md:p-7 max-w-[1700px] mx-auto">
           {selectedSection && (
             <SectionHeader
               section={selectedSection}
@@ -1044,10 +1050,10 @@ export default function FacultyDashboard() {
           <AnimatePresence mode="wait">
             <motion.div
               key={`${activeTab}-${selectedSection?.sectionId}`}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
             >
               {renderContent()}
             </motion.div>
