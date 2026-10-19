@@ -311,15 +311,19 @@ public class AcademicDataSeeder implements CommandLineRunner {
         String lastName = LAST_NAMES[random.nextInt(LAST_NAMES.length)];
         String email = "faculty" + index + "." + deptCode.toLowerCase() + "@collego.edu";
 
-        User user = User.builder()
-                .email(email)
-                .passwordHash(passwordEncoder.encode("Faculty@123"))
-                .firstName(firstName)
-                .lastName(lastName)
-                .role(Role.FACULTY)
-                .isActive(true)
-                .build();
-        user = userRepository.save(user);
+        // Avoid duplicate email collision with DataSeeder (which seeds faculty1.cse@collego.edu)
+        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (user == null) {
+            user = User.builder()
+                    .email(email)
+                    .passwordHash(passwordEncoder.encode("Faculty@123"))
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .role(Role.FACULTY)
+                    .isActive(true)
+                    .build();
+            user = userRepository.save(user);
+        }
 
         FacultyProfile faculty = FacultyProfile.builder()
                 .user(user)
@@ -336,15 +340,19 @@ public class AcademicDataSeeder implements CommandLineRunner {
         String lastName = LAST_NAMES[globalIndex % LAST_NAMES.length];
         String email = "student" + localIndex + "." + deptCode.toLowerCase() + "@collego.edu";
 
-        User user = User.builder()
-                .email(email)
-                .passwordHash(passwordEncoder.encode("Student@123"))
-                .firstName(firstName)
-                .lastName(lastName)
-                .role(Role.STUDENT)
-                .isActive(true)
-                .build();
-        user = userRepository.save(user);
+        // Avoid duplicate email collision with DataSeeder (which seeds student1.cse@collego.edu)
+        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (user == null) {
+            user = User.builder()
+                    .email(email)
+                    .passwordHash(passwordEncoder.encode("Student@123"))
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .role(Role.STUDENT)
+                    .isActive(true)
+                    .build();
+            user = userRepository.save(user);
+        }
 
         StudentProfile student = StudentProfile.builder()
                 .user(user)

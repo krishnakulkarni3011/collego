@@ -14,26 +14,25 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@SuppressWarnings("null")
 public class SectionTimetableService {
 
     private final SectionTimetableRepository timetableRepository;
     private final SectionRepository sectionRepository;
+    private final S3StorageService s3StorageService;
 
-    @Value("${collego.storage.timetables:${user.home}/collego-storage/timetables}")
-    private String storageBasePath;
+    @Value("${collego.aws.s3-bucket-timetables:collego-timetables-prod}")
+    private String timetableBucket;
 
-    /** Upload (or replace) the timetable PDF for a section. Only one allowed per section. */
+    /**
+     * Upload (or replace) the timetable PDF for a section. Only one allowed per section.
+     * Stores the file in S3 (collego.aws.use-s3=true in prod).
+     */
     @Transactional
     public Map<String, Object> uploadTimetable(Long sectionId, MultipartFile file) throws IOException {
         Section section = sectionRepository.findById(sectionId)
@@ -41,31 +40,34 @@ public class SectionTimetableService {
 
         validatePdf(file);
 
-        // Delete old file from disk if replacing
+        // Delete old file from S3 if replacing
         timetableRepository.findBySectionId(sectionId).ifPresent(old -> {
             try {
-                Files.deleteIfExists(Paths.get(storageBasePath, old.getFilePath()));
-            } catch (IOException e) {
-                log.warn("Could not delete old timetable file: {}", old.getFilePath());
+                if (old.getFilePath() != null) {
+                    s3StorageService.delete(timetableBucket, old.getFilePath());
+                }
+            } catch (Exception e) {
+                log.warn("Could not delete old timetable file from S3: {}", old.getFilePath(), e);
             }
             timetableRepository.delete(old);
         });
 
-        // Store new file
+        // Store new file in S3
         String uniqueName = UUID.randomUUID() + "_" + sanitize(file.getOriginalFilename());
-        String relativePath = "section/" + sectionId + "/" + uniqueName;
-        Path target = Paths.get(storageBasePath, relativePath);
-        Files.createDirectories(target.getParent());
-        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        String s3Key = "timetables/section/" + sectionId + "/" + uniqueName;
+        String contentType = S3StorageService.detectContentType(file.getOriginalFilename());
+
+        s3StorageService.upload(timetableBucket, s3Key, file.getInputStream(),
+                file.getSize(), contentType);
 
         SectionTimetable record = SectionTimetable.builder()
                 .section(section)
                 .fileName(file.getOriginalFilename() != null ? file.getOriginalFilename() : uniqueName)
-                .filePath(relativePath)
+                .filePath(s3Key)
                 .build();
         timetableRepository.save(record);
 
-        log.info("Timetable uploaded for section {}: {}", sectionId, relativePath);
+        log.info("Timetable uploaded for section {} to s3://{}/{}", sectionId, timetableBucket, s3Key);
         return toMeta(record);
     }
 
@@ -76,37 +78,41 @@ public class SectionTimetableService {
                 .orElse(null);
     }
 
-    /** Serve the raw PDF bytes. */
+    /** Serve the raw PDF bytes from S3. */
     public byte[] downloadTimetable(Long sectionId) throws IOException {
         SectionTimetable record = timetableRepository.findBySectionId(sectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("No timetable found for section: " + sectionId));
 
-        Path filePath = Paths.get(storageBasePath, record.getFilePath());
-        if (!Files.exists(filePath)) {
-            throw new ResourceNotFoundException("Timetable file missing on disk for section: " + sectionId);
+        if (record.getFilePath() == null) {
+            throw new ResourceNotFoundException("Timetable file path missing for section: " + sectionId);
         }
-        return Files.readAllBytes(filePath);
+
+        // Download from S3
+        return s3StorageService.download(timetableBucket, record.getFilePath());
     }
 
-    /** Delete the timetable for a section. */
+    /** Delete the timetable for a section (file from S3 + DB record). */
     @Transactional
     public void deleteTimetable(Long sectionId) {
         SectionTimetable record = timetableRepository.findBySectionId(sectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("No timetable found for section: " + sectionId));
 
         try {
-            Files.deleteIfExists(Paths.get(storageBasePath, record.getFilePath()));
-        } catch (IOException e) {
-            log.warn("Could not delete timetable file from disk: {}", record.getFilePath());
+            if (record.getFilePath() != null) {
+                s3StorageService.delete(timetableBucket, record.getFilePath());
+            }
+        } catch (Exception e) {
+            log.warn("Could not delete timetable file from S3: {}", record.getFilePath(), e);
         }
         timetableRepository.delete(record);
     }
 
     private Map<String, Object> toMeta(SectionTimetable t) {
         return Map.of(
-                "sectionId",  t.getSection().getId(),
-                "fileName",   t.getFileName(),
-                "uploadedAt", t.getUploadedAt().toString()
+                "sectionId", t.getSection().getId(),
+                "fileName", t.getFileName(),
+                "uploadedAt", t.getUploadedAt().toString(),
+                "s3Key", t.getFilePath()
         );
     }
 

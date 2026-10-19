@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -105,8 +106,9 @@ public class QuestionPaperController {
     @PostMapping("/{id}/upload")
     @PreAuthorize("hasRole('FACULTY')")
     public ResponseEntity<QuestionPaperResponse> uploadFile(
+            Authentication auth,
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) throws IOException {
-        return ResponseEntity.ok(questionPaperService.uploadFileForQp(id, file));
+        return ResponseEntity.ok(questionPaperService.uploadFileForQp(id, file, auth.getName()));
     }
 }

@@ -5,6 +5,7 @@ import com.collego.entity.QuestionPaper;
 import com.collego.exception.BadRequestException;
 import com.collego.exception.ResourceNotFoundException;
 import com.collego.repository.QuestionPaperRepository;
+import com.collego.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +36,7 @@ public class QuestionPaperService {
 
     private final QuestionPaperRepository questionPaperRepository;
     private final S3StorageService s3StorageService;
+    private final UserRepository userRepository;
 
     @Value("${collego.aws.s3-bucket-question-papers:collego-question-papers-prod}")
     private String qpBucket;
@@ -86,11 +88,20 @@ public class QuestionPaperService {
      *
      * The S3 key is persisted in QuestionPaper.filePath so download can retrieve it.
      * Returns the S3 key (stored as filePath).
+     *
+     * @param uploaderEmail email of the faculty uploading the file (ownership is verified)
      */
     @Transactional
-    public String storeFile(MultipartFile file, Long qpId) throws IOException {
+    public String storeFile(MultipartFile file, Long qpId, String uploaderEmail) throws IOException {
         QuestionPaper qp = questionPaperRepository.findById(qpId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question paper not found: " + qpId));
+
+        // Ownership check: only the faculty who created the QP can attach a file
+        if (qp.getUploadedBy() != null && qp.getUploadedBy().getEmail() != null) {
+            if (!qp.getUploadedBy().getEmail().equalsIgnoreCase(uploaderEmail)) {
+                throw new BadRequestException("You do not own this question paper. Cannot attach file.");
+            }
+        }
 
         validateFileType(file);
 
@@ -143,10 +154,12 @@ public class QuestionPaperService {
     /**
      * Convenience method: Store file AND link it to a QP in one step.
      * Called after QP record is created via FacultyPortalService.
+     *
+     * @param uploaderEmail email of the faculty uploading the file (ownership is verified)
      */
     @Transactional
-    public QuestionPaperResponse uploadFileForQp(Long qpId, MultipartFile file) throws IOException {
-        storeFile(file, qpId);
+    public QuestionPaperResponse uploadFileForQp(Long qpId, MultipartFile file, String uploaderEmail) throws IOException {
+        storeFile(file, qpId, uploaderEmail);
         QuestionPaper qp = questionPaperRepository.findById(qpId).orElseThrow();
         return mapToResponse(qp);
     }

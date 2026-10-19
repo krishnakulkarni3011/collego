@@ -12,6 +12,10 @@ import java.util.Map;
 @Service
 public class JwtService {
 
+    public static final String TOKEN_TYPE_CLAIM = "tokenType";
+    public static final String ACCESS_TOKEN_TYPE = "access";
+    public static final String REFRESH_TOKEN_TYPE = "refresh";
+
     @Value("${jwt.secret}")
     private String jwtSecret;
 
@@ -22,11 +26,11 @@ public class JwtService {
     private long refreshTokenExpiration;
 
     public String generateAccessToken(String email, String role) {
-        return buildToken(email, Map.of("role", role), accessTokenExpiration);
+        return buildToken(email, Map.of("role", role, TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE), accessTokenExpiration);
     }
 
     public String generateRefreshToken(String email) {
-        return buildToken(email, Map.of(), refreshTokenExpiration);
+        return buildToken(email, Map.of(TOKEN_TYPE_CLAIM, REFRESH_TOKEN_TYPE), refreshTokenExpiration);
     }
 
     public String extractEmail(String token) {
@@ -35,6 +39,18 @@ public class JwtService {
 
     public String extractRole(String token) {
         return extractClaims(token).get("role", String.class);
+    }
+
+    public String extractTokenType(String token) {
+        return extractClaims(token).get(TOKEN_TYPE_CLAIM, String.class);
+    }
+
+    public boolean isAccessToken(String token) {
+        return ACCESS_TOKEN_TYPE.equals(extractTokenType(token));
+    }
+
+    public boolean isRefreshToken(String token) {
+        return REFRESH_TOKEN_TYPE.equals(extractTokenType(token));
     }
 
     public boolean isTokenValid(String token) {

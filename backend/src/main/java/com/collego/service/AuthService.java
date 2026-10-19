@@ -76,6 +76,12 @@ public class AuthService {
             throw new UnauthorizedException("Invalid or expired refresh token");
         }
 
+        // SECURITY FIX: Ensure the presented token is actually a refresh token,
+        // not an access token being misused at the refresh endpoint.
+        if (!jwtService.isRefreshToken(refreshToken)) {
+            throw new UnauthorizedException("Access token cannot be used as a refresh token");
+        }
+
         String email = jwtService.extractEmail(refreshToken);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UnauthorizedException("User not found"));

@@ -37,6 +37,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             if (jwtService.isTokenValid(jwt)) {
+                // SECURITY FIX: Only accept access tokens on API endpoints.
+                // A refresh token must never be usable as an access token.
+                if (!jwtService.isAccessToken(jwt)) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.getWriter().write("{\"error\":\"Refresh token cannot be used as an access token\"}");
+                    return;
+                }
+
                 String email = jwtService.extractEmail(jwt);
 
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
