@@ -6,7 +6,7 @@ import {
   DollarSign, Briefcase, Bell, Sparkles, Target,
   TrendingUp, Download, Send, FileText,
   GraduationCap, CheckCircle2, Bot,
-  Layers, Award, Wallet, ScrollText,
+  Layers, Award, Wallet, ScrollText, Search, AlertTriangle, RefreshCw,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -64,6 +64,10 @@ const NAV_SECTIONS = [
     items: [
       { id: 'aiAssistant', label: 'AI Assistant', icon: Sparkles },
       { id: 'aiPrediction', label: 'AI Prediction', icon: Target },
+      { id: 'aiSmartSearch', label: 'Smart Search', icon: Search },
+      { id: 'aiAttendanceRisk', label: 'Attendance Risk', icon: AlertTriangle },
+      { id: 'aiResumeAnalyzer', label: 'Resume Analyzer', icon: FileText },
+      { id: 'aiPlacementAssistant', label: 'Placement Assistant', icon: Briefcase },
     ],
   },
 ]
@@ -766,6 +770,204 @@ function AiPredictionTab() {
   )
 }
 
+// ─── AI Smart Search ─────────────────────────────────────────────────────────
+function AiSmartSearchTab() {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const search = async () => {
+    if (!query.trim()) return
+    setLoading(true)
+    try {
+      const res = await api.post('/api/ai/smart-search', { query })
+      setResults(res.data)
+    } catch { setResults(null) }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={Search} title="AI Smart Search" subtitle="Search across attendance, marks, placements, notices, and more using natural language." accent="indigo"
+        actions={<Badge variant="purple">AI Powered</Badge>} />
+      <div className="glass-card p-6 border border-white/60">
+        <div className="flex gap-2 mb-6">
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g., 'Show my attendance below 75%', 'Find placement notices for CSE'..." className="collego-input flex-1" />
+          <Button variant="gradient" onClick={search} disabled={loading || !query.trim()} className="px-5">
+            {loading ? (
+              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Searching...</span>
+            ) : (
+              <span className="flex gap-1"><Search size={14} /> Search</span>
+            )}
+          </Button>
+        </div>
+        {loading && <div className="flex justify-center py-8"><Spinner color="indigo" /></div>}
+        {results && (
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-800">Search Results</h3>
+            {Object.entries(results).map(([key, value]) => (
+              <div key={key} className="p-4 rounded-xl border border-white/60 bg-white/50">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{key}</p>
+                <p className="text-sm text-slate-700">{JSON.stringify(value)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── AI Attendance Risk ──────────────────────────────────────────────────────
+function AiAttendanceRiskTab() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      try {
+        const res = await api.get('/api/ai/attendance-risk')
+        setData(res.data)
+      } catch (e) { setError(e.response?.data?.message || 'Attendance risk service unavailable.') }
+      finally { setLoading(false) }
+    }
+    load()
+  }, [])
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={AlertTriangle} title="Attendance Risk Early Warning" subtitle="AI-powered early warning for students at risk of low attendance." accent="amber"
+        actions={<Badge variant="purple">AI Powered</Badge>} />
+      {loading && <div className="flex justify-center py-16"><Spinner color="amber" /></div>}
+      {error && <div className="glass-card p-5 border-red-100/50 bg-red-50/10"><p className="text-red-600 text-sm">{error}</p></div>}
+      {data && (
+        <div className="space-y-4">
+          <div className="glass-card p-6 border border-white/60">
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">Subject Attendance Risk</h3>
+            <div className="space-y-3">
+              {(data.subjectAttendance || []).map((s, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-white/60 bg-white/50">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{s.courseName}</p>
+                    <p className="text-[10px] text-slate-500 font-mono">{s.courseCode}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono text-slate-400">{s.present} / {s.totalClasses}</span>
+                    <Badge variant={Number(s.percentage) >= 75 ? 'success' : Number(s.percentage) >= 50 ? 'warning' : 'destructive'}>
+                      {Number(s.percentage).toFixed(1)}%
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── AI Resume Analyzer ──────────────────────────────────────────────────────
+function AiResumeAnalyzerTab() {
+  const [resumeText, setResumeText] = useState('')
+  const [targetRole, setTargetRole] = useState('')
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const analyze = async () => {
+    if (!resumeText.trim()) return
+    setLoading(true)
+    try {
+      const res = await api.post('/api/ai/resume-analyze', { resumeText, targetRole })
+      setResult(res.data)
+    } catch { setResult(null) }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={FileText} title="AI Resume Analyzer" subtitle="ATS-friendly resume analysis with feedback and improvement suggestions." accent="violet"
+        actions={<Badge variant="purple">AI Powered</Badge>} />
+      <div className="glass-card p-6 border border-white/60">
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Resume Text</label>
+            <textarea value={resumeText} onChange={e => setResumeText(e.target.value)} rows={6} placeholder="Paste your resume text here..." className="collego-input resize-none" />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Target Role (optional)</label>
+            <input value={targetRole} onChange={e => setTargetRole(e.target.value)} placeholder="e.g., Software Engineer" className="collego-input" />
+          </div>
+          <Button variant="gradient" onClick={analyze} disabled={loading || !resumeText.trim()} className="w-auto px-6">
+            {loading ? (
+              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Analyzing...</span>
+            ) : (
+              <span className="flex gap-1"><Sparkles size={14} /> Analyze Resume</span>
+            )}
+          </Button>
+        </div>
+      </div>
+      {result && (
+        <div className="glass-card p-6 border border-white/60">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Analysis Result</h3>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-700">{typeof result === 'string' ? result : JSON.stringify(result)}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── AI Placement Assistant ──────────────────────────────────────────────────
+function AiPlacementAssistantTab() {
+  const [query, setQuery] = useState('')
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const ask = async () => {
+    if (!query.trim()) return
+    setLoading(true)
+    try {
+      const res = await api.post('/api/ai/placement-assistant', { query })
+      setResult(res.data)
+    } catch { setResult(null) }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={Briefcase} title="AI Placement Assistant" subtitle="AI-powered placement recommendations and mock interview preparation." accent="emerald"
+        actions={<Badge variant="purple">AI Powered</Badge>} />
+      <div className="glass-card p-6 border border-white/60">
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Ask about placements</label>
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g., 'Which companies are hiring CSE students?', 'Help me prepare for Google interview'..." className="collego-input" />
+          </div>
+          <Button variant="gradient" onClick={ask} disabled={loading || !query.trim()} className="w-auto px-6">
+            {loading ? (
+              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Thinking...</span>
+            ) : (
+              <span className="flex gap-1"><Briefcase size={14} /> Get Advice</span>
+            )}
+          </Button>
+        </div>
+      </div>
+      {result && (
+        <div className="glass-card p-6 border border-white/60">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Placement Guidance</h3>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-700">{typeof result === 'string' ? result : JSON.stringify(result)}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default function StudentDashboard() {
   const navigate = useNavigate()
@@ -846,6 +1048,10 @@ export default function StudentDashboard() {
       case 'documents': return <DocumentsTab cgpa={cgpa} showMessage={showMsg} />
       case 'aiAssistant': return <AiAssistantTab overall={overall} cgpa={cgpa} fees={fees} />
       case 'aiPrediction': return <AiPredictionTab />
+      case 'aiSmartSearch': return <AiSmartSearchTab />
+      case 'aiAttendanceRisk': return <AiAttendanceRiskTab />
+      case 'aiResumeAnalyzer': return <AiResumeAnalyzerTab />
+      case 'aiPlacementAssistant': return <AiPlacementAssistantTab />
       default: return null
     }
   }
