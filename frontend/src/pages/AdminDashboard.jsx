@@ -325,12 +325,21 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
 function DirectoryTab({
   users, departments, loading, query, fixedRole, title, subtitle, icon,
   onCreateUser, onEditUser, onToggleActive, onCsvImport, importResult,
+  enableYearFilter = false,
 }) {
   const [roleFilter, setRoleFilter] = useState(fixedRole || 'ALL')
+  const [yearFilter, setYearFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', role: fixedRole || 'STUDENT', departmentId: '' })
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '' })
+
+  const YEAR_OPTIONS = [
+    { label: 'I Year', value: '1' },
+    { label: 'II Year', value: '2' },
+    { label: 'III Year', value: '3' },
+    { label: 'Final Year', value: '4' },
+  ]
 
   const filtered = useMemo(() => {
     const q = (query || '').trim().toLowerCase()
@@ -340,6 +349,18 @@ function DirectoryTab({
       return `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q)
     })
   }, [users, roleFilter, query])
+
+  const yearFiltered = useMemo(() => {
+    if (!enableYearFilter || !yearFilter) return filtered
+    return filtered.filter(u => {
+      const sem = u.semester || 0
+      if (yearFilter === '1') return sem <= 2
+      if (yearFilter === '2') return sem > 2 && sem <= 4
+      if (yearFilter === '3') return sem > 4 && sem <= 6
+      if (yearFilter === '4') return sem > 6
+      return true
+    })
+  }, [filtered, enableYearFilter, yearFilter])
 
   const submitCreate = async (e) => {
     e.preventDefault()
@@ -460,7 +481,18 @@ function DirectoryTab({
               {r === 'ALL' ? 'All' : r.charAt(0) + r.slice(1).toLowerCase()}
             </button>
           ))}
-          <span className="ml-auto px-2 py-1 rounded bg-slate-50 text-[10px] text-slate-500 font-medium">{filtered.length} users</span>
+          <span className="ml-auto px-2 py-1 rounded bg-slate-50 text-[10px] text-slate-500 font-medium">{yearFiltered.length} users</span>
+          {enableYearFilter && (
+            <div className="flex items-center gap-2 ml-4">
+              <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Year:</label>
+              <select value={yearFilter} onChange={e => setYearFilter(e.target.value)} className="collego-input !w-32 text-xs">
+                <option value="">All Years</option>
+                {YEAR_OPTIONS.map(y => (
+                  <option key={y.value} value={y.value}>{y.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
@@ -477,7 +509,7 @@ function DirectoryTab({
               </tr>
             </thead>
             <tbody>
-              {filtered.map(u => (
+              {yearFiltered.map(u => (
                 <tr key={u.id} className="hover:bg-white/30 transition-colors">
                   <td>
                     <div className="flex items-center gap-3">
@@ -845,6 +877,114 @@ function NoticesTab({ insights }) {
   )
 }
 
+// ─── Fee Management Tab ──────────────────────────────────────────────────────
+function FeeTab({ fees, onCreateFee, onUpdateFee, onPayFee, onAddFeeItem }) {
+  const [showCreate, setShowCreate] = useState(false)
+  const [form, setForm] = useState({ studentId: '', semesterId: '', totalAmount: '', paidAmount: '', dueDate: '', status: 'PENDING', items: [] })
+
+  const totalOutstanding = fees.reduce((s, f) => s + (f.status !== 'PAID' ? Number(f.totalAmount || 0) : 0), 0)
+  const totalPaid = fees.reduce((s, f) => s + (Number(f.paidAmount || 0)), 0)
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={Wallet} title="Fee Management" subtitle="Student fee structures, payment tracking, and financial reports." />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard index={0} label="Total Outstanding" value={totalOutstanding} prefix="₹" icon={Wallet} accent="amber" glow />
+        <StatCard index={1} label="Total Paid" value={totalPaid} prefix="₹" icon={CheckCircle2} accent="emerald" glow />
+        <StatCard index={2} label="Fee Records" value={fees.length} icon={ScrollText} accent="blue" glow />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <Panel title="Create Fee Record" icon={Plus} accent="emerald">
+          <div className="glass-card p-5 border border-white/60">
+            <form onSubmit={(e) => { e.preventDefault(); onCreateFee({ ...form, totalAmount: Number(form.totalAmount), paidAmount: Number(form.paidAmount || 0), items: form.items.filter(i => i.description) })}} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Student ID</label>
+                <input value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} placeholder="e.g., 10" className="collego-input" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Semester ID</label>
+                <input value={form.semesterId} onChange={e => setForm({ ...form, semesterId: e.target.value })} placeholder="e.g., 20" className="collego-input" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Total Amount (₹)</label>
+                <input type="number" value={form.totalAmount} onChange={e => setForm({ ...form, totalAmount: e.target.value })} placeholder="0" className="collego-input" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Paid Amount (₹)</label>
+                <input type="number" value={form.paidAmount} onChange={e => setForm({ ...form, paidAmount: e.target.value })} placeholder="0" className="collego-input" />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Due Date</label>
+                <input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} className="collego-input" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Status</label>
+                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="collego-input">
+                  <option value="PENDING">Pending</option>
+                  <option value="PAID">Paid</option>
+                  <option value="OVERDUE">Overdue</option>
+                </select>
+              </div>
+              <Button type="submit" variant="gradient" size="sm" className="w-full">
+                <Plus size={13} /> Create Fee Record
+              </Button>
+            </form>
+          </div>
+        </Panel>
+
+        <Panel title="Fee Records" icon={ScrollText} accent="blue">
+          <div className="overflow-x-auto">
+            <table className="collego-table">
+              <thead>
+                <tr>
+                  <th>Student ID</th>
+                  <th>Semester</th>
+                  <th style={{ textAlign: 'center' }}>Total</th>
+                  <th style={{ textAlign: 'center' }}>Paid</th>
+                  <th style={{ textAlign: 'center' }}>Due Date</th>
+                  <th style={{ textAlign: 'center' }}>Status</th>
+                  <th style={{ textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fees.map(f => (
+                  <tr key={f.id} className="hover:bg-white/30 transition-colors">
+                    <td className="text-slate-800 font-medium">#{f.studentId}</td>
+                    <td className="text-slate-500">{f.semesterName || '—'}</td>
+                    <td style={{ textAlign: 'center' }} className="font-medium">₹{Number(f.totalAmount || 0).toLocaleString()}</td>
+                    <td style={{ textAlign: 'center' }} className="font-medium">₹{Number(f.paidAmount || 0).toLocaleString()}</td>
+                    <td style={{ textAlign: 'center' }} className="text-slate-500">{f.dueDate || '—'}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <Badge variant={f.status === 'PAID' ? 'success' : f.status === 'OVERDUE' ? 'destructive' : 'warning'}>{f.status}</Badge>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {f.status !== 'PAID' && (
+                        <Button variant="success" size="sm" onClick={() => onPayFee(f.id, { paidAmount: f.totalAmount, paymentMethod: 'CARD' })} className="px-3">
+                          <CheckCircle2 size={13} /> Pay
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {fees.length === 0 && <tr><td colSpan={7} className="text-center text-slate-400 py-12">No fee records found.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      </div>
+
+      {showCreate && (
+        <div className="glass-card p-6 border border-white/60">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2"><Plus size={15} className="text-emerald-500" /> Create New Fee</h3>
+          <p className="text-xs text-slate-500 mb-4">Fee records will appear in the table above once created.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Coming soon / informational ─────────────────────────────────────────────
 const COMING_SOON = {
   fees: { title: 'Fees & Finance', icon: Wallet, accent: 'amber', copy: 'Student fee structures, payment tracking, receipts and financial reports will be managed here.' },
@@ -893,6 +1033,7 @@ export default function AdminDashboard() {
   const [insights, setInsights] = useState(null)
   const [semesters, setSemesters] = useState([])
   const [importResult, setImportResult] = useState(null)
+  const [fees, setFees] = useState([])
 
   const sidebarWidth = collapsed ? 76 : 248
   const showMsg = useCallback((text, type = 'success') => setToast({ text, type }), [])
@@ -905,7 +1046,7 @@ export default function AdminDashboard() {
   }, [])
 
   const loadAll = useCallback(async () => {
-    const [ovRes, usRes, dpRes, drRes, srRes, asRes, qpRes, psRes, inRes, semRes] = await Promise.allSettled([
+    const [ovRes, usRes, dpRes, drRes, srRes, asRes, qpRes, psRes, inRes, semRes, feesRes] = await Promise.allSettled([
       api.get('/api/admin/overview'),
       api.get('/api/admin/users'),
       api.get('/api/departments'),
@@ -916,6 +1057,7 @@ export default function AdminDashboard() {
       api.get('/api/placement/stats'),
       api.get('/api/admin/dashboard/insights'),
       api.get('/api/semesters'),
+      api.get('/api/admin/fees'),
     ])
     if (ovRes.status === 'fulfilled') setOverview(ovRes.value.data)
     if (usRes.status === 'fulfilled') setUsers(Array.isArray(usRes.value.data) ? usRes.value.data : usRes.value.data?.content || [])
@@ -927,6 +1069,7 @@ export default function AdminDashboard() {
     if (psRes.status === 'fulfilled') setPlacementStats(psRes.value.data)
     if (inRes.status === 'fulfilled') setInsights(inRes.value.data)
     if (semRes.status === 'fulfilled') setSemesters(Array.isArray(semRes.value.data) ? semRes.value.data : [])
+    if (feesRes.status === 'fulfilled') setFees(Array.isArray(feesRes.value.data) ? feesRes.value.data : [])
   }, [])
 
   const handleSemesterChange = async (semId) => {
@@ -1004,6 +1147,55 @@ export default function AdminDashboard() {
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to reject', 'error') }
   }
 
+  // ─── Fee CRUD handlers ─────────────────────────────────────────────────────
+  const onCreateFee = async (payload) => {
+    try {
+      await api.post('/api/admin/fees', payload)
+      showMsg('Fee created successfully')
+      loadAll()
+      return true
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to create fee', 'error')
+      return false
+    }
+  }
+
+  const onUpdateFee = async (id, payload) => {
+    try {
+      await api.put(`/api/admin/fees/${id}`, payload)
+      showMsg('Fee updated successfully')
+      loadAll()
+      return true
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to update fee', 'error')
+      return false
+    }
+  }
+
+  const onPayFee = async (id, payload) => {
+    try {
+      await api.post(`/api/admin/fees/${id}/pay`, payload)
+      showMsg('Fee payment recorded')
+      loadAll()
+      return true
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to record payment', 'error')
+      return false
+    }
+  }
+
+  const onAddFeeItem = async (feeId, payload) => {
+    try {
+      await api.post(`/api/admin/fees/${feeId}/items`, payload)
+      showMsg('Fee item added')
+      loadAll()
+      return true
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to add fee item', 'error')
+      return false
+    }
+  }
+
   useEffect(() => { loadAll() }, [loadAll])
 
   const unreadCount = insights?.recentNotices?.filter(n => !n.read).length || 0
@@ -1011,7 +1203,7 @@ export default function AdminDashboard() {
   const renderTab = () => {
     switch (activeTab) {
       case 'overview': return <OverviewTab overview={overview} deptReports={deptReports} attendanceSummary={attendanceSummary} placementStats={placementStats} insights={insights} semesters={semesters} onTabChange={setActiveTab} onSemesterChange={handleSemesterChange} />
-      case 'users': return <DirectoryTab users={users} departments={departments} loading={loading} query={query} fixedRole="STUDENT" title="Student Directory" subtitle="Manage and enroll students across departments." icon={GraduationCap} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onCsvImport={onCsvImport} importResult={importResult} />
+      case 'users': return <DirectoryTab users={users} departments={departments} loading={loading} query={query} fixedRole="STUDENT" title="Student Directory" subtitle="Manage and enroll students across departments." icon={GraduationCap} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onCsvImport={onCsvImport} importResult={importResult} enableYearFilter />
       case 'faculty': return <DirectoryTab users={users} departments={departments} loading={loading} query={query} fixedRole="FACULTY" title="Faculty Directory" subtitle="Manage faculty members and teaching assignments." icon={Users} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onCsvImport={onCsvImport} importResult={null} />
       case 'academics': return <AcademicsTab departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} />
       case 'attendance': return <AttendanceTab attendanceSummary={attendanceSummary} overview={overview} />
@@ -1020,7 +1212,7 @@ export default function AdminDashboard() {
       case 'reports': return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} />
       case 'announcements': return <NoticesTab insights={insights} />
       case 'aiAssistant': return <ComingSoonTab id="aiAssistant" />
-      case 'fees': return <ComingSoonTab id="fees" />
+      case 'fees': return <FeeTab fees={fees} onCreateFee={onCreateFee} onUpdateFee={onUpdateFee} onPayFee={onPayFee} onAddFeeItem={onAddFeeItem} />
       case 'hostel': return <ComingSoonTab id="hostel" />
       case 'library': return <ComingSoonTab id="library" />
       case 'settings': return <ComingSoonTab id="settings" />
