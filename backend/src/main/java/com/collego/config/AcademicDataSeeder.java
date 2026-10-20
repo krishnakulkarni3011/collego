@@ -44,6 +44,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
     private final FeeItemRepository feeItemRepository;
     private final PlacementNoticeRepository placementNoticeRepository;
     private final NotificationRepository notificationRepository;
+    private final AdminProfileRepository adminProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
 
@@ -212,6 +213,23 @@ public class AcademicDataSeeder implements CommandLineRunner {
         log.info("Created: 1 department (CSE), {} courses, 7 faculty, 120 students (30 per year × 4 years)",
                 courseRepository.count());
         log.info("Sample student login: USN format 1CG24CS001 / Student@123");
+
+        ensureAdminProfile();
+    }
+
+    private void ensureAdminProfile() {
+        String admin = (adminEmail != null && !adminEmail.isBlank())
+                ? adminEmail.trim().toLowerCase()
+                : "admin@collego.edu";
+        userRepository.findByEmailIgnoreCase(admin).ifPresent(user -> {
+            if (adminProfileRepository.findByUserId(user.getId()).isEmpty()) {
+                adminProfileRepository.save(AdminProfile.builder()
+                        .user(user)
+                        .adminLevel("SUPER_ADMIN")
+                        .build());
+                log.info("Admin profile recreated for {}", admin);
+            }
+        });
     }
 
     // ==================== Seeder Helpers ====================
@@ -255,7 +273,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
 
         if (product != null && product.toLowerCase().contains("postgres")) {
             List<String> tables = jdbcTemplate.queryForList(
-                    "SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename NOT IN ('users', 'admin_profiles')",
+                    "SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename <> 'users'",
                     String.class);
             if (!tables.isEmpty()) {
                 String joined = tables.stream()
