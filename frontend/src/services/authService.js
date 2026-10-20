@@ -15,8 +15,8 @@ const getRoleFromToken = (token) => {
 }
 
 export const authService = {
-  login: async (email, password) => {
-    const response = await api.post('/api/auth/login', { email, password })
+  login: async (username, password) => {
+    const response = await api.post('/api/auth/login', { username, password })
     if (typeof response.data === 'string' && response.data.trim().startsWith('<')) {
       throw new Error('API server returned HTML instead of JSON. Ensure backend proxy is correctly configured.')
     }
