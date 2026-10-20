@@ -557,7 +557,7 @@ function DirectoryTab({
 }
 
 // ─── Academics ───────────────────────────────────────────────────────────────
-function AcademicsTab({ departments, overview, semesters, deptReports }) {
+function AcademicsTab({ departments, overview, semesters, deptReports, showMsg }) {
   const stats = [
     { label: 'Departments', value: overview?.totalDepartments ?? departments.length, icon: Layers, accent: 'blue', grad: 'from-blue-500 to-cyan-500' },
     { label: 'Courses', value: overview?.totalCourses ?? 0, icon: BookOpen, accent: 'violet', grad: 'from-violet-500 to-fuchsia-500' },
@@ -1447,7 +1447,7 @@ export default function AdminDashboard() {
       case 'overview': return <OverviewTab overview={overview} deptReports={deptReports} attendanceSummary={attendanceSummary} placementStats={placementStats} insights={insights} semesters={semesters} onTabChange={setActiveTab} onSemesterChange={handleSemesterChange} />
       case 'users': return <DirectoryTab users={users} departments={departments} loading={loading} query={query} fixedRole="STUDENT" title="Student Directory" subtitle="Manage and enroll students across departments." icon={GraduationCap} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onCsvImport={onCsvImport} importResult={importResult} enableYearFilter />
       case 'faculty': return <DirectoryTab users={users} departments={departments} loading={loading} query={query} fixedRole="FACULTY" title="Faculty Directory" subtitle="Manage faculty members and teaching assignments." icon={Users} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onCsvImport={onCsvImport} importResult={null} />
-      case 'academics': return <AcademicsTab departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} />
+      case 'academics': return <AcademicsTab departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} showMsg={showMsg} />
       case 'attendance': return <AttendanceTab attendanceSummary={attendanceSummary} overview={overview} />
       case 'examinations': return <ExaminationsTab pendingQPs={pendingQPs} onApprove={handleApproveQP} onReject={handleRejectQP} loading={loading} />
       case 'placements': return <PlacementsTab placementStats={placementStats} />

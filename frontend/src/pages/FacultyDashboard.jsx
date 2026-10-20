@@ -126,7 +126,6 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
             { icon: GraduationCap, label: 'Semester Marks', desc: 'Auto grade calculation', accent: 'blue' },
             { icon: Users, label: 'Student Performance', desc: 'Combined view per student', accent: 'emerald' },
             { icon: BookOpen, label: 'Assignments', desc: 'Create & track assignments', accent: 'amber' },
-            { icon: Sparkles, label: 'AI Notice Gen', desc: 'AI-powered notice drafting', accent: 'violet' },
           ].map(f => {
             const Icon = f.icon
             const a = ACCENTS[f.accent]
@@ -1104,24 +1103,6 @@ export default function FacultyDashboard() {
     finally { setLoading(false) }
   }
 
-  const handleAiGenerateNotice = async () => {
-    if (!aiPrompt.trim()) { showMsg('Enter a prompt for the notice', 'error'); return }
-    setAiLoading(true); setAiResult(null)
-    try {
-      const res = await api.post('/api/ai/generate-notice', { prompt: aiPrompt, audience: aiAudience, noticeType: aiNoticeType })
-      setAiResult(res.data)
-      showMsg('AI notice generated! Review the content below.')
-    } catch (err) { showMsg(err.response?.data?.message || 'AI notice generation failed', 'error') }
-    finally { setAiLoading(false) }
-  }
-
-  const useAiNotice = () => {
-    if (!aiResult) return
-    setNoticeTitle(aiResult.title || ''); setNoticeMessage(aiResult.body || '')
-    setSelectedSection(null); setActiveTab('notices')
-    showMsg('AI notice copied to Notice form!')
-  }
-
   const loadAnalytics = async () => {
     setTabLoading(true)
     try { const res = await api.get(`/api/faculty/analytics/${selectedSection.sectionId}`); setAnalytics(res.data) }
@@ -1151,6 +1132,7 @@ export default function FacultyDashboard() {
       setNewCourseName('')
       setSelectedSemesterId('')
       loadMySubjectAssignments()
+      fetchSections()
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to assign subject', 'error') }
     finally { setSubjectAssignmentsLoading(false) }
   }
@@ -1161,6 +1143,7 @@ export default function FacultyDashboard() {
       await api.delete(`/api/faculty/subject-assignments/${assignmentId}`)
       showMsg('Subject assignment removed')
       loadMySubjectAssignments()
+      fetchSections()
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to remove assignment', 'error') }
     finally { setSubjectAssignmentsLoading(false) }
   }

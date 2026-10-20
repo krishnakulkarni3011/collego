@@ -140,7 +140,6 @@ export default function Login() {
     try {
       await authService.forgotPassword(forgotEmail)
       setForgotStep('success')
-      showMsg('If an account exists, a reset link has been sent.')
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to send reset link')
     } finally {
@@ -155,7 +154,6 @@ export default function Login() {
     try {
       await authService.resetPassword(resetToken, newPassword)
       setForgotStep('success')
-      showMsg('Password reset successfully. You can now sign in.')
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to reset password')
     } finally {

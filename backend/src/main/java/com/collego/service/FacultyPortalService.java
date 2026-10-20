@@ -725,9 +725,25 @@ public class FacultyPortalService {
     @Transactional
     public FacultySubjectAssignmentResponse assignSubjectToSelf(String email, AssignFacultySubjectRequest request) {
         FacultyProfile faculty = getFacultyByEmail(email);
+        Department department = faculty.getDepartment();
 
-        Course course = courseRepository.findById(request.getCourseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found: " + request.getCourseId()));
+        String courseName = request.getCourseName() != null ? request.getCourseName().trim() : "";
+        if (courseName.isEmpty()) {
+            throw new BadRequestException("Course name is required");
+        }
+
+        // Faculty type any subject name; reuse an existing course with the same
+        // name in their department, otherwise create it on the fly.
+        Course course = courseRepository.findByDepartmentId(department.getId()).stream()
+                .filter(c -> c.getName().equalsIgnoreCase(courseName))
+                .findFirst()
+                .orElseGet(() -> courseRepository.save(Course.builder()
+                        .name(courseName)
+                        .code(generateCourseCode(department, courseName))
+                        .credits(4)
+                        .department(department)
+                        .description(courseName + " (added by faculty)")
+                        .build()));
 
         Semester semester = semesterRepository.findById(request.getSemesterId())
                 .orElseThrow(() -> new ResourceNotFoundException("Semester not found: " + request.getSemesterId()));
@@ -751,6 +767,10 @@ public class FacultyPortalService {
             assignment = facultySubjectAssignmentRepository.save(assignment);
         }
 
+        // Claim the sections that belong to this course + semester so the faculty
+        // can immediately manage attendance, marks, assignments and materials.
+        claimSectionsForFaculty(faculty, course, semester);
+
         log.info("Faculty {} assigned to course {} for semester {}", email, course.getName(), semester.getName());
 
         return mapSubjectAssignmentToResponse(assignment);
@@ -768,6 +788,17 @@ public class FacultyPortalService {
 
         assignment.setActive(false);
         facultySubjectAssignmentRepository.save(assignment);
+
+        // Release the sections this faculty was teaching for that course + semester
+        sectionRepository.findByCourseIdAndSemesterId(
+                        assignment.getCourse().getId(), assignment.getSemester().getId())
+                .stream()
+                .filter(section -> section.getFaculty() != null
+                        && section.getFaculty().getId().equals(faculty.getId()))
+                .forEach(section -> {
+                    section.setFaculty(null);
+                    sectionRepository.save(section);
+                });
 
         log.info("Faculty {} removed subject assignment {}", email, assignmentId);
     }
@@ -793,6 +824,63 @@ public class FacultyPortalService {
                 .stream()
                 .map(this::mapSemesterToResponse)
                 .collect(Collectors.toList());
+    }
+
+    private void claimSectionsForFaculty(FacultyProfile faculty, Course course, Semester semester) {
+        List<Section> sections = sectionRepository.findByCourseIdAndSemesterId(course.getId(), semester.getId());
+
+        boolean alreadyOwns = sections.stream()
+                .anyMatch(s -> s.getFaculty() != null && s.getFaculty().getId().equals(faculty.getId()));
+        if (alreadyOwns) {
+            return;
+        }
+
+        List<Section> unassigned = sections.stream()
+                .filter(s -> s.getFaculty() == null)
+                .collect(Collectors.toList());
+
+        if (!unassigned.isEmpty()) {
+            unassigned.forEach(section -> {
+                section.setFaculty(faculty);
+                sectionRepository.save(section);
+            });
+            return;
+        }
+
+        // Every existing section is already taken by another faculty member —
+        // create a fresh pair of sections for this faculty.
+        int created = 0;
+        for (String name : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
+            if (created >= 2) break;
+            if (sectionRepository.existsByNameAndCourseIdAndSemesterId(name, course.getId(), semester.getId())) {
+                continue;
+            }
+            sectionRepository.save(Section.builder()
+                    .name(name)
+                    .course(course)
+                    .semester(semester)
+                    .faculty(faculty)
+                    .maxCapacity(60)
+                    .build());
+            created++;
+        }
+    }
+
+    private String generateCourseCode(Department department, String courseName) {
+        String deptCode = (department.getCode() != null && !department.getCode().isBlank())
+                ? department.getCode().toUpperCase()
+                : "GEN";
+        String letters = courseName.replaceAll("[^A-Za-z]", "").toUpperCase();
+        if (letters.length() < 3) {
+            letters = (letters + "SUB").substring(0, 3);
+        }
+        String base = deptCode + letters.substring(0, 3);
+        String code = base;
+        int suffix = 1;
+        while (courseRepository.existsByCode(code)) {
+            code = base + suffix++;
+        }
+        return code;
     }
 
     private CourseResponse mapCourseToResponse(Course c) {
