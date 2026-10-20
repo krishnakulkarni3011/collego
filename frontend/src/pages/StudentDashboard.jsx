@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useId, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, ClipboardCheck, BookMarked, Calendar,
+  LayoutDashboard, ClipboardCheck, BookMarked, Calendar, CalendarDays,
   DollarSign, Briefcase, Bell, Sparkles, Target,
   TrendingUp, Download, Send, FileText,
   GraduationCap, CheckCircle2, Bot,
@@ -18,6 +18,7 @@ import api from '../services/api'
 import { downloadFile } from '../lib/download'
 import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
+import { ExamsStudentTab } from '../components/dashboard/ExamsStudentTab'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -53,6 +54,7 @@ const NAV_SECTIONS = [
       { id: 'marks', label: 'Marks & CGPA', icon: BookMarked },
       { id: 'assignments', label: 'Assignments', icon: BookOpen },
       { id: 'materials', label: 'Study Materials', icon: FolderOpen },
+      { id: 'exams', label: 'Examinations', icon: CalendarDays },
       { id: 'timetable', label: 'Timetable', icon: Calendar },
       { id: 'documents', label: 'Documents', icon: FileText },
     ],
@@ -1517,6 +1519,7 @@ export default function StudentDashboard() {
       case 'marks': return <MarksTab internalMarks={internalMarks} cgpa={cgpa} />
       case 'assignments': return <AssignmentsTab assignments={assignments} loading={loadingTab} onSubmit={handleSubmitAssignment} onDownload={handleDownload} />
       case 'materials': return <MaterialsTab materials={materials} loading={loadingTab} onDownload={handleDownload} />
+      case 'exams': return <ExamsStudentTab showMsg={showMsg} onDownload={handleDownload} />
       case 'timetable': return <TimetableTab timetable={timetable} loading={loadingTab} />
       case 'fees': return <FeesTab fees={fees} loading={loadingTab} onPay={handlePayFee} onDownload={handleDownload} />
       case 'placements': return <PlacementsTab notices={placements} />

@@ -6,7 +6,7 @@ import {
   Megaphone, ChevronRight, GraduationCap, Users, BookMarked,
   BarChart3, FolderOpen, Plus, CheckCircle2, X, Send,
   ArrowLeft, Clock, Upload, Download, RefreshCw, Zap, Layers, Award,
-  BookUser, Target, Settings, HelpCircle
+  BookUser, Target, Settings, HelpCircle, CalendarDays
 } from 'lucide-react'
 import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -16,6 +16,7 @@ import api from '../services/api'
 import { downloadFile } from '../lib/download'
 import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
+import { InvigilationsTab } from '../components/dashboard/InvigilationsTab'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -40,6 +41,7 @@ const GLOBAL_NAV = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'subjectAssignments', label: 'My Subject Assignments', icon: BookUser },
   { id: 'questionPapers', label: 'Question Papers', icon: FileText },
+  { id: 'invigilations', label: 'Invigilation Duties', icon: CalendarDays },
   { id: 'notices', label: 'Notices', icon: Megaphone },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'help', label: 'Help & Support', icon: HelpCircle },
@@ -1304,6 +1306,7 @@ export default function FacultyDashboard() {
         case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} deptId={noticeDeptId} setDeptId={setNoticeDeptId} departments={departments} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
         case 'settings': return <SettingsTab showMsg={showMsg} accent="violet" />
         case 'help': return <HelpTab accent="violet" />
+        case 'invigilations': return <InvigilationsTab showMsg={showMsg} />
         default: return null
       }
     }

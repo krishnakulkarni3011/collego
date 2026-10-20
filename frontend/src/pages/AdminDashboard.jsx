@@ -20,6 +20,7 @@ import api from '../services/api'
 import { downloadFile } from '../lib/download'
 import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
+import { ExamsAdminTab } from '../components/dashboard/ExamsAdminTab'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -1599,7 +1600,12 @@ export default function AdminDashboard() {
       case 'faculty': return <DirectoryTab users={users} departments={departments} loading={loading} query={query} fixedRole="FACULTY" title="Faculty Directory" subtitle="Manage faculty members and teaching assignments." icon={Users} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onCsvImport={onCsvImport} importResult={null} />
       case 'academics': return <AcademicsTab departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} showMsg={showMsg} />
       case 'attendance': return <AttendanceTab attendanceSummary={attendanceSummary} overview={overview} />
-      case 'examinations': return <ExaminationsTab pendingQPs={pendingQPs} onApprove={handleApproveQP} onReject={handleRejectQP} loading={loading} />
+      case 'examinations': return (
+        <div className="space-y-6">
+          <ExamsAdminTab showMsg={showMsg} />
+          <ExaminationsTab pendingQPs={pendingQPs} onApprove={handleApproveQP} onReject={handleRejectQP} loading={loading} />
+        </div>
+      )
       case 'placements': return <PlacementsTab placementStats={placementStats} />
       case 'reports': return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} />
       case 'announcements': return <NoticesTab insights={insights} />
