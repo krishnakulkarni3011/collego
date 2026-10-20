@@ -1,10 +1,15 @@
 package com.collego.controller;
 
 import com.collego.dto.FeeItemResponse;
+import com.collego.dto.FeePaymentResponse;
 import com.collego.dto.FeeResponse;
+import com.collego.dto.RecordPaymentRequest;
+import com.collego.service.FeePaymentService;
 import com.collego.service.FeeService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -20,6 +25,7 @@ import java.util.Map;
 public class FeeController {
 
     private final FeeService feeService;
+    private final FeePaymentService feePaymentService;
 
     /**
      * Create a new fee record for a student (with line items).
@@ -85,6 +91,37 @@ public class FeeController {
             @RequestBody CreateFeeItemRequest request) {
         FeeItemResponse item = feeService.addFeeItem(feeId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(item);
+    }
+
+    // ==================== Payments / receipts ====================
+
+    @GetMapping("/{feeId}/payments")
+    public ResponseEntity<List<FeePaymentResponse>> listPayments(@PathVariable Long feeId) {
+        return ResponseEntity.ok(feePaymentService.listForFee(feeId));
+    }
+
+    /**
+     * Record an offline payment (cash, cheque, DD, or an already-settled online
+     * payment). Supports partial/installment payments.
+     */
+    @PostMapping("/{feeId}/payments")
+    public ResponseEntity<FeePaymentResponse> recordPayment(
+            Authentication auth,
+            @PathVariable Long feeId,
+            @jakarta.validation.Valid @RequestBody RecordPaymentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(feePaymentService.recordOffline(auth.getName(), feeId, request));
+    }
+
+    @GetMapping("/payments/{paymentId}/receipt")
+    public ResponseEntity<byte[]> downloadReceipt(
+            Authentication auth,
+            @PathVariable Long paymentId) {
+        byte[] pdf = feePaymentService.receipt(auth.getName(), paymentId, true);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=receipt-" + paymentId + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     // ─── Request DTOs ─────────────────────────────────────────────────────────

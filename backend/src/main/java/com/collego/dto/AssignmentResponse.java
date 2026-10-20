@@ -19,4 +19,17 @@ public class AssignmentResponse {
     private String fileName;
     private Boolean hasFile; // true if a file is uploaded to S3 and downloadable
     private LocalDateTime createdAt;
+    private Integer maxMarks;
+
+    // Faculty view
+    private Long submissionCount;
+    private Long gradedCount;
+
+    // Student view (populated for the requesting student)
+    private Long submissionId;
+    private String submissionStatus; // SUBMITTED | GRADED | null (not submitted)
+    private java.math.BigDecimal marks;
+    private String feedback;
+    private LocalDateTime submittedAt;
+    private Boolean late;
 }

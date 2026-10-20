@@ -165,8 +165,16 @@ public class FeeService {
 
         BigDecimal paidAmount = request.getPaidAmount() != null ? request.getPaidAmount() : fee.getTotalAmount();
         fee.setPaidAmount(paidAmount);
-        fee.setStatus(paidAmount.compareTo(fee.getTotalAmount()) >= 0 ? FeeStatus.PAID : FeeStatus.PENDING);
-        fee.setPaidAt(LocalDateTime.now());
+        if (paidAmount.compareTo(fee.getTotalAmount()) >= 0) {
+            fee.setStatus(FeeStatus.PAID);
+            fee.setPaidAt(LocalDateTime.now());
+        } else if (paidAmount.signum() > 0) {
+            fee.setStatus(FeeStatus.PENDING);
+            fee.setPaidAt(null);
+        } else {
+            fee.setStatus(FeeStatus.PENDING);
+            fee.setPaidAt(null);
+        }
         fee.setTransactionRef(request.getPaymentReference() != null ? request.getPaymentReference()
                 : "TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
 
@@ -213,6 +221,7 @@ public class FeeService {
         response.setSemesterName(fee.getSemester() != null ? fee.getSemester().getName() : null);
         response.setTotalAmount(fee.getTotalAmount());
         response.setPaidAmount(fee.getPaidAmount());
+        response.setBalance(fee.getTotalAmount().subtract(fee.getPaidAmount()));
         response.setDueDate(fee.getDueDate());
         response.setStatus(fee.getStatus() != null ? fee.getStatus().name() : null);
         response.setPaidAt(fee.getPaidAt());

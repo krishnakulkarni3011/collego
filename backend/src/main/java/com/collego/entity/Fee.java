@@ -48,6 +48,9 @@ public class Fee {
 
     private String transactionRef;
 
+    /** Last time a due-date reminder was sent, used to avoid duplicates. */
+    private LocalDateTime lastReminderAt;
+
     @Builder.Default
     @OneToMany(mappedBy = "fee", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FeeItem> items = new ArrayList<>();

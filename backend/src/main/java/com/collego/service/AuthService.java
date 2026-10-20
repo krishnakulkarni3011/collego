@@ -30,6 +30,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final AuditService auditService;
+    private final EmailService emailService;
 
     @Transactional
     public LoginResponse login(LoginRequest request, String ipAddress) {
@@ -156,8 +157,15 @@ public class AuthService {
             user.setPasswordResetTokenExpiry(LocalDateTime.now().plusHours(1));
             userRepository.save(user);
 
-            // Stub: Log the token instead of sending email
+            // Log for local development; deliver by email when SMTP is configured.
             log.info("PASSWORD RESET TOKEN for {}: {}", user.getEmail(), resetToken);
+            String resetLink = emailService.frontendUrl() + "/reset-password?token=" + resetToken;
+            emailService.send(user.getEmail(), "Collego password reset",
+                    "Hello " + user.getFirstName() + ",\n\n"
+                    + "A password reset was requested for your Collego account.\n"
+                    + "Use the link below within 1 hour (or paste the token into the reset form):\n\n"
+                    + resetLink + "\n\nToken: " + resetToken + "\n\n"
+                    + "If you did not request this, you can ignore this email.");
 
             auditService.log(user.getId(), user.getEmail(), "PASSWORD_RESET_REQUEST",
                     "Password reset requested", null);

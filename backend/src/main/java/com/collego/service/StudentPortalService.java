@@ -10,8 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,6 +35,8 @@ public class StudentPortalService {
     private final PlacementNoticeRepository placementNoticeRepository;
     private final NotificationRepository notificationRepository;
     private final AssignmentRepository assignmentRepository;
+    private final AssignmentSubmissionRepository assignmentSubmissionRepository;
+    private final FeePaymentService feePaymentService;
     private final CourseMaterialRepository courseMaterialRepository;
     private final S3StorageService s3StorageService;
 
@@ -340,11 +344,13 @@ public class StudentPortalService {
                     .semesterName(fee.getSemester().getName())
                     .totalAmount(fee.getTotalAmount())
                     .paidAmount(fee.getPaidAmount())
+                    .balance(fee.getTotalAmount().subtract(fee.getPaidAmount()))
                     .dueDate(fee.getDueDate())
                     .status(fee.getStatus().name())
                     .paidAt(fee.getPaidAt())
                     .transactionRef(fee.getTransactionRef())
                     .items(items)
+                    .payments(feePaymentService.listForFee(fee.getId()))
                     .build();
         }).collect(Collectors.toList());
     }
@@ -428,11 +434,16 @@ public class StudentPortalService {
         List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatus(
                 student.getId(), EnrollmentStatus.ACTIVE);
 
+        Map<Long, AssignmentSubmission> mySubmissions = assignmentSubmissionRepository
+                .findByStudentId(student.getId()).stream()
+                .collect(Collectors.toMap(s -> s.getAssignment().getId(), s -> s, (a, b) -> a));
+
         List<AssignmentResponse> results = new ArrayList<>();
         for (Enrollment enrollment : enrollments) {
             List<Assignment> assignments = assignmentRepository
                     .findBySectionIdOrderByCreatedAtDesc(enrollment.getSection().getId());
             for (Assignment a : assignments) {
+                AssignmentSubmission sub = mySubmissions.get(a.getId());
                 results.add(AssignmentResponse.builder()
                         .id(a.getId())
                         .sectionId(a.getSection().getId())
@@ -444,10 +455,141 @@ public class StudentPortalService {
                         .fileName(a.getFileName())
                         .hasFile(a.getFilePath() != null && !a.getFilePath().isBlank())
                         .createdAt(a.getCreatedAt())
+                        .maxMarks(a.getMaxMarks() != null ? a.getMaxMarks() : 10)
+                        .submissionId(sub != null ? sub.getId() : null)
+                        .submissionStatus(sub != null && sub.getStatus() != null ? sub.getStatus().name() : null)
+                        .marks(sub != null ? sub.getMarks() : null)
+                        .feedback(sub != null ? sub.getFeedback() : null)
+                        .submittedAt(sub != null ? sub.getSubmittedAt() : null)
+                        .late(sub != null ? sub.isLate() : null)
                         .build());
             }
         }
         return results;
+    }
+
+    /**
+     * Submit (or replace) the file for an assignment. Graded submissions are
+     * locked. Returns the stored submission.
+     */
+    @Transactional
+    public AssignmentSubmissionResponse submitAssignment(String email, Long assignmentId,
+                                                         String note, MultipartFile file) throws IOException {
+        StudentProfile student = getStudentByEmail(email);
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
+
+        boolean enrolled = enrollmentRepository.existsByStudentIdAndSectionId(
+                student.getId(), assignment.getSection().getId());
+        if (!enrolled) {
+            throw new BadRequestException("You are not enrolled in this assignment's course.");
+        }
+
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Please choose a file to upload.");
+        }
+        if (file.getSize() > 25L * 1024 * 1024) {
+            throw new BadRequestException("Submission file must be 25 MB or smaller.");
+        }
+        String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "submission";
+        String lower = originalName.toLowerCase();
+        if (!(lower.endsWith(".pdf") || lower.endsWith(".doc") || lower.endsWith(".docx")
+                || lower.endsWith(".ppt") || lower.endsWith(".pptx") || lower.endsWith(".zip")
+                || lower.endsWith(".txt") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+                || lower.endsWith(".png"))) {
+            throw new BadRequestException("Unsupported file type. Upload PDF, DOC/DOCX, PPT/PPTX, ZIP, TXT or an image.");
+        }
+
+        AssignmentSubmission submission = assignmentSubmissionRepository
+                .findByAssignmentIdAndStudentId(assignmentId, student.getId())
+                .orElseGet(() -> AssignmentSubmission.builder()
+                        .assignment(assignment)
+                        .student(student)
+                        .build());
+
+        if (submission.getId() != null && submission.getStatus() == SubmissionStatus.GRADED) {
+            throw new BadRequestException("This submission has already been graded and cannot be replaced.");
+        }
+
+        // Replace the previous file, if any
+        if (submission.getFilePath() != null && !submission.getFilePath().isBlank()) {
+            s3StorageService.delete(assignmentBucket, submission.getFilePath());
+        }
+
+        String uniqueName = UUID.randomUUID() + "_" + sanitizeFilename(originalName);
+        String key = "submissions/" + assignmentId + "/" + student.getId() + "/" + uniqueName;
+        s3StorageService.upload(assignmentBucket, key, file.getInputStream(), file.getSize(),
+                S3StorageService.detectContentType(originalName));
+
+        submission.setFilePath(key);
+        submission.setFileName(originalName);
+        submission.setFileSize(file.getSize());
+        submission.setContentType(S3StorageService.detectContentType(originalName));
+        submission.setNote(note);
+        submission.setSubmittedAt(java.time.LocalDateTime.now());
+        submission.setLate(assignment.getDueDate() != null
+                && LocalDate.now().isAfter(assignment.getDueDate()));
+        submission.setStatus(SubmissionStatus.SUBMITTED);
+        submission.setMarks(null);
+        submission.setFeedback(null);
+        submission.setGradedAt(null);
+        submission.setGradedBy(null);
+        assignmentSubmissionRepository.save(submission);
+
+        log.info("Student {} submitted assignment {} ({} bytes)", email, assignmentId, file.getSize());
+        return mapSubmissionResponse(submission);
+    }
+
+    public Optional<AssignmentSubmissionResponse> getMySubmission(String email, Long assignmentId) {
+        StudentProfile student = getStudentByEmail(email);
+        return assignmentSubmissionRepository.findByAssignmentIdAndStudentId(assignmentId, student.getId())
+                .map(this::mapSubmissionResponse);
+    }
+
+    /** Download the student's own submitted file. */
+    public byte[] downloadMySubmissionFile(String email, Long submissionId) throws IOException {
+        StudentProfile student = getStudentByEmail(email);
+        AssignmentSubmission submission = assignmentSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Submission not found: " + submissionId));
+        if (!submission.getStudent().getId().equals(student.getId())) {
+            throw new BadRequestException("You can only download your own submission.");
+        }
+        if (submission.getFilePath() == null || submission.getFilePath().isBlank()) {
+            throw new BadRequestException("No file attached to this submission.");
+        }
+        return s3StorageService.download(assignmentBucket, submission.getFilePath());
+    }
+
+    private AssignmentSubmissionResponse mapSubmissionResponse(AssignmentSubmission s) {
+        Assignment a = s.getAssignment();
+        return AssignmentSubmissionResponse.builder()
+                .id(s.getId())
+                .assignmentId(a.getId())
+                .assignmentTitle(a.getTitle())
+                .sectionId(a.getSection().getId())
+                .courseName(a.getSection().getCourse().getName())
+                .courseCode(a.getSection().getCourse().getCode())
+                .studentId(s.getStudent().getId())
+                .studentName(s.getStudent().getUser().getFirstName() + " "
+                        + s.getStudent().getUser().getLastName())
+                .enrollmentNumber(s.getStudent().getEnrollmentNumber())
+                .fileName(s.getFileName())
+                .fileSize(s.getFileSize())
+                .note(s.getNote())
+                .late(s.isLate())
+                .hasFile(s.getFilePath() != null && !s.getFilePath().isBlank())
+                .status(s.getStatus() != null ? s.getStatus().name() : null)
+                .marks(s.getMarks())
+                .maxMarks(a.getMaxMarks() != null ? a.getMaxMarks() : 10)
+                .feedback(s.getFeedback())
+                .submittedAt(s.getSubmittedAt())
+                .gradedAt(s.getGradedAt())
+                .build();
+    }
+
+    private String sanitizeFilename(String name) {
+        if (name == null) return "file";
+        return name.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
     /**

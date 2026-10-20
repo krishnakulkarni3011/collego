@@ -30,6 +30,9 @@ public class Assignment {
 
     private LocalDate dueDate;
 
+    /** Maximum marks for this assignment; defaults to 10 when not set. */
+    private Integer maxMarks;
+
     @Column(name = "file_path")
     private String filePath;
 

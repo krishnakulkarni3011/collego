@@ -1,6 +1,7 @@
 package com.collego.controller;
 
 import com.collego.dto.*;
+import com.collego.service.FeePaymentService;
 import com.collego.service.MarksheetService;
 import com.collego.service.StudentPortalService;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -24,6 +26,7 @@ public class StudentController {
 
     private final StudentPortalService studentPortalService;
     private final MarksheetService marksheetService;
+    private final FeePaymentService feePaymentService;
 
     @GetMapping("/profile")
     public ResponseEntity<StudentProfileResponse> getProfile(Authentication auth) {
@@ -69,6 +72,30 @@ public class StudentController {
     @GetMapping("/fees")
     public ResponseEntity<List<FeeResponse>> getFees(Authentication auth) {
         return ResponseEntity.ok(studentPortalService.getFees(auth.getName()));
+    }
+
+    @GetMapping("/fees/payment-config")
+    public ResponseEntity<Map<String, Object>> paymentConfig() {
+        return ResponseEntity.ok(feePaymentService.paymentConfig());
+    }
+
+    @PostMapping("/fees/{feeId}/pay")
+    public ResponseEntity<FeePaymentResponse> payFee(
+            Authentication auth,
+            @PathVariable Long feeId,
+            @jakarta.validation.Valid @RequestBody RecordPaymentRequest request) {
+        return ResponseEntity.ok(feePaymentService.payAsStudent(auth.getName(), feeId, request));
+    }
+
+    @GetMapping("/fees/payments/{paymentId}/receipt")
+    public ResponseEntity<byte[]> downloadReceipt(
+            Authentication auth,
+            @PathVariable Long paymentId) {
+        byte[] pdf = feePaymentService.receipt(auth.getName(), paymentId, false);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=receipt-" + paymentId + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @GetMapping("/placements")
@@ -148,6 +175,37 @@ public class StudentController {
             Authentication auth,
             @PathVariable Long materialId) throws IOException {
         byte[] bytes = studentPortalService.downloadMaterialFile(auth.getName(), materialId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(bytes);
+    }
+
+    // ==================== Assignment Submissions ====================
+
+    @PostMapping(value = "/assignments/{assignmentId}/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<AssignmentSubmissionResponse> submitAssignment(
+            Authentication auth,
+            @PathVariable Long assignmentId,
+            @RequestParam(value = "note", required = false) String note,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(studentPortalService.submitAssignment(auth.getName(), assignmentId, note, file));
+    }
+
+    @GetMapping("/assignments/{assignmentId}/submission")
+    public ResponseEntity<AssignmentSubmissionResponse> getMySubmission(
+            Authentication auth,
+            @PathVariable Long assignmentId) {
+        return studentPortalService.getMySubmission(auth.getName(), assignmentId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/submissions/{submissionId}/file")
+    public ResponseEntity<byte[]> downloadMySubmission(
+            Authentication auth,
+            @PathVariable Long submissionId) throws IOException {
+        byte[] bytes = studentPortalService.downloadMySubmissionFile(auth.getName(), submissionId);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)

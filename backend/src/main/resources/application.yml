@@ -24,6 +24,15 @@ spring:
       max-file-size: 50MB
       max-request-size: 55MB
 
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
 server:
   port: 8080
   error:
@@ -42,6 +51,20 @@ collego:
     password: ${ADMIN_PASSWORD:Admin@123}
     first-name: System
     last-name: Admin
+
+  # Email delivery (password reset, fee reminders). Disabled = log only.
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:no-reply@collego.local}
+
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
+  # Online fee payments: disabled | demo (simulated) | razorpay
+  payments:
+    mode: ${PAYMENT_MODE:demo}
+
+  fees:
+    reminder-cron: ${FEE_REMINDER_CRON:0 0 9 * * *}
 
   # Phase 6 & 7: Local storage paths (used when use-s3=false)
   storage:

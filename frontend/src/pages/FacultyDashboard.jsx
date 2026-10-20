@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -6,13 +6,16 @@ import {
   Megaphone, ChevronRight, GraduationCap, Users, BookMarked,
   BarChart3, FolderOpen, Plus, CheckCircle2, X, Send,
   ArrowLeft, Clock, Upload, Download, RefreshCw, Zap, Layers, Award,
-  BookUser, Target
+  BookUser, Target, Settings, HelpCircle
 } from 'lucide-react'
 import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
 import { authService } from '../services/authService'
 import api from '../services/api'
+import { downloadFile } from '../lib/download'
+import { SettingsTab } from '../components/dashboard/SettingsTab'
+import { HelpTab } from '../components/dashboard/HelpTab'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -38,6 +41,8 @@ const GLOBAL_NAV = [
   { id: 'subjectAssignments', label: 'My Subject Assignments', icon: BookUser },
   { id: 'questionPapers', label: 'Question Papers', icon: FileText },
   { id: 'notices', label: 'Notices', icon: Megaphone },
+  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'help', label: 'Help & Support', icon: HelpCircle },
 ]
 
 const SECTION_TABS = [
@@ -397,7 +402,18 @@ function StudentPerformanceTab({ data, loading }) {
 }
 
 // ─── Assignments Tab ─────────────────────────────────────────────────────────
-function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, onSubmit, assignments, loading, onUploadFile, uploadFileLoading, fileInputRef }) {
+function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, maxMarks, setMaxMarks, onSubmit, assignments, loading, onDownload, showMsg }) {
+  const fileRef = useRef(null)
+  const [pendingFile, setPendingFile] = useState(null)
+
+  const handleCreate = async () => {
+    try {
+      await onSubmit(pendingFile)
+      setPendingFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+    } catch { /* toast already shown */ }
+  }
+
   return (
     <div className="space-y-6">
       <div className="glass-card p-6 border border-white/60">
@@ -405,30 +421,23 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, o
         <div className="space-y-3">
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Assignment title" className="collego-input" /></div>
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="Assignment description..." className="collego-input resize-none" /></div>
-          <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Due Date (optional)</label><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="collego-input !w-48" /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Due Date (optional)</label><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="collego-input" /></div>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Maximum Marks</label><input type="number" min="1" value={maxMarks} onChange={e => setMaxMarks(e.target.value)} className="collego-input" /></div>
+          </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Attachment (optional)</label>
-            <div className="relative group">
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="sr-only"
-                onChange={e => {
-                  if (e.target.files?.[0]) {
-                    const fd = new FormData()
-                    fd.append('file', e.target.files[0])
-                    onUploadFile(fd)
-                  }
-                }}
-              />
-              <button type="button" className="collego-input px-4 py-2 text-[10px] text-slate-400 border border-white/60 rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-all bg-white/50 w-full text-left">
-                Choose file
-              </button>
-            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              onChange={e => setPendingFile(e.target.files?.[0] || null)}
+              className="collego-input file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-indigo-600"
+            />
+            {pendingFile && <p className="text-[10px] text-slate-400 mt-1">Selected: {pendingFile.name}</p>}
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim() || uploadFileLoading}>
-          {loading || uploadFileLoading ? (
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={handleCreate} disabled={loading || !title.trim()}>
+          {loading ? (
             <span className="flex gap-1"><RefreshCw size={13} className="animate-spin" /> Creating...</span>
           ) : (
             <span className="flex gap-1"><Plus size={13} /> Create Assignment</span>
@@ -441,24 +450,24 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, o
           <div className="divide-y divide-white/30">
             {assignments.map(a => (
               <div key={a.id} className="px-5 py-4 hover:bg-white/30 transition-colors">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{a.title}</p>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-slate-800">{a.title}</p>
+                      <Badge variant="secondary">{a.maxMarks ?? 10} marks</Badge>
+                    </div>
                     <p className="text-xs text-slate-500 mt-1">{a.description}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     {a.dueDate && <span className="text-xs text-amber-600 shrink-0 flex items-center gap-1.5"><Clock size={11} /> {fmtDate(a.dueDate)}</span>}
                     {a.hasFile && (
-                      <a
-                        href={`/api/faculty/assignments/${a.id}/file`}
-                        download={a.fileName}
-                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                      >
-                        <Download size={12} /> {a.fileName}
-                      </a>
+                      <Button variant="outline" size="sm" onClick={() => onDownload(`/api/faculty/assignments/${a.id}/file`, a.fileName || `assignment-${a.id}`)}>
+                        <span className="flex gap-1"><Download size={12} /> {a.fileName || 'Attachment'}</span>
+                      </Button>
                     )}
                   </div>
                 </div>
+                <AssignmentSubmissions assignment={a} showMsg={showMsg} />
               </div>
             ))}
           </div>
@@ -468,9 +477,137 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, o
   )
 }
 
+// ─── Assignment Submissions ──────────────────────────────────────────────────
+function AssignmentSubmissions({ assignment, showMsg }) {
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get(`/api/faculty/assignments/${assignment.id}/submissions`)
+      setRows(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to load submissions', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { if (open) load() }, [open])
+
+  const download = async (row) => {
+    try {
+      await downloadFile(`/api/faculty/submissions/${row.id}/file`, row.fileName || 'submission')
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Download failed', 'error')
+    }
+  }
+
+  const graded = rows.filter(r => r.status === 'GRADED').length
+
+  return (
+    <div className="mt-3">
+      <button onClick={() => setOpen(o => !o)} className="text-xs font-medium text-indigo-600 hover:underline flex items-center gap-1">
+        <Users size={12} /> Submissions ({assignment.submissionCount ?? 0}){graded > 0 ? ` · ${graded} graded` : ''}
+      </button>
+      {open && (
+        <div className="mt-3 rounded-xl border border-white/60 bg-white/40 overflow-hidden">
+          {loading ? (
+            <div className="p-4"><Spinner color="violet" /></div>
+          ) : rows.length === 0 ? (
+            <p className="p-4 text-xs text-slate-400">No submissions yet.</p>
+          ) : (
+            <div className="divide-y divide-white/40">
+              {rows.map(r => <SubmissionRow key={r.id} row={r} onGraded={load} onDownload={download} showMsg={showMsg} />)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SubmissionRow({ row, onGraded, onDownload, showMsg }) {
+  const [marks, setMarks] = useState(row.marks ?? '')
+  const [feedback, setFeedback] = useState(row.feedback ?? '')
+  const [busy, setBusy] = useState(false)
+  const isGraded = row.status === 'GRADED'
+
+  const save = async () => {
+    if (marks === '' || marks == null) {
+      showMsg('Enter marks before saving', 'error')
+      return
+    }
+    setBusy(true)
+    try {
+      await api.put(`/api/faculty/submissions/${row.id}/grade`, { marks: Number(marks), feedback })
+      showMsg('Submission graded')
+      await onGraded()
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to grade submission', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-slate-800">
+            {row.studentName} <span className="text-xs text-slate-400">({row.enrollmentNumber})</span>
+          </p>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            {row.submittedAt ? `Submitted ${fmtDate(row.submittedAt)}` : 'Submitted'}
+            {row.late && <span className="ml-2 text-amber-600">Late</span>}
+            {row.fileName && <span className="ml-2">· {row.fileName}</span>}
+          </p>
+          {row.note && <p className="text-xs text-slate-500 mt-1">“{row.note}”</p>}
+        </div>
+        <div className="flex items-center gap-2">
+          {row.hasFile && (
+            <Button variant="outline" size="sm" onClick={() => onDownload(row)}>
+              <span className="flex gap-1"><Download size={12} /> File</span>
+            </Button>
+          )}
+          <Badge variant={isGraded ? 'success' : 'info'}>
+            {isGraded ? `${row.marks}/${row.maxMarks}` : 'Submitted'}
+          </Badge>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-[110px_1fr_auto] gap-2 items-end">
+        <div>
+          <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Marks / {row.maxMarks}</label>
+          <input type="number" min="0" max={row.maxMarks} value={marks} onChange={e => setMarks(e.target.value)} className="collego-input" />
+        </div>
+        <div>
+          <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Feedback</label>
+          <input value={feedback} onChange={e => setFeedback(e.target.value)} placeholder="Optional feedback" className="collego-input" />
+        </div>
+        <Button variant="gradient" size="sm" onClick={save} disabled={busy}>
+          {busy ? <RefreshCw size={13} className="animate-spin" /> : 'Save'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Materials Tab ───────────────────────────────────────────────────────────
-function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit, materials, loading, onUploadFile, uploadFileLoading, fileInputRef }) {
+function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit, materials, loading, onDownload }) {
   const MATERIAL_TYPES = ['NOTES', 'SLIDES', 'REFERENCE', 'VIDEO', 'ASSIGNMENT', 'OTHER']
+  const fileRef = useRef(null)
+  const [pendingFile, setPendingFile] = useState(null)
+
+  const handleCreate = async () => {
+    try {
+      await onSubmit(pendingFile)
+      setPendingFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+    } catch { /* toast already shown */ }
+  }
+
   return (
     <div className="space-y-6">
       <div className="glass-card p-6 border border-white/60">
@@ -486,27 +623,17 @@ function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit,
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Attachment (optional)</label>
-            <div className="relative group">
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="sr-only"
-                onChange={e => {
-                  if (e.target.files?.[0]) {
-                    const fd = new FormData()
-                    fd.append('file', e.target.files[0])
-                    onUploadFile(fd)
-                  }
-                }}
-              />
-              <button type="button" className="collego-input px-4 py-2 text-[10px] text-slate-400 border border-white/60 rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-all bg-white/50 w-full text-left">
-                Choose file
-              </button>
-            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              onChange={e => setPendingFile(e.target.files?.[0] || null)}
+              className="collego-input file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-indigo-600"
+            />
+            {pendingFile && <p className="text-[10px] text-slate-400 mt-1">Selected: {pendingFile.name}</p>}
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim() || uploadFileLoading}>
-          {loading || uploadFileLoading ? (
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={handleCreate} disabled={loading || !title.trim()}>
+          {loading ? (
             <span className="flex gap-1"><RefreshCw size={13} className="animate-spin" /> Adding...</span>
           ) : (
             <span className="flex gap-1"><Plus size={13} /> Add Material</span>
@@ -526,13 +653,9 @@ function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit,
                     <td className="text-slate-500 text-xs max-w-xs truncate">{m.description || '—'}</td>
                     <td style={{ textAlign: 'center' }}>
                       {m.hasFile && (
-                        <a
-                          href={`/api/faculty/materials/${m.id}/file`}
-                          download={m.fileName}
-                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                        >
-                          <Download size={12} /> {m.fileName}
-                        </a>
+                        <Button variant="outline" size="sm" onClick={() => onDownload(`/api/faculty/materials/${m.id}/file`, m.fileName || `material-${m.id}`)}>
+                          <span className="flex gap-1"><Download size={12} /> {m.fileName || 'File'}</span>
+                        </Button>
                       )}
                     </td>
                   </tr>
@@ -596,7 +719,18 @@ function AnalyticsTab({ analytics, loading }) {
 }
 
 // ─── Question Papers Tab ─────────────────────────────────────────────────────
-function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fileName, setFileName, selectedSectionId, setSelectedSectionId, onSubmit, papers, loading, onUploadFile, uploadFileLoading, fileInputRef }) {
+function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fileName, setFileName, selectedSectionId, setSelectedSectionId, onSubmit, papers, loading, uploadFileLoading }) {
+  const [pendingFile, setPendingFile] = useState(null)
+  const fileRef = useRef(null)
+
+  const handleSubmit = async () => {
+    try {
+      await onSubmit(pendingFile)
+      setPendingFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+    } catch { /* toast already shown */ }
+  }
+
   return (
     <div className="space-y-6">
       <PageTitle icon={FileText} title="Question Papers" subtitle="Upload and track question papers for admin approval." accent="violet" />
@@ -626,27 +760,17 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
           </div>
         </div>
         <div className="mt-4">
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Question Paper File</label>
-          <div className="relative group">
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="sr-only"
-              accept=".pdf,.doc,.docx"
-              onChange={e => {
-                if (e.target.files?.[0]) {
-                  const fd = new FormData()
-                  fd.append('file', e.target.files[0])
-                  onUploadFile(fd)
-                }
-              }}
-            />
-            <button type="button" className="collego-input px-4 py-2 text-[10px] text-slate-400 border border-white/60 rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-all bg-white/50 w-full text-left">
-              Choose file
-            </button>
-          </div>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Question Paper File (optional)</label>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,.doc,.docx"
+            onChange={e => setPendingFile(e.target.files?.[0] || null)}
+            className="collego-input file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-indigo-600"
+          />
+          {pendingFile && <p className="text-[10px] text-slate-400 mt-1">Selected: {pendingFile.name}</p>}
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !selectedSectionId || uploadFileLoading}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={handleSubmit} disabled={loading || uploadFileLoading || !selectedSectionId}>
           {loading || uploadFileLoading ? <><RefreshCw size={13} className="animate-spin" /> Uploading...</> : <><Upload size={13} /> Submit for Approval</>}
         </Button>
       </div>
@@ -828,14 +952,12 @@ export default function FacultyDashboard() {
   const [assignmentTitle, setAssignmentTitle] = useState('')
   const [assignmentDesc, setAssignmentDesc] = useState('')
   const [assignmentDueDate, setAssignmentDueDate] = useState('')
+  const [assignmentMaxMarks, setAssignmentMaxMarks] = useState(10)
   const [sectionAssignments, setSectionAssignments] = useState([])
   const [materialTitle, setMaterialTitle] = useState('')
   const [materialDesc, setMaterialDesc] = useState('')
   const [materialType, setMaterialType] = useState('NOTES')
   const [sectionMaterials, setSectionMaterials] = useState([])
-  const [assignmentFileRef, setAssignmentFileRef] = useState(null)
-  const [materialFileRef, setMaterialFileRef] = useState(null)
-  const [qpFileRef, setQpFileRef] = useState(null)
   const [uploadFileLoading, setUploadFileLoading] = useState(false)
   const [uploadFileType, setUploadFileType] = useState(null) // 'assignment' | 'material' | 'qp'
 
@@ -989,15 +1111,29 @@ export default function FacultyDashboard() {
     } catch { /* ignore */ } finally { setTabLoading(false) }
   }, [selectedSection])
 
-  const handleCreateAssignment = async () => {
+  const handleCreateAssignment = async (file) => {
     setLoading(true)
     try {
-      await api.post('/api/faculty/assignments', { sectionId: selectedSection.sectionId, title: assignmentTitle, description: assignmentDesc, dueDate: assignmentDueDate || null, fileName: null })
+      const res = await api.post('/api/faculty/assignments', {
+        sectionId: selectedSection.sectionId,
+        title: assignmentTitle,
+        description: assignmentDesc,
+        dueDate: assignmentDueDate || null,
+        maxMarks: Number(assignmentMaxMarks) || 10,
+        fileName: null,
+      })
+      if (file) {
+        const fd = new FormData()
+        fd.append('file', file)
+        await api.post(`/api/faculty/assignments/${res.data.id}/file`, fd)
+      }
       showMsg('Assignment created successfully')
-      setAssignmentTitle(''); setAssignmentDesc(''); setAssignmentDueDate('')
-      loadAssignments()
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to create assignment', 'error') }
-    finally { setLoading(false) }
+      setAssignmentTitle(''); setAssignmentDesc(''); setAssignmentDueDate(''); setAssignmentMaxMarks(10)
+      await loadAssignments()
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to create assignment', 'error')
+      throw err
+    } finally { setLoading(false) }
   }
 
   const loadAssignments = async () => {
@@ -1006,64 +1142,38 @@ export default function FacultyDashboard() {
     catch { /* ignore */ } finally { setTabLoading(false) }
   }
 
-  const handleCreateMaterial = async () => {
+  const handleCreateMaterial = async (file) => {
     setLoading(true)
     try {
-      await api.post('/api/faculty/materials', { sectionId: selectedSection.sectionId, title: materialTitle, description: materialDesc, materialType, fileName: null })
+      const res = await api.post('/api/faculty/materials', {
+        sectionId: selectedSection.sectionId,
+        title: materialTitle,
+        description: materialDesc,
+        materialType,
+        fileName: null,
+      })
+      if (file) {
+        const fd = new FormData()
+        fd.append('file', file)
+        await api.post(`/api/faculty/materials/${res.data.id}/file`, fd)
+      }
       showMsg('Material added successfully')
       setMaterialTitle(''); setMaterialDesc('')
-      loadMaterials()
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to add material', 'error') }
-    finally { setLoading(false) }
+      await loadMaterials()
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to add material', 'error')
+      throw err
+    } finally { setLoading(false) }
   }
 
-  const handleUploadAssignmentFile = async (assignmentId, fd) => {
-    setUploadFileLoading(true)
-    setUploadFileType('assignment')
+  const handleDownload = useCallback(async (url, name) => {
     try {
-      await api.post(`/api/faculty/assignments/${assignmentId}/file`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      showMsg('File uploaded successfully')
-      loadAssignments()
-      if (assignmentFileRef.current) assignmentFileRef.current.value = ''
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload file', 'error') }
-    finally { setUploadFileLoading(false); setUploadFileType(null) }
-  }
+      await downloadFile(url, name)
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Download failed', 'error')
+    }
+  }, [showMsg])
 
-  const handleUploadMaterialFile = async (materialId, fd) => {
-    setUploadFileLoading(true)
-    setUploadFileType('material')
-    try {
-      await api.post(`/api/faculty/materials/${materialId}/file`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      showMsg('File uploaded successfully')
-      loadMaterials()
-      if (materialFileRef.current) materialFileRef.current.value = ''
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload file', 'error') }
-    finally { setUploadFileLoading(false); setUploadFileType(null) }
-  }
-
-  const handleUploadQPFile = async (fd) => {
-    setUploadFileLoading(true)
-    setUploadFileType('qp')
-    try {
-      const sec = sections.find(s => s.sectionId === parseInt(qpSelectedSectionId))
-      if (!sec) { showMsg('Please select a course/section', 'error'); return }
-      await api.post('/api/faculty/question-papers/with-file', fd, { 
-        headers: { 'Content-Type': 'multipart/form-data' },
-        params: { 
-          courseId: sec.courseId, 
-          departmentId: sec.course.departmentId || departments[0]?.id || 1, 
-          examType: qpExamType, 
-          year: parseInt(qpYear), 
-          semesterNumber: sec.semesterNumber, 
-          fileName: qpFileName || `${sec.courseCode}_${qpExamType}_${qpYear}.pdf` 
-        }
-      })
-      showMsg('Question paper uploaded (pending admin approval)')
-      setQpFileName(''); loadMyQPs()
-      if (qpFileRef.current) qpFileRef.current.value = ''
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload question paper', 'error') }
-    finally { setUploadFileLoading(false); setUploadFileType(null) }
-  }
 
   const loadMaterials = async () => {
     setTabLoading(true)
@@ -1071,20 +1181,31 @@ export default function FacultyDashboard() {
     catch { /* ignore */ } finally { setTabLoading(false) }
   }
 
-  const handleUploadQP = async () => {
+  const handleUploadQP = async (file) => {
     const sec = sections.find(s => s.sectionId === parseInt(qpSelectedSectionId))
-    if (!sec) { showMsg('Please select a course/section', 'error'); return }
+    if (!sec) { showMsg('Please select a course/section', 'error'); throw new Error('No section') }
     setLoading(true)
     try {
-      await api.post('/api/faculty/question-papers', { courseId: sec.courseId, departmentId: null, examType: qpExamType, year: parseInt(qpYear), semesterNumber: sec.semesterNumber, fileName: qpFileName || `${sec.courseCode}_${qpExamType}_${qpYear}.pdf` })
+      const params = {
+        courseId: sec.courseId,
+        departmentId: sec.course?.departmentId || departments[0]?.id || 1,
+        examType: qpExamType,
+        year: parseInt(qpYear),
+        semesterNumber: sec.semesterNumber,
+        fileName: qpFileName || `${sec.courseCode}_${qpExamType}_${qpYear}.pdf`,
+      }
+      if (file) {
+        const fd = new FormData()
+        fd.append('file', file)
+        await api.post('/api/faculty/question-papers/with-file', fd, { params })
+      } else {
+        await api.post('/api/faculty/question-papers', params)
+      }
       showMsg('Question paper uploaded (pending admin approval)')
       setQpFileName(''); loadMyQPs()
-    } catch {
-      try {
-        await api.post('/api/faculty/question-papers', { courseId: sec.courseId, departmentId: departments[0]?.id || 1, examType: qpExamType, year: parseInt(qpYear), semesterNumber: sec.semesterNumber, fileName: qpFileName || `${sec.courseCode}_${qpExamType}_${qpYear}.pdf` })
-        showMsg('Question paper uploaded (pending admin approval)')
-        setQpFileName(''); loadMyQPs()
-      } catch (e2) { showMsg(e2.response?.data?.message || 'Failed to upload', 'error') }
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to upload question paper', 'error')
+      throw err
     } finally { setLoading(false) }
   }
 
@@ -1179,8 +1300,10 @@ export default function FacultyDashboard() {
       switch (activeTab) {
         case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
         case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} />
-        case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} onUploadFile={fd => handleUploadQPFile(fd)} uploadFileLoading={uploadFileLoading && uploadFileType === 'qp'} fileInputRef={qpFileRef} />
+        case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
         case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} deptId={noticeDeptId} setDeptId={setNoticeDeptId} departments={departments} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
+        case 'settings': return <SettingsTab showMsg={showMsg} accent="violet" />
+        case 'help': return <HelpTab accent="violet" />
         default: return null
       }
     }
@@ -1190,8 +1313,8 @@ export default function FacultyDashboard() {
       case 'internalMarks': return <InternalMarksTab examName={examName} setExamName={setExamName} maxMarks={maxMarks} setMaxMarks={setMaxMarks} marksEntries={marksEntries} setMarksEntries={setMarksEntries} onSubmit={handleUploadInternalMarks} sectionMarks={sectionMarks} loading={loading} />
       case 'semesterMarks': return <SemesterMarksTab semMaxMarks={semMaxMarks} setSemMaxMarks={setSemMaxMarks} semMarksEntries={semMarksEntries} setSemMarksEntries={setSemMarksEntries} onSubmit={handleUploadSemesterMarks} loading={loading} />
       case 'studentPerformance': return <StudentPerformanceTab data={studentPerformance} loading={tabLoading} />
-      case 'assignments': return <AssignmentsTab title={assignmentTitle} setTitle={setAssignmentTitle} desc={assignmentDesc} setDesc={setAssignmentDesc} dueDate={assignmentDueDate} setDueDate={setAssignmentDueDate} onSubmit={handleCreateAssignment} assignments={sectionAssignments} loading={loading} onUploadFile={fd => handleUploadAssignmentFile(null, fd)} uploadFileLoading={uploadFileLoading && uploadFileType === 'assignment'} fileInputRef={assignmentFileRef} />
-      case 'materials': return <MaterialsTab title={materialTitle} setTitle={setMaterialTitle} desc={materialDesc} setDesc={setMaterialDesc} type={materialType} setType={setMaterialType} onSubmit={handleCreateMaterial} materials={sectionMaterials} loading={loading} onUploadFile={fd => handleUploadMaterialFile(null, fd)} uploadFileLoading={uploadFileLoading && uploadFileType === 'material'} fileInputRef={materialFileRef} />
+      case 'assignments': return <AssignmentsTab title={assignmentTitle} setTitle={setAssignmentTitle} desc={assignmentDesc} setDesc={setAssignmentDesc} dueDate={assignmentDueDate} setDueDate={setAssignmentDueDate} maxMarks={assignmentMaxMarks} setMaxMarks={setAssignmentMaxMarks} onSubmit={handleCreateAssignment} assignments={sectionAssignments} loading={loading} onDownload={handleDownload} showMsg={showMsg} />
+      case 'materials': return <MaterialsTab title={materialTitle} setTitle={setMaterialTitle} desc={materialDesc} setDesc={setMaterialDesc} type={materialType} setType={setMaterialType} onSubmit={handleCreateMaterial} materials={sectionMaterials} loading={loading} onDownload={handleDownload} />
       case 'analytics': return <AnalyticsTab analytics={analytics} loading={tabLoading} />
       default: return null
     }

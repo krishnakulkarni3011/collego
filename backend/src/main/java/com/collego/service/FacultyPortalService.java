@@ -14,6 +14,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,6 +34,7 @@ public class FacultyPortalService {
     private final SemesterMarksRepository semesterMarksRepository;
     private final StudentProfileRepository studentProfileRepository;
     private final AssignmentRepository assignmentRepository;
+    private final AssignmentSubmissionRepository assignmentSubmissionRepository;
     private final CourseMaterialRepository courseMaterialRepository;
     private final QuestionPaperRepository questionPaperRepository;
     private final NotificationRepository notificationRepository;
@@ -342,6 +345,7 @@ public class FacultyPortalService {
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .dueDate(request.getDueDate())
+                .maxMarks(request.getMaxMarks() != null && request.getMaxMarks() > 0 ? request.getMaxMarks() : 10)
                 .fileName(request.getFileName())
                 .uploadedBy(facultyUser)
                 .build();
@@ -409,6 +413,84 @@ public class FacultyPortalService {
             throw new BadRequestException("No file attached to this assignment.");
         }
         return s3StorageService.download(assignmentBucket, assignment.getFilePath());
+    }
+
+    // ==================== Assignment Submissions (grading) ====================
+
+    public List<AssignmentSubmissionResponse> getSubmissions(String email, Long assignmentId) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
+        validateFacultyOwnsSection(faculty, assignment.getSection());
+        return assignmentSubmissionRepository.findByAssignmentIdOrderBySubmittedAtDesc(assignmentId)
+                .stream()
+                .map(this::mapSubmissionToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /** Download a student's submitted file (faculty must own the section). */
+    public byte[] downloadSubmissionFile(String email, Long submissionId) throws IOException {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        AssignmentSubmission submission = assignmentSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Submission not found: " + submissionId));
+        validateFacultyOwnsSection(faculty, submission.getAssignment().getSection());
+
+        if (submission.getFilePath() == null || submission.getFilePath().isBlank()) {
+            throw new BadRequestException("No file attached to this submission.");
+        }
+        return s3StorageService.download(assignmentBucket, submission.getFilePath());
+    }
+
+    /** Grade a student's submission. Marks may not exceed the assignment's max marks. */
+    @Transactional
+    public AssignmentSubmissionResponse gradeSubmission(String email, Long submissionId, GradeSubmissionRequest request) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        AssignmentSubmission submission = assignmentSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Submission not found: " + submissionId));
+        validateFacultyOwnsSection(faculty, submission.getAssignment().getSection());
+
+        int maxMarks = submission.getAssignment().getMaxMarks() != null
+                ? submission.getAssignment().getMaxMarks() : 10;
+        if (request.getMarks().compareTo(BigDecimal.valueOf(maxMarks)) > 0) {
+            throw new BadRequestException("Marks cannot exceed the maximum of " + maxMarks);
+        }
+
+        submission.setMarks(request.getMarks());
+        submission.setFeedback(request.getFeedback());
+        submission.setStatus(SubmissionStatus.GRADED);
+        submission.setGradedAt(LocalDateTime.now());
+        submission.setGradedBy(faculty.getUser());
+        assignmentSubmissionRepository.save(submission);
+
+        log.info("Faculty {} graded submission {} with {} marks", email, submissionId, request.getMarks());
+        return mapSubmissionToResponse(submission);
+    }
+
+    private AssignmentSubmissionResponse mapSubmissionToResponse(AssignmentSubmission s) {
+        Assignment a = s.getAssignment();
+        return AssignmentSubmissionResponse.builder()
+                .id(s.getId())
+                .assignmentId(a.getId())
+                .assignmentTitle(a.getTitle())
+                .sectionId(a.getSection().getId())
+                .courseName(a.getSection().getCourse().getName())
+                .courseCode(a.getSection().getCourse().getCode())
+                .studentId(s.getStudent().getId())
+                .studentName(s.getStudent().getUser().getFirstName() + " "
+                        + s.getStudent().getUser().getLastName())
+                .enrollmentNumber(s.getStudent().getEnrollmentNumber())
+                .fileName(s.getFileName())
+                .fileSize(s.getFileSize())
+                .note(s.getNote())
+                .late(s.isLate())
+                .hasFile(s.getFilePath() != null && !s.getFilePath().isBlank())
+                .status(s.getStatus() != null ? s.getStatus().name() : null)
+                .marks(s.getMarks())
+                .maxMarks(a.getMaxMarks() != null ? a.getMaxMarks() : 10)
+                .feedback(s.getFeedback())
+                .submittedAt(s.getSubmittedAt())
+                .gradedAt(s.getGradedAt())
+                .build();
     }
 
     // ==================== Course Materials ====================
@@ -1049,6 +1131,10 @@ public class FacultyPortalService {
                 .fileName(a.getFileName())
                 .hasFile(a.getFilePath() != null && !a.getFilePath().isBlank())
                 .createdAt(a.getCreatedAt())
+                .maxMarks(a.getMaxMarks() != null ? a.getMaxMarks() : 10)
+                .submissionCount(assignmentSubmissionRepository.countByAssignmentId(a.getId()))
+                .gradedCount(assignmentSubmissionRepository.countByAssignmentIdAndStatus(
+                        a.getId(), SubmissionStatus.GRADED))
                 .build();
     }
 

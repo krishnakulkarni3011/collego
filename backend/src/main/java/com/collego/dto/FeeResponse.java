@@ -16,9 +16,11 @@ public class FeeResponse {
     private String semesterName;
     private BigDecimal totalAmount;
     private BigDecimal paidAmount;
+    private BigDecimal balance;
     private LocalDate dueDate;
     private String status;
     private LocalDateTime paidAt;
     private String transactionRef;
     private List<FeeItemResponse> items;
+    private List<FeePaymentResponse> payments;
 }

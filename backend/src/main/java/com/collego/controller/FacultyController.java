@@ -146,6 +146,34 @@ public class FacultyController {
                 .body(bytes);
     }
 
+    // ==================== Assignment Submissions / Grading ====================
+
+    @GetMapping("/assignments/{assignmentId}/submissions")
+    public ResponseEntity<List<AssignmentSubmissionResponse>> getSubmissions(
+            Authentication auth,
+            @PathVariable Long assignmentId) {
+        return ResponseEntity.ok(facultyPortalService.getSubmissions(auth.getName(), assignmentId));
+    }
+
+    @GetMapping("/submissions/{submissionId}/file")
+    public ResponseEntity<byte[]> downloadSubmissionFile(
+            Authentication auth,
+            @PathVariable Long submissionId) throws IOException {
+        byte[] bytes = facultyPortalService.downloadSubmissionFile(auth.getName(), submissionId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(bytes);
+    }
+
+    @PutMapping("/submissions/{submissionId}/grade")
+    public ResponseEntity<AssignmentSubmissionResponse> gradeSubmission(
+            Authentication auth,
+            @PathVariable Long submissionId,
+            @Valid @RequestBody GradeSubmissionRequest request) {
+        return ResponseEntity.ok(facultyPortalService.gradeSubmission(auth.getName(), submissionId, request));
+    }
+
     // ==================== Course Materials ====================
 
     @PostMapping("/materials")

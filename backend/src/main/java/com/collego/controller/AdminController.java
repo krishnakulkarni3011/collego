@@ -8,6 +8,8 @@ import com.collego.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -63,6 +65,45 @@ public class AdminController {
         }
 
         return ResponseEntity.ok(users);
+    }
+
+    /**
+     * Paginated + searchable directory. Kept separate from /users so existing
+     * clients keep receiving the full list.
+     */
+    @GetMapping("/users/page")
+    public ResponseEntity<Map<String, Object>> listUsersPage(
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        List<UserResponse> users = userService.getAllUsers();
+        if (role != null && !role.isEmpty()) {
+            users = users.stream()
+                    .filter(u -> u.getRole().equalsIgnoreCase(role))
+                    .collect(Collectors.toList());
+        }
+        if (q != null && !q.isBlank()) {
+            String needle = q.trim().toLowerCase();
+            users = users.stream()
+                    .filter(u -> (u.getFirstName() + " " + u.getLastName() + " " + u.getEmail())
+                            .toLowerCase().contains(needle))
+                    .collect(Collectors.toList());
+        }
+
+        int safeSize = Math.max(1, Math.min(size, 100));
+        int total = users.size();
+        int totalPages = (int) Math.ceil(total / (double) safeSize);
+        int from = Math.min(page * safeSize, total);
+        int to = Math.min(from + safeSize, total);
+
+        return ResponseEntity.ok(Map.of(
+                "content", users.subList(from, to),
+                "page", page,
+                "size", safeSize,
+                "totalElements", total,
+                "totalPages", totalPages));
     }
 
     @GetMapping("/users/{id}")
@@ -131,6 +172,37 @@ public class AdminController {
                         .build())
                 .collect(Collectors.toList());
         return ResponseEntity.ok(logs);
+    }
+
+    @GetMapping("/audit-logs/page")
+    public ResponseEntity<Map<String, Object>> getAuditLogsPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Page<com.collego.entity.AuditLog> result = auditLogRepository
+                .findAllByOrderByTimestampDesc(
+                        PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100))));
+
+        List<AuditLogResponse> content = result.getContent().stream()
+                .map(log -> AuditLogResponse.builder()
+                        .id(log.getId())
+                        .userId(log.getUserId())
+                        .userEmail(log.getUserEmail())
+                        .action(log.getAction())
+                        .entityType(log.getEntityType())
+                        .entityId(log.getEntityId())
+                        .details(log.getDetails())
+                        .ipAddress(log.getIpAddress())
+                        .timestamp(log.getTimestamp() != null ? log.getTimestamp() : java.time.LocalDateTime.now())
+                        .build())
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of(
+                "content", content,
+                "page", result.getNumber(),
+                "size", result.getSize(),
+                "totalElements", result.getTotalElements(),
+                "totalPages", result.getTotalPages()));
     }
 
     // ==================== Departments ====================

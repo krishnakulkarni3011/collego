@@ -17,6 +17,8 @@ public class CreateAssignmentRequest {
 
     private LocalDate dueDate;
 
+    private Integer maxMarks;
+
     private Long sectionId;
 
     private String fileName;

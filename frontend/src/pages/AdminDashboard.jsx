@@ -8,7 +8,7 @@ import {
   Megaphone, FileText, CheckCircle2,
   Clock, MapPin, Activity, BookMarked, Briefcase, X,
   RefreshCw, Upload, Edit, Power, Filter, Trophy, Zap,
-  TrendingUp, Percent, XCircle, Wallet, Home, Landmark,
+  TrendingUp, Percent, XCircle, Wallet, Home, Landmark, Download,
   UsersRound, CalendarDays, ScrollText, Layers,
 } from 'lucide-react'
 import {
@@ -17,6 +17,9 @@ import {
 } from 'recharts'
 import { authService } from '../services/authService'
 import api from '../services/api'
+import { downloadFile } from '../lib/download'
+import { SettingsTab } from '../components/dashboard/SettingsTab'
+import { HelpTab } from '../components/dashboard/HelpTab'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -67,12 +70,9 @@ const NAV_SECTIONS = [
     title: 'Finance & Admin',
     items: [
       { id: 'fees', label: 'Fees & Finance', icon: DollarSign },
-      { id: 'hostel', label: 'Hostel & Facilities', icon: Building2 },
-      { id: 'library', label: 'Library', icon: Library },
       { id: 'announcements', label: 'Notices & Events', icon: Megaphone },
     ],
   },
-  { title: 'AI Assistant', items: [{ id: 'aiAssistant', label: 'AI Assistant', icon: Sparkles }] },
   {
     title: 'Administration',
     items: [
@@ -385,6 +385,15 @@ function DirectoryTab({
         subtitle={subtitle}
         actions={
           <>
+            <button
+              onClick={() => downloadFile(
+                `/api/admin/export/${fixedRole === 'FACULTY' ? 'faculty' : 'students'}`,
+                `${fixedRole === 'FACULTY' ? 'faculty' : 'students'}.csv`
+              ).catch(() => {})}
+              className="flex items-center gap-2 bg-white border border-white/60 text-slate-500 text-xs font-semibold px-3 py-2 rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-colors backdrop-blur-sm"
+            >
+              <Download size={14} /> Export CSV
+            </button>
             <label className="flex items-center gap-2 bg-white border border-white/60 text-slate-500 text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer hover:border-indigo-300 hover:text-indigo-600 transition-colors backdrop-blur-sm">
               <Upload size={14} />
               <span>Import CSV</span>
@@ -757,13 +766,12 @@ function AcademicsTab({ departments, overview, semesters, deptReports, showMsg }
                   {timetableMeta ? (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-500">Timetable uploaded:</span>
-                      <a
-                        href={`/api/sections/${selectedSection.sectionId}/timetable`}
-                        download={timetableMeta.fileName}
+                      <button
+                        onClick={() => downloadFile(`/api/sections/${selectedSection.sectionId}/timetable`, timetableMeta.fileName || 'timetable').catch(() => {})}
                         className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 transition-colors"
                       >
                         <Download size={12} /> {timetableMeta.fileName}
-                      </a>
+                      </button>
                       <button
                         onClick={handleDeleteTimetable}
                         className="px-2 py-1.5 rounded-lg text-xs text-red-500 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors"
@@ -1013,13 +1021,24 @@ function ReportsTab({ deptReports, subjectReports }) {
         title="Reports & Analytics"
         subtitle="Department performance, pass percentages and subject-level outcomes."
         actions={
-          <div className="flex bg-white border border-white/60 rounded-2xl p-1 backdrop-blur-sm">
-            {[['department', 'Departments'], ['subject', 'Subjects']].map(([id, label]) => (
-              <button key={id} onClick={() => setView(id)}
-                className={cn('px-4 py-2 rounded-xl text-xs font-medium transition-all', view === id ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50')}>
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadFile('/api/admin/export/students', 'students.csv').catch(() => {})}>
+              <span className="flex gap-1"><Download size={12} /> Students</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => downloadFile('/api/admin/export/faculty', 'faculty.csv').catch(() => {})}>
+              <span className="flex gap-1"><Download size={12} /> Faculty</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => downloadFile('/api/admin/export/fees', 'fees.csv').catch(() => {})}>
+              <span className="flex gap-1"><Download size={12} /> Fees</span>
+            </Button>
+            <div className="flex bg-white border border-white/60 rounded-2xl p-1 backdrop-blur-sm">
+              {[['department', 'Departments'], ['subject', 'Subjects']].map(([id, label]) => (
+                <button key={id} onClick={() => setView(id)}
+                  className={cn('px-4 py-2 rounded-xl text-xs font-medium transition-all', view === id ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50')}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
@@ -1120,7 +1139,148 @@ function NoticesTab({ insights }) {
 }
 
 // ─── Fee Management Tab ──────────────────────────────────────────────────────
-function FeeTab({ fees, onCreateFee, onUpdateFee, onPayFee, onAddFeeItem }) {
+function FeeRow({ fee, onRecordPayment }) {
+  const [open, setOpen] = useState(false)
+  const [payments, setPayments] = useState([])
+  const [loadingPayments, setLoadingPayments] = useState(false)
+  const [amount, setAmount] = useState('')
+  const [method, setMethod] = useState('CASH')
+  const [reference, setReference] = useState('')
+  const [remarks, setRemarks] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const total = Number(fee.totalAmount || 0)
+  const paid = Number(fee.paidAmount || 0)
+  const balance = Number(fee.balance ?? (total - paid))
+  const isPaid = fee.status === 'PAID'
+  const partial = !isPaid && paid > 0
+
+  useEffect(() => {
+    if (!open) return
+    setAmount(balance > 0 ? String(balance) : '')
+    let cancelled = false
+    const load = async () => {
+      setLoadingPayments(true)
+      try {
+        const res = await api.get(`/api/admin/fees/${fee.id}/payments`)
+        if (!cancelled) setPayments(Array.isArray(res.data) ? res.data : [])
+      } catch {
+        if (!cancelled) setPayments([])
+      } finally {
+        if (!cancelled) setLoadingPayments(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [open, fee.id, balance])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      const ok = await onRecordPayment(fee.id, {
+        amount: Number(amount),
+        method,
+        reference: reference || null,
+        remarks: remarks || null,
+      })
+      if (ok !== false) {
+        setOpen(false)
+        setReference('')
+        setRemarks('')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <tr className="hover:bg-white/30 transition-colors">
+        <td className="text-slate-800 font-medium">#{fee.studentId}</td>
+        <td className="text-slate-500">{fee.semesterName || '—'}</td>
+        <td style={{ textAlign: 'center' }} className="font-medium">₹{total.toLocaleString('en-IN')}</td>
+        <td style={{ textAlign: 'center' }} className="font-medium">₹{paid.toLocaleString('en-IN')}</td>
+        <td style={{ textAlign: 'center' }} className={balance > 0 ? 'text-amber-600 font-medium' : 'text-emerald-600 font-medium'}>
+          ₹{balance.toLocaleString('en-IN')}
+        </td>
+        <td style={{ textAlign: 'center' }} className="text-slate-500">{fee.dueDate || '—'}</td>
+        <td style={{ textAlign: 'center' }}>
+          <Badge variant={isPaid ? 'success' : partial ? 'info' : fee.status === 'OVERDUE' ? 'destructive' : 'warning'}>{isPaid ? 'PAID' : partial ? 'PARTIAL' : fee.status}</Badge>
+        </td>
+        <td style={{ textAlign: 'center' }}>
+          <Button variant="outline" size="sm" onClick={() => setOpen(o => !o)} className="px-3">
+            <span className="flex gap-1"><Wallet size={13} /> Record</span>
+          </Button>
+        </td>
+      </tr>
+      {open && (
+        <tr>
+          <td colSpan={8} className="bg-slate-50/60">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-4">
+              <form onSubmit={submit} className="space-y-3">
+                <p className="text-xs font-semibold text-slate-700">Record a payment (cash, cheque, DD or settled online)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Amount</label>
+                    <input type="number" min="1" max={balance} value={amount} onChange={e => setAmount(e.target.value)} className="collego-input" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Method</label>
+                    <select value={method} onChange={e => setMethod(e.target.value)} className="collego-input">
+                      {['CASH', 'CHEQUE', 'DD', 'UPI', 'CARD', 'NET_BANKING'].map(m => <option key={m}>{m}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Reference</label>
+                    <input value={reference} onChange={e => setReference(e.target.value)} placeholder="Cheque/UTR no." className="collego-input" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Remarks</label>
+                    <input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional" className="collego-input" />
+                  </div>
+                </div>
+                <Button type="submit" variant="gradient" size="sm" disabled={busy || !amount || Number(amount) <= 0 || Number(amount) > balance}>
+                  {busy ? <span className="flex gap-1"><RefreshCw size={13} className="animate-spin" /> Saving...</span> : 'Record payment'}
+                </Button>
+              </form>
+
+              <div>
+                <p className="text-xs font-semibold text-slate-700 mb-2">Payment history</p>
+                {loadingPayments ? (
+                  <p className="text-xs text-slate-400">Loading...</p>
+                ) : payments.length === 0 ? (
+                  <p className="text-xs text-slate-400">No payments recorded yet.</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {payments.map(p => (
+                      <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-white/70 bg-white/60 px-3 py-2">
+                        <div>
+                          <p className="text-xs font-medium text-slate-700">₹{Number(p.amount).toLocaleString('en-IN')} · {p.method}</p>
+                          <p className="text-[10px] text-slate-400">{p.receiptNumber} · {fmtDate(p.paidAt)}</p>
+                        </div>
+                        <button
+                          onClick={() => downloadFile(`/api/admin/fees/payments/${p.id}/receipt`, `receipt-${p.receiptNumber}.pdf`).catch(() => {})}
+                          className="text-indigo-600 hover:underline text-[11px] flex items-center gap-1"
+                        >
+                          <Download size={11} /> Receipt
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+function FeeTab({ fees, onCreateFee, onUpdateFee, onRecordPayment, onAddFeeItem }) {
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ studentId: '', semesterId: '', totalAmount: '', paidAmount: '', dueDate: '', status: 'PENDING', items: [] })
 
@@ -1177,6 +1337,11 @@ function FeeTab({ fees, onCreateFee, onUpdateFee, onPayFee, onAddFeeItem }) {
         </Panel>
 
         <Panel title="Fee Records" icon={ScrollText} accent="blue">
+          <div className="flex justify-end mb-3">
+            <Button variant="outline" size="sm" onClick={() => downloadFile('/api/admin/export/fees', 'fees.csv').catch(() => {})}>
+              <span className="flex gap-1"><Download size={13} /> Export CSV</span>
+            </Button>
+          </div>
           <div className="overflow-x-auto">
             <table className="collego-table">
               <thead>
@@ -1185,6 +1350,7 @@ function FeeTab({ fees, onCreateFee, onUpdateFee, onPayFee, onAddFeeItem }) {
                   <th>Semester</th>
                   <th style={{ textAlign: 'center' }}>Total</th>
                   <th style={{ textAlign: 'center' }}>Paid</th>
+                  <th style={{ textAlign: 'center' }}>Balance</th>
                   <th style={{ textAlign: 'center' }}>Due Date</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
                   <th style={{ textAlign: 'center' }}>Actions</th>
@@ -1192,25 +1358,9 @@ function FeeTab({ fees, onCreateFee, onUpdateFee, onPayFee, onAddFeeItem }) {
               </thead>
               <tbody>
                 {fees.map(f => (
-                  <tr key={f.id} className="hover:bg-white/30 transition-colors">
-                    <td className="text-slate-800 font-medium">#{f.studentId}</td>
-                    <td className="text-slate-500">{f.semesterName || '—'}</td>
-                    <td style={{ textAlign: 'center' }} className="font-medium">₹{Number(f.totalAmount || 0).toLocaleString()}</td>
-                    <td style={{ textAlign: 'center' }} className="font-medium">₹{Number(f.paidAmount || 0).toLocaleString()}</td>
-                    <td style={{ textAlign: 'center' }} className="text-slate-500">{f.dueDate || '—'}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <Badge variant={f.status === 'PAID' ? 'success' : f.status === 'OVERDUE' ? 'destructive' : 'warning'}>{f.status}</Badge>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      {f.status !== 'PAID' && (
-                        <Button variant="success" size="sm" onClick={() => onPayFee(f.id, { paidAmount: f.totalAmount, paymentMethod: 'CARD' })} className="px-3">
-                          <CheckCircle2 size={13} /> Pay
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
+                  <FeeRow key={f.id} fee={f} onRecordPayment={onRecordPayment} />
                 ))}
-                {fees.length === 0 && <tr><td colSpan={7} className="text-center text-slate-400 py-12">No fee records found.</td></tr>}
+                {fees.length === 0 && <tr><td colSpan={8} className="text-center text-slate-400 py-12">No fee records found.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1414,10 +1564,10 @@ export default function AdminDashboard() {
     }
   }
 
-  const onPayFee = async (id, payload) => {
+  const onRecordPayment = async (id, payload) => {
     try {
-      await api.post(`/api/admin/fees/${id}/pay`, payload)
-      showMsg('Fee payment recorded')
+      await api.post(`/api/admin/fees/${id}/payments`, payload)
+      showMsg('Payment recorded and receipt generated')
       loadAll()
       return true
     } catch (err) {
@@ -1453,12 +1603,9 @@ export default function AdminDashboard() {
       case 'placements': return <PlacementsTab placementStats={placementStats} />
       case 'reports': return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} />
       case 'announcements': return <NoticesTab insights={insights} />
-      case 'aiAssistant': return <ComingSoonTab id="aiAssistant" />
-      case 'fees': return <FeeTab fees={fees} onCreateFee={onCreateFee} onUpdateFee={onUpdateFee} onPayFee={onPayFee} onAddFeeItem={onAddFeeItem} />
-      case 'hostel': return <ComingSoonTab id="hostel" />
-      case 'library': return <ComingSoonTab id="library" />
-      case 'settings': return <ComingSoonTab id="settings" />
-      case 'help': return <ComingSoonTab id="help" />
+      case 'fees': return <FeeTab fees={fees} onCreateFee={onCreateFee} onUpdateFee={onUpdateFee} onRecordPayment={onRecordPayment} onAddFeeItem={onAddFeeItem} />
+      case 'settings': return <SettingsTab showMsg={showMsg} accent="indigo" />
+      case 'help': return <HelpTab accent="indigo" />
       default: return null
     }
   }
