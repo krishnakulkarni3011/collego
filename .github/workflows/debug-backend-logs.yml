@@ -1,0 +1,20 @@
+name: Debug Backend Logs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch backend logs
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "===== CONTAINERS ====="
+            docker ps -a
+            echo "===== BACKEND LOGS (tail 300) ====="
+            docker logs collego-backend --tail 300 2>&1 || true
