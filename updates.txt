@@ -1,4 +1,27 @@
-Changes to be made
-in Admin portal:
-1.on clicking academics tab ,and upon clicking departments ,and on clicking "students" , dont just display all the students , give an option to select "select year", options must include I year , II year , III year and Final year , then upon selecting the year , students belonging to that year should be diplayed
-2.on clicking academics tab ,and upon clicking departments ,and on clicking "section",give an option to select the section(A & B in all departments) and  give an option to add ,delete and view the timetable(only one time table can exist for a section) on clicking a particular section , also list of students belonging to that section must be displayed with name of both male and female Class representatives on top 
+In Faculty Portal:
+
+I want you to remove all the seeded data and create 7 Authentic Faculties with the names 
+Prof S.R Karjol
+Dr. V.B Pagi
+Dr. Vilas Naik
+Dr. M.G Kambalimath
+Prof Shama PS
+Dr. S.V Saboji 
+Dr. G.B Chittapur 
+
+create authentic emails and passwords for each and give me there credentials to log in 
+(All of them Belong to CSE department)
+They should be able to assign themselves with their Subject for each semester 
+for example if they should be able to choose UI/UX for 5th semester and Prompt engineering for 7th sem etc , they should have full independence to choose their semester and subject , create such option
+
+
+Management of alloted sections is perfect , but While they are uploading Question Papers or Material , they should be able to select the file from locally(choose file option)
+
+Completely remove AI notice generator and Summarizer
+
+In Student Portal : 
+I want you to remove all the seeded data and create 30 Authentic Students in each year in CSE and they should be reflected in the Faculty portal aswell
+I want Students to have their University Serial Number(USN) instead of their email id, and Password they should be able to create 
+Give me the usn, names and Password of all those studnets so that i can login and check if the faculty responses are reflected in student portal
+
+I want both faculty and student credentials in a text file 

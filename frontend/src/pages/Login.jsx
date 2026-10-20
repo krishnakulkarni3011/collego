@@ -4,23 +4,26 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, ChevronRight, ChevronLeft, Eye, EyeOff,
   Mail, Lock, AlertCircle, CheckCircle2, Sparkles,
-  Shield, BookOpen, BarChart3, Zap, RefreshCw
+  Shield, BookOpen, BarChart3, Zap, RefreshCw,
+  User, IdCard, HelpCircle
 } from 'lucide-react'
 import { authService } from '../services/authService'
 import { cn } from '../lib/utils'
 import hero from '../assets/hero.png'
+import { Button } from '../components/ui/button'
 
 const ROLES = [
   {
     id: 'STUDENT',
     label: 'Student',
-    description: 'Access academic portal',
+    description: 'Login with USN',
     icon: GraduationCap,
     grad: 'from-emerald-500 to-teal-500',
     text: 'text-emerald-600',
     iconBg: 'bg-emerald-50',
     iconColor: 'text-emerald-600',
     badgeColor: 'bg-emerald-500',
+    placeholder: 'Enter your USN (e.g., 1CG24CS001)'
   },
   {
     id: 'FACULTY',
@@ -32,6 +35,7 @@ const ROLES = [
     iconBg: 'bg-violet-50',
     iconColor: 'text-violet-600',
     badgeColor: 'bg-violet-500',
+    placeholder: 'Enter your email'
   },
   {
     id: 'ADMIN',
@@ -43,6 +47,7 @@ const ROLES = [
     iconBg: 'bg-indigo-50',
     iconColor: 'text-indigo-600',
     badgeColor: 'bg-indigo-500',
+    placeholder: 'Enter your email'
   },
 ]
 
@@ -74,12 +79,12 @@ function Particles() {
 export default function Login() {
   const [step, setStep] = useState('role')
   const [selectedRole, setSelectedRole] = useState(null)
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [forgotStep, setForgotStep] = useState('email') // 'email' | 'reset' | 'success'
+  const [forgotStep, setForgotStep] = useState('email')
   const [forgotEmail, setForgotEmail] = useState('')
   const [resetToken, setResetToken] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -99,7 +104,7 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      const data = await authService.login(email, password)
+      const data = await authService.login(username, password)
       const rawRole = data?.role || data?.data?.role || data?.userRole || data?.user?.role || authService.getRole() || ''
       const returnedRole = String(rawRole).toUpperCase().replace(/^ROLE_/, '')
       const normalizedSelected = String(selectedRole || '').toUpperCase().replace(/^ROLE_/, '')
@@ -118,7 +123,7 @@ export default function Login() {
       else if (active === 'ADMIN') navigate('/admin')
       else navigate('/')
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password.')
+      setError(err.response?.data?.message || 'Invalid username/USN or password.')
     } finally {
       setLoading(false)
     }
@@ -165,15 +170,13 @@ export default function Login() {
       <div className="bg-mesh" />
       <Particles />
 
-      {/* ── Left Panel (feature showcase) ── */}
+      {/* Left Panel (feature showcase) */}
       <div className="hidden lg:flex lg:w-[47%] xl:w-1/2 flex-col relative overflow-hidden z-10">
-        {/* Soft gradient background */}
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-violet-50 to-cyan-50" />
         <div className="absolute top-0 left-0 w-72 h-72 bg-indigo-200/50 rounded-full blur-[100px] -translate-x-1/3 -translate-y-1/3" />
         <div className="absolute bottom-0 right-0 w-80 h-80 bg-violet-200/50 rounded-full blur-[100px] translate-x-1/4 translate-y-1/4" />
 
         <div className="relative flex flex-col h-full p-12 lg:p-16">
-          {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/25">
               <GraduationCap size={24} className="text-white" />
@@ -184,7 +187,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Headline */}
           <div className="flex-1 flex flex-col justify-center max-w-xl">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -202,7 +204,6 @@ export default function Login() {
               </p>
             </motion.div>
 
-            {/* Hero image */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -212,7 +213,6 @@ export default function Login() {
               <img src={hero} alt="Campus" className="w-full h-44 xl:h-52 object-cover" />
             </motion.div>
 
-            {/* Feature cards */}
             <div className="grid grid-cols-2 gap-4">
               {[
                 { icon: Sparkles, title: 'AI Insights', desc: 'Prediction & risk detection', color: 'text-violet-600', bg: 'bg-violet-100' },
@@ -242,18 +242,16 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Footer */}
           <div className="mt-8">
             <p className="text-xs text-slate-400">© {new Date().getFullYear()} Collego · AI-Powered College ERP</p>
           </div>
         </div>
       </div>
 
-      {/* ── Right Panel (login form) ── */}
+      {/* Right Panel (login form) */}
       <div className="flex-1 flex items-center justify-center p-6 relative z-10">
         <div className="w-full max-w-[440px]">
 
-          {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-3 justify-center mb-10">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/25">
               <GraduationCap size={24} className="text-white" />
@@ -261,14 +259,12 @@ export default function Login() {
             <p className="text-xl font-extrabold text-slate-900">COLLEGO</p>
           </div>
 
-          {/* Card */}
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.5 }}
             className="relative rounded-[2rem] overflow-hidden bg-white border border-white/60 shadow-2xl shadow-slate-900/5 backdrop-blur-md"
           >
-            {/* Progress bar */}
             <div className="h-1 bg-slate-100">
               <motion.div
                 className="h-full rounded-r-full"
@@ -281,7 +277,7 @@ export default function Login() {
             <div className="p-8 lg:p-10">
               <AnimatePresence mode="wait">
 
-                {/* ── STEP 1: Role Selection ── */}
+                {/* STEP 1: Role Selection */}
                 {step === 'role' && (
                   <motion.div
                     key="role"
@@ -303,7 +299,7 @@ export default function Login() {
                           <button
                             key={role.id}
                             id={`role-${role.id.toLowerCase()}`}
-                            onClick={() => { setSelectedRole(role.id); setError('') }}
+                            onClick={() => { setSelectedRole(role.id); setError(''); setUsername(''); setPassword('') }}
                             className={cn(
                               'relative flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none group',
                               isActive
@@ -376,7 +372,7 @@ export default function Login() {
                   </motion.div>
                 )}
 
-                {/* ── STEP 2: Credentials ── */}
+                {/* STEP 2: Credentials */}
                 {step === 'credentials' && (
                   <motion.div
                     key="credentials"
@@ -385,11 +381,10 @@ export default function Login() {
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.25 }}
                   >
-                    {/* Back + role badge */}
                     <div className="flex items-center gap-3 mb-8">
                       <button
                         id="btn-back-to-role"
-                        onClick={() => { setStep('role'); setError(''); setEmail(''); setPassword('') }}
+                        onClick={() => { setStep('role'); setError(''); setUsername(''); setPassword('') }}
                         className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-all"
                       >
                         <ChevronLeft size={16} />
@@ -411,25 +406,35 @@ export default function Login() {
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
-                      {/* Email */}
                       <div>
-                        <label htmlFor="login-email" className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
+                        <label htmlFor="login-username" className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                          {activeRole?.id === 'STUDENT' ? 'University Serial Number (USN)' : 'Email Address'}
+                        </label>
                         <div className="relative">
-                          <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          {activeRole?.id === 'STUDENT' ? (
+                            <IdCard size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          ) : (
+                            <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          )}
                           <input
-                            id="login-email"
-                            type="email"
-                            value={email}
-                            onChange={e => setEmail(e.target.value)}
+                            id="login-username"
+                            type="text"
+                            value={username}
+                            onChange={e => setUsername(e.target.value)}
                             className="collego-input pl-9"
-                            placeholder="you@college.edu"
+                            placeholder={activeRole?.placeholder || 'you@college.edu'}
                             required
                             autoFocus
+                            autoComplete={activeRole?.id === 'STUDENT' ? 'username' : 'email'}
                           />
                         </div>
+                        {activeRole?.id === 'STUDENT' && (
+                          <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
+                            <HelpCircle size={11} /> Format: 1CG24CS001 (Year + Branch + Number)
+                          </p>
+                        )}
                       </div>
 
-                      {/* Password */}
                       <div>
                         <label htmlFor="login-password" className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Password</label>
                         <div className="relative">
@@ -442,6 +447,7 @@ export default function Login() {
                             className="collego-input pl-9 pr-10"
                             placeholder="Enter your password"
                             required
+                            autoComplete="current-password"
                           />
                           <button
                             type="button"
@@ -643,7 +649,6 @@ export default function Login() {
             </div>
           </motion.div>
 
-          {/* Footer text */}
           <p className="text-center text-slate-400 text-xs mt-8">
             © {new Date().getFullYear()} Collego · AI-Powered College ERP
           </p>

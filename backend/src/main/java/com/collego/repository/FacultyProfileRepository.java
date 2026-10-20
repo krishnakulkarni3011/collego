@@ -11,4 +11,6 @@ public interface FacultyProfileRepository extends JpaRepository<FacultyProfile, 
     Optional<FacultyProfile> findByUserId(Long userId);
     List<FacultyProfile> findByDepartmentId(Long departmentId);
     long countByDepartmentId(Long departmentId);
+    Optional<FacultyProfile> findByEmployeeId(String employeeId);
+    List<FacultyProfile> findByDepartmentCode(String code);
 }

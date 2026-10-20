@@ -33,6 +33,39 @@ public class FacultyController {
         return ResponseEntity.ok(facultyPortalService.getAssignedSections(auth.getName()));
     }
 
+    // ==================== Faculty Subject Assignment ====================
+
+    @GetMapping("/courses")
+    public ResponseEntity<List<CourseResponse>> getAvailableCourses(Authentication auth) {
+        return ResponseEntity.ok(facultyPortalService.getAvailableCoursesForDepartment(auth.getName()));
+    }
+
+    @GetMapping("/semesters")
+    public ResponseEntity<List<SemesterResponse>> getAllSemesters(Authentication auth) {
+        return ResponseEntity.ok(facultyPortalService.getAllSemesters());
+    }
+
+    @PostMapping("/subject-assignments")
+    public ResponseEntity<FacultySubjectAssignmentResponse> assignSubjectToSelf(
+            Authentication auth,
+            @Valid @RequestBody AssignFacultySubjectRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(facultyPortalService.assignSubjectToSelf(auth.getName(), request));
+    }
+
+    @GetMapping("/subject-assignments")
+    public ResponseEntity<List<FacultySubjectAssignmentResponse>> getMySubjectAssignments(Authentication auth) {
+        return ResponseEntity.ok(facultyPortalService.getMySubjectAssignments(auth.getName()));
+    }
+
+    @DeleteMapping("/subject-assignments/{assignmentId}")
+    public ResponseEntity<Map<String, String>> removeSubjectAssignment(
+            Authentication auth,
+            @PathVariable Long assignmentId) {
+        facultyPortalService.removeSubjectAssignment(auth.getName(), assignmentId);
+        return ResponseEntity.ok(Map.of("message", "Subject assignment removed successfully"));
+    }
+
     // ==================== Attendance ====================
 
     @PostMapping("/attendance")
@@ -123,6 +156,27 @@ public class FacultyController {
                 .body(facultyPortalService.createCourseMaterial(auth.getName(), request));
     }
 
+    @PostMapping(value = "/materials/with-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CourseMaterialResponse> createCourseMaterialWithFile(
+            Authentication auth,
+            @RequestParam("title") String title,
+            @RequestParam("description") String description,
+            @RequestParam("materialType") String materialType,
+            @RequestParam("sectionId") Long sectionId,
+            @RequestParam(value = "file", required = false) MultipartFile file) throws IOException {
+
+        CreateCourseMaterialRequest request = CreateCourseMaterialRequest.builder()
+                .title(title)
+                .description(description)
+                .materialType(materialType)
+                .sectionId(sectionId)
+                .fileName(file != null ? file.getOriginalFilename() : null)
+                .build();
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(facultyPortalService.createCourseMaterialWithFile(auth.getName(), request, file));
+    }
+
     @GetMapping("/materials/{sectionId}")
     public ResponseEntity<List<CourseMaterialResponse>> getCourseMaterials(
             Authentication auth,
@@ -162,9 +216,44 @@ public class FacultyController {
                 .body(facultyPortalService.uploadQuestionPaper(auth.getName(), request));
     }
 
+    @PostMapping(value = "/question-papers/with-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<QuestionPaperResponse> uploadQuestionPaperWithFile(
+            Authentication auth,
+            @RequestParam("courseId") Long courseId,
+            @RequestParam("departmentId") Long departmentId,
+            @RequestParam("examType") String examType,
+            @RequestParam("year") Integer year,
+            @RequestParam("semesterNumber") Integer semesterNumber,
+            @RequestParam(value = "fileName", required = false) String fileName,
+            @RequestParam(value = "file", required = false) MultipartFile file) throws IOException {
+
+        CreateQuestionPaperRequest request = CreateQuestionPaperRequest.builder()
+                .courseId(courseId)
+                .departmentId(departmentId)
+                .examType(examType)
+                .year(year)
+                .semesterNumber(semesterNumber)
+                .fileName(fileName != null ? fileName : (file != null ? file.getOriginalFilename() : null))
+                .build();
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(facultyPortalService.uploadQuestionPaperWithFile(auth.getName(), request, file));
+    }
+
     @GetMapping("/question-papers")
     public ResponseEntity<List<QuestionPaperResponse>> getMyQuestionPapers(Authentication auth) {
         return ResponseEntity.ok(facultyPortalService.getMyQuestionPapers(auth.getName()));
+    }
+
+    @GetMapping("/question-papers/{questionPaperId}/file")
+    public ResponseEntity<byte[]> downloadQuestionPaperFile(
+            Authentication auth,
+            @PathVariable Long questionPaperId) throws IOException {
+        byte[] bytes = facultyPortalService.downloadQuestionPaperFile(auth.getName(), questionPaperId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(bytes);
     }
 
     // ==================== Notices ====================

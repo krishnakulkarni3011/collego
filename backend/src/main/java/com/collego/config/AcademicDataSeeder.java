@@ -42,95 +42,109 @@ public class AcademicDataSeeder implements CommandLineRunner {
 
     private final Random random = new Random(42); // Fixed seed for reproducibility
 
-    // Department definitions: name -> code
-    private static final String[][] DEPARTMENTS = {
-            {"AI & ML", "AIML"},
-            {"Automobile Engineering", "AU"},
-            {"Biotechnology", "BT"},
-            {"Civil Engineering", "CE"},
-            {"Computer Science & Engineering", "CSE"},
-            {"Electrical & Electronics Engineering", "EEE"},
-            {"Electronics & Communication Engineering", "ECE"},
-            {"Electronics & Computer Engineering", "EC"},
-            {"Industrial & Production Engineering", "IPE"},
-            {"Information Science & Engineering", "ISE"},
-            {"Mechanical Engineering", "ME"}
+    // 7 Authentic Faculty Members for CSE Department
+    private static final String[][] FACULTY_DATA = {
+            {"Prof S.R Karjol", "prof.srkarjol.cse@collego.edu", "Faculty@123", "Professor"},
+            {"Dr. V.B Pagi", "dr.vbpagi.cse@collego.edu", "Faculty@123", "Associate Professor"},
+            {"Dr. Vilas Naik", "dr.vilasnaik.cse@collego.edu", "Faculty@123", "Professor"},
+            {"Dr. M.G Kambalimath", "dr.mgkambalimath.cse@collego.edu", "Faculty@123", "Associate Professor"},
+            {"Prof Shama PS", "prof.shama.cse@collego.edu", "Faculty@123", "Assistant Professor"},
+            {"Dr. S.V Saboji", "dr.svsaboji.cse@collego.edu", "Faculty@123", "Professor"},
+            {"Dr. G.B Chittapur", "dr.gbchittapur.cse@collego.edu", "Faculty@123", "Associate Professor"}
     };
 
-    // Course names per department (generic — 6 courses each)
-    private static final Map<String, String[][]> DEPARTMENT_COURSES = new LinkedHashMap<>();
+    // CSE Courses per semester (8 semesters, 4 years)
+    private static final Map<Integer, String[][]> CSE_COURSES_BY_SEMESTER = new LinkedHashMap<>();
     static {
-        DEPARTMENT_COURSES.put("AIML", new String[][]{
-                {"Machine Learning", "AIML301", "4"}, {"Deep Learning", "AIML302", "4"},
-                {"Natural Language Processing", "AIML303", "3"}, {"Computer Vision", "AIML304", "3"},
-                {"Data Structures & Algorithms", "AIML305", "4"}, {"Mathematics for AI", "AIML306", "3"}
+        // Semester 1
+        CSE_COURSES_BY_SEMESTER.put(1, new String[][]{
+                {"Engineering Mathematics I", "CSE101", "4"},
+                {"Engineering Physics", "CSE102", "4"},
+                {"Programming in C", "CSE103", "4"},
+                {"Basic Electrical Engineering", "CSE104", "3"},
+                {"Engineering Graphics", "CSE105", "3"},
+                {"Communicative English", "CSE106", "2"}
         });
-        DEPARTMENT_COURSES.put("AU", new String[][]{
-                {"Automotive Engineering", "AU301", "4"}, {"Vehicle Dynamics", "AU302", "3"},
-                {"IC Engines", "AU303", "4"}, {"Automotive Electrical Systems", "AU304", "3"},
-                {"CAD/CAM", "AU305", "3"}, {"Engineering Mathematics III", "AU306", "4"}
+        // Semester 2
+        CSE_COURSES_BY_SEMESTER.put(2, new String[][]{
+                {"Engineering Mathematics II", "CSE201", "4"},
+                {"Engineering Chemistry", "CSE202", "4"},
+                {"Data Structures", "CSE203", "4"},
+                {"Basic Electronics", "CSE204", "3"},
+                {"Environmental Studies", "CSE205", "2"},
+                {"Professional Communication", "CSE206", "2"}
         });
-        DEPARTMENT_COURSES.put("BT", new String[][]{
-                {"Molecular Biology", "BT301", "4"}, {"Genetic Engineering", "BT302", "4"},
-                {"Biochemistry", "BT303", "3"}, {"Microbiology", "BT304", "3"},
-                {"Bioprocess Engineering", "BT305", "4"}, {"Biostatistics", "BT306", "3"}
+        // Semester 3
+        CSE_COURSES_BY_SEMESTER.put(3, new String[][]{
+                {"Engineering Mathematics III", "CSE301", "4"},
+                {"Digital Logic Design", "CSE302", "4"},
+                {"Object Oriented Programming", "CSE303", "4"},
+                {"Computer Organization", "CSE304", "3"},
+                {"Discrete Mathematics", "CSE305", "3"},
+                {"Constitution of India", "CSE306", "2"}
         });
-        DEPARTMENT_COURSES.put("CE", new String[][]{
-                {"Structural Analysis", "CE301", "4"}, {"Geotechnical Engineering", "CE302", "4"},
-                {"Fluid Mechanics", "CE303", "3"}, {"Surveying", "CE304", "3"},
-                {"Building Materials", "CE305", "3"}, {"Engineering Mathematics III", "CE306", "4"}
+        // Semester 4
+        CSE_COURSES_BY_SEMESTER.put(4, new String[][]{
+                {"Engineering Mathematics IV", "CSE401", "4"},
+                {"Database Management Systems", "CSE402", "4"},
+                {"Operating Systems", "CSE403", "4"},
+                {"Computer Networks", "CSE404", "3"},
+                {"Software Engineering", "CSE405", "3"},
+                {"Universal Human Values", "CSE406", "2"}
         });
-        DEPARTMENT_COURSES.put("CSE", new String[][]{
-                {"Data Structures & Algorithms", "CSE301", "4"}, {"Database Management Systems", "CSE302", "4"},
-                {"Operating Systems", "CSE303", "4"}, {"Computer Networks", "CSE304", "3"},
-                {"Software Engineering", "CSE305", "3"}, {"Discrete Mathematics", "CSE306", "3"}
+        // Semester 5
+        CSE_COURSES_BY_SEMESTER.put(5, new String[][]{
+                {"Web Technologies", "CSE501", "4"},
+                {"Machine Learning", "CSE502", "4"},
+                {"Compiler Design", "CSE503", "4"},
+                {"UI/UX Design", "CSE504", "3"},
+                {"Cloud Computing", "CSE505", "3"},
+                {"Professional Elective I", "CSE506", "3"}
         });
-        DEPARTMENT_COURSES.put("EEE", new String[][]{
-                {"Power Systems", "EEE301", "4"}, {"Electrical Machines", "EEE302", "4"},
-                {"Control Systems", "EEE303", "3"}, {"Digital Electronics", "EEE304", "3"},
-                {"Power Electronics", "EEE305", "4"}, {"Engineering Mathematics III", "EEE306", "3"}
+        // Semester 6
+        CSE_COURSES_BY_SEMESTER.put(6, new String[][]{
+                {"Artificial Intelligence", "CSE601", "4"},
+                {"Data Analytics", "CSE602", "4"},
+                {"Cyber Security", "CSE603", "4"},
+                {"Mobile Application Development", "CSE604", "3"},
+                {"Internet of Things", "CSE605", "3"},
+                {"Professional Elective II", "CSE606", "3"}
         });
-        DEPARTMENT_COURSES.put("ECE", new String[][]{
-                {"Analog Electronics", "ECE301", "4"}, {"Digital Signal Processing", "ECE302", "4"},
-                {"Communication Systems", "ECE303", "3"}, {"Microprocessors", "ECE304", "3"},
-                {"VLSI Design", "ECE305", "4"}, {"Electromagnetic Theory", "ECE306", "3"}
+        // Semester 7
+        CSE_COURSES_BY_SEMESTER.put(7, new String[][]{
+                {"Prompt Engineering", "CSE701", "4"},
+                {"Deep Learning", "CSE702", "4"},
+                {"Big Data Analytics", "CSE703", "4"},
+                {"DevOps", "CSE704", "3"},
+                {"Blockchain Technology", "CSE705", "3"},
+                {"Professional Elective III", "CSE706", "3"}
         });
-        DEPARTMENT_COURSES.put("EC", new String[][]{
-                {"Embedded Systems", "EC301", "4"}, {"Computer Architecture", "EC302", "4"},
-                {"Digital Communication", "EC303", "3"}, {"Microcontrollers", "EC304", "3"},
-                {"IoT Systems", "EC305", "3"}, {"Signals & Systems", "EC306", "4"}
-        });
-        DEPARTMENT_COURSES.put("IPE", new String[][]{
-                {"Operations Research", "IPE301", "4"}, {"Production Technology", "IPE302", "4"},
-                {"Quality Engineering", "IPE303", "3"}, {"Industrial Management", "IPE304", "3"},
-                {"Supply Chain Management", "IPE305", "3"}, {"Engineering Economics", "IPE306", "3"}
-        });
-        DEPARTMENT_COURSES.put("ISE", new String[][]{
-                {"Data Structures & Algorithms", "ISE301", "4"}, {"Web Technologies", "ISE302", "3"},
-                {"Cloud Computing", "ISE303", "3"}, {"Information Security", "ISE304", "4"},
-                {"Software Testing", "ISE305", "3"}, {"Discrete Mathematics", "ISE306", "3"}
-        });
-        DEPARTMENT_COURSES.put("ME", new String[][]{
-                {"Thermodynamics", "ME301", "4"}, {"Fluid Mechanics", "ME302", "4"},
-                {"Manufacturing Processes", "ME303", "3"}, {"Machine Design", "ME304", "4"},
-                {"Heat Transfer", "ME305", "3"}, {"Engineering Mathematics III", "ME306", "3"}
+        // Semester 8
+        CSE_COURSES_BY_SEMESTER.put(8, new String[][]{
+                {"Major Project", "CSE801", "8"},
+                {"Internship", "CSE802", "6"},
+                {"Seminar", "CSE803", "2"},
+                {"Comprehensive Viva", "CSE804", "2"}
         });
     }
 
-    private static final String[] FIRST_NAMES = {
+    // Student first names for variety
+    private static final String[] STUDENT_FIRST_NAMES = {
             "Aarav", "Aditi", "Aditya", "Ananya", "Arjun", "Diya", "Ishaan", "Kavya",
             "Krishna", "Meera", "Neha", "Nikhil", "Pooja", "Priya", "Rahul", "Riya",
             "Rohan", "Saanvi", "Sanya", "Shreya", "Siddharth", "Tanvi", "Varun", "Vihaan",
-            "Yash", "Akash", "Anjali", "Bhavya", "Chirag", "Divya"
+            "Yash", "Akash", "Anjali", "Bhavya", "Chirag", "Divya", "Esha", "Farhan",
+            "Gaurav", "Harsh", "Ira", "Jatin", "Kritika", "Laksh", "Maya", "Naman",
+            "Omkar", "Pranav", "Rashmi", "Samir", "Tara", "Udit", "Ved", "Zara",
+            "Aryan", "Dhruv", "Kiaan", "Mishka", "Nirvaan", "Prisha", "Reyansh", "Siya"
     };
 
-    private static final String[] LAST_NAMES = {
+    private static final String[] STUDENT_LAST_NAMES = {
             "Sharma", "Patel", "Reddy", "Kumar", "Singh", "Gupta", "Jain", "Verma",
             "Rao", "Nair", "Iyer", "Menon", "Pillai", "Das", "Chatterjee", "Bhat",
-            "Hegde", "Shetty", "Kulkarni", "Deshpande"
+            "Hegde", "Shetty", "Kulkarni", "Deshpande", "Bansal", "Agarwal", "Malhotra",
+            "Chopra", "Saxena", "Trivedi", "Shukla", "Mishra", "Dubey", "Tiwari"
     };
-
-    private static final String[] FACULTY_PREFIXES = {"Dr. ", "Prof. ", ""};
 
     @Override
     @Transactional
@@ -140,232 +154,279 @@ public class AcademicDataSeeder implements CommandLineRunner {
             return;
         }
 
-        log.info("=== Starting Academic Data Seeder ===");
+        log.info("=== Starting Academic Data Seeder for CSE Department ===");
 
-        // 1. Create departments
-        Map<String, Department> departments = seedDepartments();
+        // 1. Create CSE Department only
+        Department cseDept = seedCSEDepartment();
 
-        // 2. Create semesters
-        Semester sem2 = seedSemester("Semester 2", 2, "2025-2026",
-                LocalDate.of(2025, 8, 1), LocalDate.of(2025, 12, 31), false);
-        Semester sem3 = seedSemester("Semester 3", 3, "2025-2026",
-                LocalDate.of(2026, 1, 15), LocalDate.of(2026, 6, 30), true);
+        // 2. Create all 8 semesters
+        List<Semester> semesters = seedAllSemesters();
 
-        // 3. Create courses, faculty, students, sections, enrollments, data for each department
-        int totalStudents = 0;
-        int totalFaculty = 0;
+        // 3. Create courses for all semesters
+        Map<Integer, List<Course>> coursesBySemester = seedAllCSECourses(cseDept);
 
-        for (String[] dept : DEPARTMENTS) {
-            String deptCode = dept[1];
-            Department department = departments.get(deptCode);
-            String[][] courses = DEPARTMENT_COURSES.get(deptCode);
+        // 4. Create 7 authentic faculty members
+        List<FacultyProfile> facultyList = seedAuthenticFaculty(cseDept);
 
-            // Create courses
-            List<Course> courseList = new ArrayList<>();
-            for (String[] courseData : courses) {
-                Course course = Course.builder()
-                        .name(courseData[0])
-                        .code(courseData[1])
-                        .credits(Integer.parseInt(courseData[2]))
-                        .department(department)
-                        .description(courseData[0] + " for " + dept[0])
-                        .build();
-                courseList.add(courseRepository.save(course));
-            }
+        // 5. Create sections and assign faculty (faculty will self-assign later via portal)
+        Map<String, List<Section>> semSections = seedSectionsForAllSemesters(coursesBySemester, semesters, facultyList);
 
-            // Create faculty (1 per course = 6 faculty per dept)
-            List<FacultyProfile> facultyList = new ArrayList<>();
-            for (int i = 0; i < courseList.size(); i++) {
-                FacultyProfile faculty = createFaculty(department, deptCode, i + 1);
-                facultyList.add(faculty);
-                totalFaculty++;
-            }
+        // 6. Create 30 students per year × 4 years = 120 students
+        Map<Integer, List<StudentProfile>> studentsByYear = seedStudentsPerYear(cseDept);
 
-            // Create sections (A & B for each course for each semester)
-            Map<String, List<Section>> semSections = new HashMap<>();
+        // 7. Enroll students in sections
+        enrollStudentsInSections(studentsByYear, semSections, semesters);
 
-            for (Semester semester : List.of(sem2, sem3)) {
-                List<Section> sections = new ArrayList<>();
-                for (int i = 0; i < courseList.size(); i++) {
-                    Course course = courseList.get(i);
-                    FacultyProfile faculty = facultyList.get(i);
+        // 8. Create timetable for all semesters
+        seedTimetableForAllSections(semSections);
 
-                    for (String secName : new String[]{"A", "B"}) {
-                        Section section = Section.builder()
-                                .name(secName)
-                                .course(course)
-                                .semester(semester)
-                                .faculty(faculty)
-                                .maxCapacity(60)
-                                .build();
-                        sections.add(sectionRepository.save(section));
-                    }
-                }
-                semSections.put(semester.getId().toString(), sections);
-            }
+        // 9. Create sample attendance, marks, fees, notifications
+        seedAcademicData(semSections, studentsByYear, semesters);
 
-            // Create students (15 per section = 30 per dept)
-            List<StudentProfile> sectionAStudents = new ArrayList<>();
-            List<StudentProfile> sectionBStudents = new ArrayList<>();
-
-            for (int i = 0; i < 30; i++) {
-                String sectionName = i < 15 ? "A" : "B";
-                StudentProfile student = createStudent(department, deptCode, totalStudents + i + 1, sectionName);
-                if (sectionName.equals("A")) {
-                    sectionAStudents.add(student);
-                } else {
-                    sectionBStudents.add(student);
-                }
-            }
-            totalStudents += 30;
-
-            // Enroll students in sections
-            for (Semester semester : List.of(sem2, sem3)) {
-                List<Section> sections = semSections.get(semester.getId().toString());
-                EnrollmentStatus status = semester.isActive() ? EnrollmentStatus.ACTIVE : EnrollmentStatus.COMPLETED;
-
-                for (Section section : sections) {
-                    List<StudentProfile> studentsForSection = section.getName().equals("A") ? sectionAStudents : sectionBStudents;
-                    for (StudentProfile student : studentsForSection) {
-                        Enrollment enrollment = Enrollment.builder()
-                                .student(student)
-                                .section(section)
-                                .status(status)
-                                .build();
-                        enrollmentRepository.save(enrollment);
-                    }
-                }
-            }
-
-            // Create timetable for current semester (sem3) sections
-            List<Section> currentSections = semSections.get(sem3.getId().toString());
-            seedTimetable(currentSections);
-
-            // Create attendance for current semester sections
-            seedAttendance(currentSections, sectionAStudents, sectionBStudents);
-
-            // Create internal marks for current semester
-            seedInternalMarks(currentSections, sectionAStudents, sectionBStudents);
-
-            // Create semester marks for previous semester (sem2)
-            List<Section> prevSections = semSections.get(sem2.getId().toString());
-            seedSemesterMarks(prevSections, sectionAStudents, sectionBStudents);
-
-            // Create fees
-            seedFees(sectionAStudents, sectionBStudents, sem2, sem3);
-
-            // Create notifications
-            seedNotifications(sectionAStudents, sectionBStudents);
-
-            log.info("Seeded department: {} — {} courses, {} faculty, 30 students",
-                    dept[0], courseList.size(), facultyList.size());
-        }
-
-        // Seed placement notices (global)
-        seedPlacementNotices(departments);
+        // 10. Seed placement notices
+        seedPlacementNotices(Map.of("CSE", cseDept));
 
         log.info("=== Academic Data Seeder Complete ===");
-        log.info("Total: {} departments, {} courses, {} faculty, {} students",
-                DEPARTMENTS.length, courseRepository.count(), totalFaculty, totalStudents);
-        log.info("Sample student login: student1.cse@collego.edu / Student@123");
+        log.info("Created: 1 department (CSE), {} courses, 7 faculty, 120 students (30 per year × 4 years)",
+                courseRepository.count());
+        log.info("Sample student login: USN format 1CG24CS001 / Student@123");
     }
 
     // ==================== Seeder Helpers ====================
 
-    private Map<String, Department> seedDepartments() {
-        Map<String, Department> map = new LinkedHashMap<>();
-        for (String[] dept : DEPARTMENTS) {
-            Department existing = departmentRepository.findByCode(dept[1]).orElse(null);
-            if (existing != null) {
-                map.put(dept[1], existing);
-            } else {
-                Department department = Department.builder()
-                        .name(dept[0])
-                        .code(dept[1])
-                        .description(dept[0] + " Department")
+    private Department seedCSEDepartment() {
+        Department existing = departmentRepository.findByCode("CSE").orElse(null);
+        if (existing != null) return existing;
+
+        Department department = Department.builder()
+                .name("Computer Science & Engineering")
+                .code("CSE")
+                .description("Computer Science & Engineering Department")
+                .build();
+        return departmentRepository.save(department);
+    }
+
+    private List<Semester> seedAllSemesters() {
+        List<Semester> semesters = new ArrayList<>();
+        String academicYear = "2025-2026";
+
+        for (int i = 1; i <= 8; i++) {
+            boolean isActive = (i == 7 || i == 8); // Current active semesters
+            LocalDate start, end;
+
+            if (i % 2 == 1) { // Odd semesters (Jul-Dec)
+                start = LocalDate.of(2025, 8, 1);
+                end = LocalDate.of(2025, 12, 31);
+            } else { // Even semesters (Jan-Jun)
+                start = LocalDate.of(2026, 1, 15);
+                end = LocalDate.of(2026, 6, 30);
+            }
+
+            Semester sem = Semester.builder()
+                    .name("Semester " + i)
+                    .number(i)
+                    .academicYear(academicYear)
+                    .startDate(start)
+                    .endDate(end)
+                    .isActive(isActive)
+                    .build();
+            semesters.add(semesterRepository.save(sem));
+        }
+        return semesters;
+    }
+
+    private Map<Integer, List<Course>> seedAllCSECourses(Department cseDept) {
+        Map<Integer, List<Course>> coursesBySemester = new LinkedHashMap<>();
+
+        for (Map.Entry<Integer, String[][]> entry : CSE_COURSES_BY_SEMESTER.entrySet()) {
+            int semNum = entry.getKey();
+            String[][] coursesData = entry.getValue();
+            List<Course> courseList = new ArrayList<>();
+
+            for (String[] courseData : coursesData) {
+                Course course = Course.builder()
+                        .name(courseData[0])
+                        .code(courseData[1])
+                        .credits(Integer.parseInt(courseData[2]))
+                        .department(cseDept)
+                        .description(courseData[0] + " for CSE Semester " + semNum)
                         .build();
-                map.put(dept[1], departmentRepository.save(department));
+                courseList.add(courseRepository.save(course));
+            }
+            coursesBySemester.put(semNum, courseList);
+        }
+        return coursesBySemester;
+    }
+
+    private List<FacultyProfile> seedAuthenticFaculty(Department cseDept) {
+        List<FacultyProfile> facultyList = new ArrayList<>();
+
+        for (int i = 0; i < FACULTY_DATA.length; i++) {
+            String[] f = FACULTY_DATA[i];
+            String name = f[0];
+            String email = f[1];
+            String password = f[2];
+            String designation = f[3];
+
+            String[] nameParts = name.split(" ", 2);
+            String firstName = nameParts[0];
+            String lastName = nameParts.length > 1 ? nameParts[1] : "";
+
+            User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+            if (user == null) {
+                user = User.builder()
+                        .email(email)
+                        .passwordHash(passwordEncoder.encode(password))
+                        .firstName(firstName)
+                        .lastName(lastName)
+                        .role(Role.FACULTY)
+                        .isActive(true)
+                        .build();
+                user = userRepository.save(user);
+                log.info("Created faculty user: {} / {}", email, password);
+            }
+
+            FacultyProfile faculty = FacultyProfile.builder()
+                    .user(user)
+                    .department(cseDept)
+                    .employeeId("FAC-CSE-" + String.format("%03d", i + 1))
+                    .designation(designation)
+                    .build();
+            facultyList.add(facultyProfileRepository.save(faculty));
+        }
+        return facultyList;
+    }
+
+    private Map<String, List<Section>> seedSectionsForAllSemesters(
+            Map<Integer, List<Course>> coursesBySemester,
+            List<Semester> semesters,
+            List<FacultyProfile> facultyList) {
+
+        Map<String, List<Section>> semSections = new HashMap<>();
+
+        for (Semester semester : semesters) {
+            int semNum = semester.getNumber();
+            List<Course> courses = coursesBySemester.get(semNum);
+            if (courses == null) continue;
+
+            List<Section> sections = new ArrayList<>();
+            for (int i = 0; i < courses.size(); i++) {
+                Course course = courses.get(i);
+                // Create Section A and B for each course
+                for (String secName : new String[]{"A", "B"}) {
+                    Section section = Section.builder()
+                            .name(secName)
+                            .course(course)
+                            .semester(semester)
+                            .faculty(null) // Faculty will self-assign via portal
+                            .maxCapacity(60)
+                            .build();
+                    sections.add(sectionRepository.save(section));
+                }
+            }
+            semSections.put(semester.getId().toString(), sections);
+        }
+        return semSections;
+    }
+
+    private Map<Integer, List<StudentProfile>> seedStudentsPerYear(Department cseDept) {
+        Map<Integer, List<StudentProfile>> studentsByYear = new HashMap<>();
+        int globalIndex = 0;
+
+        for (int year = 1; year <= 4; year++) {
+            List<StudentProfile> yearStudents = new ArrayList<>();
+            for (int i = 0; i < 30; i++) {
+                String firstName = STUDENT_FIRST_NAMES[(globalIndex + i) % STUDENT_FIRST_NAMES.length];
+                String lastName = STUDENT_LAST_NAMES[(globalIndex + i) % STUDENT_LAST_NAMES.length];
+                // USN format: 1CG + 24 (admission year) + CS + 3-digit number
+                String usn = String.format("1CG24CS%03d", globalIndex + i + 1);
+                String email = "student" + (globalIndex + i + 1) + ".cse@collego.edu";
+
+                User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+                if (user == null) {
+                    user = User.builder()
+                            .email(email)
+                            .passwordHash(passwordEncoder.encode("Student@123"))
+                            .firstName(firstName)
+                            .lastName(lastName)
+                            .role(Role.STUDENT)
+                            .isActive(true)
+                            .build();
+                    user = userRepository.save(user);
+                }
+
+                // Students in year 1: sem 1-2, year 2: sem 3-4, year 3: sem 5-6, year 4: sem 7-8
+                int currentSemester = (year - 1) * 2 + 1; // Current odd semester
+                String section = (i < 15) ? "A" : "B";
+
+                StudentProfile student = StudentProfile.builder()
+                        .user(user)
+                        .department(cseDept)
+                        .enrollmentNumber(usn) // USN stored as enrollmentNumber
+                        .semester(currentSemester)
+                        .section(section)
+                        .admissionYear(2024)
+                        .build();
+                yearStudents.add(studentProfileRepository.save(student));
+            }
+            studentsByYear.put(year, yearStudents);
+            globalIndex += 30;
+        }
+        return studentsByYear;
+    }
+
+    private void enrollStudentsInSections(
+            Map<Integer, List<StudentProfile>> studentsByYear,
+            Map<String, List<Section>> semSections,
+            List<Semester> semesters) {
+
+        for (int year = 1; year <= 4; year++) {
+            List<StudentProfile> yearStudents = studentsByYear.get(year);
+            List<StudentProfile> sectionAStudents = new ArrayList<>();
+            List<StudentProfile> sectionBStudents = new ArrayList<>();
+
+            for (StudentProfile s : yearStudents) {
+                if (s.getSection().equals("A")) sectionAStudents.add(s);
+                else sectionBStudents.add(s);
+            }
+
+            // Year 1 -> Sem 1,2; Year 2 -> Sem 3,4; Year 3 -> Sem 5,6; Year 4 -> Sem 7,8
+            int sem1Index = (year - 1) * 2;
+            int sem2Index = sem1Index + 1;
+
+            if (sem1Index < semesters.size()) {
+                enrollStudentsInSemesterSections(semSections, semesters.get(sem1Index), sectionAStudents, sectionBStudents, EnrollmentStatus.ACTIVE);
+            }
+            if (sem2Index < semesters.size()) {
+                enrollStudentsInSemesterSections(semSections, semesters.get(sem2Index), sectionAStudents, sectionBStudents, EnrollmentStatus.ACTIVE);
             }
         }
-        return map;
     }
 
-    private Semester seedSemester(String name, int number, String academicYear, LocalDate start, LocalDate end, boolean active) {
-        return semesterRepository.findByNumberAndAcademicYear(number, academicYear)
-                .orElseGet(() -> {
-                    Semester sem = Semester.builder()
-                            .name(name)
-                            .number(number)
-                            .academicYear(academicYear)
-                            .startDate(start)
-                            .endDate(end)
-                            .isActive(active)
-                            .build();
-                    return semesterRepository.save(sem);
-                });
-    }
+    private void enrollStudentsInSemesterSections(
+            Map<String, List<Section>> semSections,
+            Semester semester,
+            List<StudentProfile> sectionAStudents,
+            List<StudentProfile> sectionBStudents,
+            EnrollmentStatus status) {
 
-    private FacultyProfile createFaculty(Department department, String deptCode, int index) {
-        String prefix = FACULTY_PREFIXES[random.nextInt(FACULTY_PREFIXES.length)];
-        String firstName = prefix + FIRST_NAMES[random.nextInt(FIRST_NAMES.length)];
-        String lastName = LAST_NAMES[random.nextInt(LAST_NAMES.length)];
-        String email = "faculty" + index + "." + deptCode.toLowerCase() + "@collego.edu";
+        List<Section> sections = semSections.get(semester.getId().toString());
+        if (sections == null) return;
 
-        // Avoid duplicate email collision with DataSeeder (which seeds faculty1.cse@collego.edu)
-        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
-        if (user == null) {
-            user = User.builder()
-                    .email(email)
-                    .passwordHash(passwordEncoder.encode("Faculty@123"))
-                    .firstName(firstName)
-                    .lastName(lastName)
-                    .role(Role.FACULTY)
-                    .isActive(true)
-                    .build();
-            user = userRepository.save(user);
+        for (Section section : sections) {
+            List<StudentProfile> studentsForSection = section.getName().equals("A") ? sectionAStudents : sectionBStudents;
+            for (StudentProfile student : studentsForSection) {
+                Enrollment enrollment = Enrollment.builder()
+                        .student(student)
+                        .section(section)
+                        .status(status)
+                        .build();
+                enrollmentRepository.save(enrollment);
+            }
         }
-
-        FacultyProfile faculty = FacultyProfile.builder()
-                .user(user)
-                .department(department)
-                .employeeId("FAC-" + deptCode + "-" + String.format("%03d", index))
-                .designation(random.nextBoolean() ? "Assistant Professor" : "Associate Professor")
-                .build();
-        return facultyProfileRepository.save(faculty);
     }
 
-    private StudentProfile createStudent(Department department, String deptCode, int globalIndex, String section) {
-        int localIndex = ((globalIndex - 1) % 30) + 1;
-        String firstName = FIRST_NAMES[globalIndex % FIRST_NAMES.length];
-        String lastName = LAST_NAMES[globalIndex % LAST_NAMES.length];
-        String email = "student" + localIndex + "." + deptCode.toLowerCase() + "@collego.edu";
-
-        // Avoid duplicate email collision with DataSeeder (which seeds student1.cse@collego.edu)
-        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
-        if (user == null) {
-            user = User.builder()
-                    .email(email)
-                    .passwordHash(passwordEncoder.encode("Student@123"))
-                    .firstName(firstName)
-                    .lastName(lastName)
-                    .role(Role.STUDENT)
-                    .isActive(true)
-                    .build();
-            user = userRepository.save(user);
-        }
-
-        StudentProfile student = StudentProfile.builder()
-                .user(user)
-                .department(department)
-                .enrollmentNumber("1CG" + deptCode + String.format("%03d", globalIndex))
-                .semester(3) // Current semester
-                .section(section)
-                .admissionYear(2024)
-                .build();
-        return studentProfileRepository.save(student);
-    }
-
-    private void seedTimetable(List<Section> sections) {
+    private void seedTimetableForAllSections(Map<String, List<Section>> semSections) {
         LocalTime[] startTimes = {
                 LocalTime.of(9, 0), LocalTime.of(10, 0), LocalTime.of(11, 0),
                 LocalTime.of(12, 0), LocalTime.of(14, 0), LocalTime.of(15, 0)
@@ -375,31 +436,107 @@ public class AcademicDataSeeder implements CommandLineRunner {
                 LocalTime.of(12, 50), LocalTime.of(14, 50), LocalTime.of(15, 50)
         };
 
-        // Group sections by section name (A or B) — each section name group gets its own timetable
-        Map<String, List<Section>> sectionsByName = new HashMap<>();
-        for (Section section : sections) {
-            sectionsByName.computeIfAbsent(section.getName(), k -> new ArrayList<>()).add(section);
-        }
+        for (List<Section> sections : semSections.values()) {
+            Map<String, List<Section>> sectionsByName = new HashMap<>();
+            for (Section section : sections) {
+                sectionsByName.computeIfAbsent(section.getName(), k -> new ArrayList<>()).add(section);
+            }
 
-        for (Map.Entry<String, List<Section>> entry : sectionsByName.entrySet()) {
-            List<Section> secs = entry.getValue();
-            int roomBase = entry.getKey().equals("A") ? 100 : 200;
+            for (Map.Entry<String, List<Section>> entry : sectionsByName.entrySet()) {
+                List<Section> secs = entry.getValue();
+                int roomBase = entry.getKey().equals("A") ? 100 : 200;
 
-            for (DayOfWeekEnum day : DayOfWeekEnum.values()) {
-                // Assign 6 periods per day — one per course (shuffled)
-                List<Section> shuffled = new ArrayList<>(secs);
-                Collections.shuffle(shuffled, random);
-                for (int i = 0; i < Math.min(shuffled.size(), startTimes.length); i++) {
-                    TimetableSlot slot = TimetableSlot.builder()
-                            .section(shuffled.get(i))
-                            .dayOfWeek(day)
-                            .startTime(startTimes[i])
-                            .endTime(endTimes[i])
-                            .roomNumber("Room " + (roomBase + i + 1))
-                            .build();
-                    timetableSlotRepository.save(slot);
+                for (DayOfWeekEnum day : DayOfWeekEnum.values()) {
+                    List<Section> shuffled = new ArrayList<>(secs);
+                    Collections.shuffle(shuffled, random);
+                    for (int i = 0; i < Math.min(shuffled.size(), startTimes.length); i++) {
+                        TimetableSlot slot = TimetableSlot.builder()
+                                .section(shuffled.get(i))
+                                .dayOfWeek(day)
+                                .startTime(startTimes[i])
+                                .endTime(endTimes[i])
+                                .roomNumber("Room " + (roomBase + i + 1))
+                                .build();
+                        timetableSlotRepository.save(slot);
+                    }
                 }
             }
+        }
+    }
+
+    private void seedAcademicData(
+            Map<String, List<Section>> semSections,
+            Map<Integer, List<StudentProfile>> studentsByYear,
+            List<Semester> semesters) {
+
+        // Collect all students
+        List<StudentProfile> allStudents = new ArrayList<>();
+        for (List<StudentProfile> list : studentsByYear.values()) {
+            allStudents.addAll(list);
+        }
+
+        // For current active semesters (7, 8), create attendance and internal marks
+        for (Semester semester : semesters) {
+            if (!semester.isActive()) continue;
+
+            List<Section> sections = semSections.get(semester.getId().toString());
+            if (sections == null) continue;
+
+            // Split students by section for this semester
+            List<StudentProfile> sectionAStudents = new ArrayList<>();
+            List<StudentProfile> sectionBStudents = new ArrayList<>();
+            for (StudentProfile s : allStudents) {
+                if (s.getSemester() == semester.getNumber()) {
+                    if (s.getSection().equals("A")) sectionAStudents.add(s);
+                    else sectionBStudents.add(s);
+                }
+            }
+
+            seedAttendance(sections, sectionAStudents, sectionBStudents);
+            seedInternalMarks(sections, sectionAStudents, sectionBStudents);
+        }
+
+        // For completed semesters, create semester marks
+        for (Semester semester : semesters) {
+            if (semester.isActive()) continue;
+
+            List<Section> sections = semSections.get(semester.getId().toString());
+            if (sections == null) continue;
+
+            List<StudentProfile> sectionAStudents = new ArrayList<>();
+            List<StudentProfile> sectionBStudents = new ArrayList<>();
+            for (StudentProfile s : allStudents) {
+                if (s.getSemester() <= semester.getNumber()) {
+                    if (s.getSection().equals("A")) sectionAStudents.add(s);
+                    else sectionBStudents.add(s);
+                }
+            }
+
+            seedSemesterMarks(sections, sectionAStudents, sectionBStudents);
+        }
+
+        // Seed fees for all students
+        for (List<StudentProfile> yearStudents : studentsByYear.values()) {
+            List<StudentProfile> sectionAStudents = new ArrayList<>();
+            List<StudentProfile> sectionBStudents = new ArrayList<>();
+            for (StudentProfile s : yearStudents) {
+                if (s.getSection().equals("A")) sectionAStudents.add(s);
+                else sectionBStudents.add(s);
+            }
+            for (Semester semester : semesters) {
+                seedFees(sectionAStudents, sectionBStudents, semester);
+            }
+        }
+
+        // Seed notifications
+        for (List<StudentProfile> yearStudents : studentsByYear.values()) {
+            List<StudentProfile> sectionAStudents = new ArrayList<>();
+            List<StudentProfile> sectionBStudents = new ArrayList<>();
+            for (StudentProfile s : yearStudents) {
+                if (s.getSection().equals("A")) sectionAStudents.add(s);
+                else sectionBStudents.add(s);
+            }
+            seedNotifications(sectionAStudents, sectionBStudents);
         }
     }
 
@@ -410,12 +547,10 @@ public class AcademicDataSeeder implements CommandLineRunner {
         for (Section section : sections) {
             List<StudentProfile> students = section.getName().equals("A") ? sectionA : sectionB;
 
-            // Generate attendance for working days in last 30 days
             LocalDate date = startDate;
             while (!date.isAfter(today)) {
-                if (date.getDayOfWeek().getValue() <= 6 && date.getDayOfWeek().getValue() >= 1) { // MON-SAT
+                if (date.getDayOfWeek().getValue() <= 6 && date.getDayOfWeek().getValue() >= 1) {
                     for (StudentProfile student : students) {
-                        // ~80% attendance rate
                         AttendanceStatus status = random.nextDouble() < 0.80
                                 ? AttendanceStatus.PRESENT : AttendanceStatus.ABSENT;
 
@@ -439,7 +574,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
 
             for (StudentProfile student : students) {
                 // IA-1
-                double ia1Marks = 20 + random.nextDouble() * 30; // 20-50 out of 50
+                double ia1Marks = 20 + random.nextDouble() * 30;
                 InternalMarks ia1 = InternalMarks.builder()
                         .student(student)
                         .section(section)
@@ -468,9 +603,9 @@ public class AcademicDataSeeder implements CommandLineRunner {
             List<StudentProfile> students = section.getName().equals("A") ? sectionA : sectionB;
 
             for (StudentProfile student : students) {
-                double obtainedMarks = 35 + random.nextDouble() * 65; // 35-100 out of 100
+                double obtainedMarks = 35 + random.nextDouble() * 65;
                 obtainedMarks = Math.round(obtainedMarks * 10.0) / 10.0;
-                double percentage = obtainedMarks; // max is 100
+                double percentage = obtainedMarks;
                 String grade = Grade.calculateGrade(percentage);
                 double gradePoints = Grade.calculateGradePoints(percentage);
 
@@ -487,18 +622,14 @@ public class AcademicDataSeeder implements CommandLineRunner {
         }
     }
 
-    private void seedFees(List<StudentProfile> sectionA, List<StudentProfile> sectionB,
-                          Semester sem2, Semester sem3) {
+    private void seedFees(List<StudentProfile> sectionA, List<StudentProfile> sectionB, Semester semester) {
         List<StudentProfile> allStudents = new ArrayList<>();
         allStudents.addAll(sectionA);
         allStudents.addAll(sectionB);
 
         for (StudentProfile student : allStudents) {
-            // Fee for previous semester (paid)
-            createFee(student, sem2, FeeStatus.PAID);
-            // Fee for current semester (mix of paid and pending)
-            FeeStatus currentStatus = random.nextDouble() < 0.7 ? FeeStatus.PAID : FeeStatus.PENDING;
-            createFee(student, sem3, currentStatus);
+            FeeStatus status = random.nextDouble() < 0.7 ? FeeStatus.PAID : FeeStatus.PENDING;
+            createFee(student, semester, status);
         }
     }
 
@@ -522,7 +653,6 @@ public class AcademicDataSeeder implements CommandLineRunner {
                 .build();
         fee = feeRepository.save(fee);
 
-        // Add line items
         List<FeeItem> items = List.of(
                 FeeItem.builder().fee(fee).category(FeeCategory.ACADEMIC).description("Tuition Fee").amount(tuition).build(),
                 FeeItem.builder().fee(fee).category(FeeCategory.ACADEMIC).description("Laboratory Fee").amount(labFee).build(),
@@ -536,7 +666,6 @@ public class AcademicDataSeeder implements CommandLineRunner {
     private void seedPlacementNotices(Map<String, Department> departments) {
         User admin = userRepository.findByEmail("admin@collego.edu").orElse(null);
 
-        // Global notices (all departments)
         createPlacementNotice("Software Engineer — Google", "Google", null, admin,
                 "Google is hiring for the role of Software Engineer (L3). Open to all engineering branches.",
                 "CGPA >= 7.0, No active backlogs", "₹25-40 LPA", LocalDate.now().plusDays(15));
@@ -549,9 +678,8 @@ public class AcademicDataSeeder implements CommandLineRunner {
                 "Amazon Summer Internship 2026. 6-month internship with PPO opportunity.",
                 "CGPA >= 6.5, Proficiency in DSA", "₹60,000/month + benefits", LocalDate.now().plusDays(10));
 
-        // Department-specific notices
         createPlacementNotice("ML Engineer — Microsoft", "Microsoft",
-                departments.get("AIML"), admin,
+                departments.get("CSE"), admin,
                 "Microsoft AI division is hiring ML Engineers.",
                 "CGPA >= 8.0, Experience with ML frameworks", "₹30-45 LPA", LocalDate.now().plusDays(25));
 
@@ -560,12 +688,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
                 "Cisco is hiring network engineers for their R&D center.",
                 "CGPA >= 7.0, Networking fundamentals", "₹15-20 LPA", LocalDate.now().plusDays(18));
 
-        createPlacementNotice("Design Engineer — Tata Motors", "Tata Motors",
-                departments.get("ME"), admin,
-                "Tata Motors is hiring mechanical design engineers.",
-                "CGPA >= 6.5, CAD/CAM skills preferred", "₹8-12 LPA", LocalDate.now().plusDays(12));
-
-        log.info("Seeded {} placement notices", 6);
+        log.info("Seeded 5 placement notices");
     }
 
     private void createPlacementNotice(String title, String company, Department dept, User postedBy,
@@ -590,15 +713,14 @@ public class AcademicDataSeeder implements CommandLineRunner {
         allStudents.addAll(sectionB);
 
         String[][] notifications = {
-                {"Welcome to Semester 3!", "Your Semester 3 classes have started. Check your timetable for schedule details.", "ACADEMIC"},
+                {"Welcome to New Semester!", "Your semester classes have started. Check your timetable for schedule details.", "ACADEMIC"},
                 {"IA-1 Marks Published", "Internal Assessment 1 marks have been published. Check your marks section.", "ACADEMIC"},
-                {"Fee Payment Reminder", "Your Semester 3 fee payment is due. Please clear your dues before the deadline.", "FEE"},
-                {"New Placement Drive", "Google is visiting campus on " + LocalDate.now().plusDays(15) + ". Check placement notices for details.", "PLACEMENT"},
+                {"Fee Payment Reminder", "Your semester fee payment is due. Please clear your dues before the deadline.", "FEE"},
+                {"New Placement Drive", "Google is visiting campus soon. Check placement notices for details.", "PLACEMENT"},
                 {"Library Book Due", "You have library books due for return. Please return them to avoid fines.", "GENERAL"}
         };
 
         for (StudentProfile student : allStudents) {
-            // Each student gets 3-5 random notifications
             int numNotifications = 3 + random.nextInt(3);
             List<String[]> shuffled = new ArrayList<>(Arrays.asList(notifications));
             Collections.shuffle(shuffled, random);

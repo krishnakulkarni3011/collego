@@ -12,4 +12,5 @@ public interface SemesterRepository extends JpaRepository<Semester, Long> {
     Optional<Semester> findByNumberAndAcademicYear(Integer number, String academicYear);
     boolean existsByNumberAndAcademicYear(Integer number, String academicYear);
     List<Semester> findAllByOrderByNumberDesc();
+    List<Semester> findAllByOrderByNumberAsc();
 }

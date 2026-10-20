@@ -37,6 +37,8 @@ public class FacultyPortalService {
     private final NotificationRepository notificationRepository;
     private final CourseRepository courseRepository;
     private final DepartmentRepository departmentRepository;
+    private final SemesterRepository semesterRepository;
+    private final FacultySubjectAssignmentRepository facultySubjectAssignmentRepository;
     private final QuestionPaperService questionPaperService;
     private final S3StorageService s3StorageService;
 
@@ -45,6 +47,9 @@ public class FacultyPortalService {
 
     @Value("${collego.aws.s3-bucket-materials:collego-materials-prod}")
     private String materialBucket;
+
+    @Value("${collego.aws.s3-bucket-question-papers:collego-question-papers-prod}")
+    private String questionPaperBucket;
 
     /** Phase 8/9: URL of the AI microservice; blank = AI features disabled */
     @Value("${collego.ai-service.url:http://collego-ai-service:8000}")
@@ -715,6 +720,210 @@ public class FacultyPortalService {
                 .build();
     }
 
+    // ==================== Faculty Subject Assignment ====================
+
+    @Transactional
+    public FacultySubjectAssignmentResponse assignSubjectToSelf(String email, AssignFacultySubjectRequest request) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+
+        Course course = courseRepository.findById(request.getCourseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found: " + request.getCourseId()));
+
+        Semester semester = semesterRepository.findById(request.getSemesterId())
+                .orElseThrow(() -> new ResourceNotFoundException("Semester not found: " + request.getSemesterId()));
+
+        // Check if already assigned
+        Optional<FacultySubjectAssignment> existing = facultySubjectAssignmentRepository
+                .findByFacultyIdAndCourseIdAndSemesterId(faculty.getId(), course.getId(), semester.getId());
+
+        FacultySubjectAssignment assignment;
+        if (existing.isPresent()) {
+            assignment = existing.get();
+            assignment.setActive(true);
+            assignment = facultySubjectAssignmentRepository.save(assignment);
+        } else {
+            assignment = FacultySubjectAssignment.builder()
+                    .faculty(faculty)
+                    .course(course)
+                    .semester(semester)
+                    .isActive(true)
+                    .build();
+            assignment = facultySubjectAssignmentRepository.save(assignment);
+        }
+
+        log.info("Faculty {} assigned to course {} for semester {}", email, course.getName(), semester.getName());
+
+        return mapSubjectAssignmentToResponse(assignment);
+    }
+
+    @Transactional
+    public void removeSubjectAssignment(String email, Long assignmentId) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        FacultySubjectAssignment assignment = facultySubjectAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
+
+        if (!assignment.getFaculty().getId().equals(faculty.getId())) {
+            throw new BadRequestException("You are not authorized to remove this assignment");
+        }
+
+        assignment.setActive(false);
+        facultySubjectAssignmentRepository.save(assignment);
+
+        log.info("Faculty {} removed subject assignment {}", email, assignmentId);
+    }
+
+    public List<FacultySubjectAssignmentResponse> getMySubjectAssignments(String email) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        return facultySubjectAssignmentRepository.findByFacultyIdAndIsActiveTrue(faculty.getId())
+                .stream()
+                .map(this::mapSubjectAssignmentToResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<CourseResponse> getAvailableCoursesForDepartment(String email) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        return courseRepository.findByDepartmentId(faculty.getDepartment().getId())
+                .stream()
+                .map(this::mapCourseToResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<SemesterResponse> getAllSemesters() {
+        return semesterRepository.findAllByOrderByNumberAsc()
+                .stream()
+                .map(this::mapSemesterToResponse)
+                .collect(Collectors.toList());
+    }
+
+    private CourseResponse mapCourseToResponse(Course c) {
+        return CourseResponse.builder()
+                .id(c.getId())
+                .name(c.getName())
+                .code(c.getCode())
+                .credits(c.getCredits())
+                .departmentId(c.getDepartment() != null ? c.getDepartment().getId() : null)
+                .departmentName(c.getDepartment() != null ? c.getDepartment().getName() : null)
+                .description(c.getDescription())
+                .createdAt(c.getCreatedAt())
+                .build();
+    }
+
+    private SemesterResponse mapSemesterToResponse(Semester s) {
+        return SemesterResponse.builder()
+                .id(s.getId())
+                .name(s.getName())
+                .number(s.getNumber())
+                .academicYear(s.getAcademicYear())
+                .startDate(s.getStartDate())
+                .endDate(s.getEndDate())
+                .active(s.isActive())
+                .createdAt(s.getCreatedAt())
+                .build();
+    }
+
+    // ==================== Question Papers with File Upload ====================
+
+    @Transactional
+    public QuestionPaperResponse uploadQuestionPaperWithFile(String email, CreateQuestionPaperRequest request, MultipartFile file) throws IOException {
+        User facultyUser = getUserByEmail(email);
+
+        Course course = courseRepository.findById(request.getCourseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found: " + request.getCourseId()));
+
+        Department department = departmentRepository.findById(request.getDepartmentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found: " + request.getDepartmentId()));
+
+        QuestionPaper qp = QuestionPaper.builder()
+                .course(course)
+                .department(department)
+                .examType(request.getExamType().toUpperCase())
+                .year(request.getYear())
+                .semesterNumber(request.getSemesterNumber())
+                .fileName(request.getFileName())
+                .status("PENDING")
+                .uploadedBy(facultyUser)
+                .build();
+
+        qp = questionPaperRepository.save(qp);
+
+        // Upload file to S3 if provided
+        if (file != null && !file.isEmpty()) {
+            String uniqueName = java.util.UUID.randomUUID() + "_" + sanitizeFilename(file.getOriginalFilename());
+            String s3Key = course.getId() + "/" + qp.getId() + "/" + uniqueName;
+
+            s3StorageService.upload(questionPaperBucket, s3Key, file.getInputStream(),
+                    file.getSize(), S3StorageService.detectContentType(file.getOriginalFilename()));
+
+            qp.setFilePath(s3Key);
+            qp.setFileName(file.getOriginalFilename() != null ? file.getOriginalFilename() : uniqueName);
+            qp = questionPaperRepository.save(qp);
+        }
+
+        log.info("Faculty {} uploaded question paper for {} ({})", email, course.getName(), request.getExamType());
+
+        return mapQuestionPaperToResponse(qp);
+    }
+
+    public byte[] downloadQuestionPaperFile(String email, Long questionPaperId) throws IOException {
+        User user = getUserByEmail(email);
+        QuestionPaper qp = questionPaperRepository.findById(questionPaperId)
+                .orElseThrow(() -> new ResourceNotFoundException("Question paper not found: " + questionPaperId));
+
+        if (!qp.getUploadedBy().getId().equals(user.getId())) {
+            throw new BadRequestException("You are not authorized to download this question paper");
+        }
+
+        if (qp.getFilePath() == null || qp.getFilePath().isBlank()) {
+            throw new BadRequestException("No file attached to this question paper");
+        }
+        return s3StorageService.download(questionPaperBucket, qp.getFilePath());
+    }
+
+    // ==================== Course Materials with File Upload ====================
+
+    @Transactional
+    public CourseMaterialResponse createCourseMaterialWithFile(String email, CreateCourseMaterialRequest request, MultipartFile file) throws IOException {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        User facultyUser = faculty.getUser();
+
+        Section section = sectionRepository.findById(request.getSectionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + request.getSectionId()));
+        validateFacultyOwnsSection(faculty, section);
+
+        CourseMaterial material = CourseMaterial.builder()
+                .section(section)
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .materialType(request.getMaterialType().toUpperCase())
+                .fileName(request.getFileName())
+                .uploadedBy(facultyUser)
+                .build();
+
+        material = courseMaterialRepository.save(material);
+
+        // Upload file to S3 if provided
+        if (file != null && !file.isEmpty()) {
+            String uniqueName = java.util.UUID.randomUUID() + "_" + sanitizeFilename(file.getOriginalFilename());
+            String s3Key = section.getId() + "/" + material.getId() + "/" + uniqueName;
+
+            // Replace existing file in S3 if one is already stored
+            if (material.getFilePath() != null && !material.getFilePath().isBlank()) {
+                s3StorageService.delete(materialBucket, material.getFilePath());
+            }
+
+            s3StorageService.upload(materialBucket, s3Key, file.getInputStream(),
+                    file.getSize(), S3StorageService.detectContentType(file.getOriginalFilename()));
+
+            material.setFilePath(s3Key);
+            material.setFileName(file.getOriginalFilename() != null ? file.getOriginalFilename() : uniqueName);
+            courseMaterialRepository.save(material);
+        }
+
+        log.info("Faculty {} created course material '{}' for section {}", email, request.getTitle(), section.getId());
+
+        return mapMaterialToResponse(material);
+    }
+
     // ==================== Helpers ====================
 
     private FacultyProfile getFacultyByEmail(String email) {
@@ -772,5 +981,21 @@ public class FacultyPortalService {
 
     private QuestionPaperResponse mapQuestionPaperToResponse(QuestionPaper qp) {
         return questionPaperService.mapToResponse(qp);
+    }
+
+    private FacultySubjectAssignmentResponse mapSubjectAssignmentToResponse(FacultySubjectAssignment a) {
+        return FacultySubjectAssignmentResponse.builder()
+                .id(a.getId())
+                .facultyId(a.getFaculty().getId())
+                .facultyName(a.getFaculty().getUser().getFirstName() + " " + a.getFaculty().getUser().getLastName())
+                .courseId(a.getCourse().getId())
+                .courseName(a.getCourse().getName())
+                .courseCode(a.getCourse().getCode())
+                .semesterId(a.getSemester().getId())
+                .semesterName(a.getSemester().getName())
+                .semesterNumber(a.getSemester().getNumber())
+                .isActive(a.isActive())
+                .createdAt(a.getCreatedAt().toString())
+                .build();
     }
 }

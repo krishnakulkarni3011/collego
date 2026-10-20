@@ -11,4 +11,6 @@ public interface StudentProfileRepository extends JpaRepository<StudentProfile, 
     Optional<StudentProfile> findByUserId(Long userId);
     List<StudentProfile> findByDepartmentId(Long departmentId);
     long countByDepartmentId(Long departmentId);
+    Optional<StudentProfile> findByEnrollmentNumber(String enrollmentNumber);
+    List<StudentProfile> findByDepartmentCodeOrderByAdmissionYearAscEnrollmentNumberAsc(String code);
 }

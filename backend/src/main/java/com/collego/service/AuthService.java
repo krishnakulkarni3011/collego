@@ -1,10 +1,10 @@
 package com.collego.service;
 
 import com.collego.dto.*;
-import com.collego.entity.User;
+import com.collego.entity.*;
 import com.collego.exception.BadRequestException;
 import com.collego.exception.UnauthorizedException;
-import com.collego.repository.UserRepository;
+import com.collego.repository.*;
 import com.collego.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +24,8 @@ import java.util.UUID;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final StudentProfileRepository studentProfileRepository;
+    private final FacultyProfileRepository facultyProfileRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
@@ -31,18 +33,42 @@ public class AuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request, String ipAddress) {
-        String cleanEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        String cleanUsername = request.getUsername() != null ? request.getUsername().trim() : "";
         String cleanPassword = request.getPassword() != null ? request.getPassword().trim() : "";
 
-        // Check if user exists and is active
-        User user = userRepository.findByEmailIgnoreCase(cleanEmail)
-                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+        User user = null;
+        String loginIdentifier = cleanUsername;
+
+        // Try to find user by email first
+        user = userRepository.findByEmailIgnoreCase(cleanUsername).orElse(null);
+
+        // If not found by email, try USN (enrollmentNumber) for students
+        if (user == null && cleanUsername.matches("1CG\\d{2}CS\\d{3}")) {
+            StudentProfile student = studentProfileRepository.findByEnrollmentNumber(cleanUsername).orElse(null);
+            if (student != null) {
+                user = student.getUser();
+                loginIdentifier = user.getEmail(); // Use email for authentication
+            }
+        }
+
+        // If still not found, try employee ID for faculty
+        if (user == null && cleanUsername.matches("FAC-[A-Z]+-\\d{3}")) {
+            FacultyProfile faculty = facultyProfileRepository.findByEmployeeId(cleanUsername).orElse(null);
+            if (faculty != null) {
+                user = faculty.getUser();
+                loginIdentifier = user.getEmail(); // Use email for authentication
+            }
+        }
+
+        if (user == null) {
+            throw new BadCredentialsException("Invalid username/email/USN or password");
+        }
 
         if (!user.isActive()) {
             throw new UnauthorizedException("Account is deactivated. Contact your administrator.");
         }
 
-        // Authenticate
+        // Authenticate using email (Spring Security uses email as principal)
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(user.getEmail(), cleanPassword)
         );

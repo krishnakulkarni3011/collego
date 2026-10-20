@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, ClipboardCheck, FileText,
   Megaphone, ChevronRight, GraduationCap, Users, BookMarked,
-  BarChart3, FolderOpen, Plus, CheckCircle2, X, Send, Sparkles,
-  ArrowLeft, Clock, Upload, Download, RefreshCw, Bot, Zap, Layers, Award,
+  BarChart3, FolderOpen, Plus, CheckCircle2, X, Send,
+  ArrowLeft, Clock, Upload, Download, RefreshCw, Zap, Layers, Award,
+  BookUser, Target
 } from 'lucide-react'
 import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -34,10 +35,9 @@ function AttBadge({ pct }) {
 // ─── Nav config ──────────────────────────────────────────────────────────────
 const GLOBAL_NAV = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'subjectAssignments', label: 'My Subject Assignments', icon: BookUser },
   { id: 'questionPapers', label: 'Question Papers', icon: FileText },
   { id: 'notices', label: 'Notices', icon: Megaphone },
-  { id: 'ai-notice-gen', label: 'AI Notice Generator', icon: Sparkles },
-  { id: 'ai-notice-summary', label: 'AI Notice Summarizer', icon: Bot },
 ]
 
 const SECTION_TABS = [
@@ -597,7 +597,7 @@ function AnalyticsTab({ analytics, loading }) {
 }
 
 // ─── Question Papers Tab ─────────────────────────────────────────────────────
-function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fileName, setFileName, selectedSectionId, setSelectedSectionId, onSubmit, papers, loading }) {
+function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fileName, setFileName, selectedSectionId, setSelectedSectionId, onSubmit, papers, loading, onUploadFile, uploadFileLoading, fileInputRef }) {
   return (
     <div className="space-y-6">
       <PageTitle icon={FileText} title="Question Papers" subtitle="Upload and track question papers for admin approval." accent="violet" />
@@ -626,8 +626,29 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
             <input value={fileName} onChange={e => setFileName(e.target.value)} placeholder="e.g., CS101_EndTerm_2026.pdf" className="collego-input" />
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !selectedSectionId}>
-          {loading ? <><RefreshCw size={13} className="animate-spin" /> Uploading...</> : <><Upload size={13} /> Submit for Approval</>}
+        <div className="mt-4">
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Question Paper File</label>
+          <div className="relative group">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="sr-only"
+              accept=".pdf,.doc,.docx"
+              onChange={e => {
+                if (e.target.files?.[0]) {
+                  const fd = new FormData()
+                  fd.append('file', e.target.files[0])
+                  onUploadFile(fd)
+                }
+              }}
+            />
+            <button type="button" className="collego-input px-4 py-2 text-[10px] text-slate-400 border border-white/60 rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-all bg-white/50 w-full text-left">
+              Choose file
+            </button>
+          </div>
+        </div>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !selectedSectionId || uploadFileLoading}>
+          {loading || uploadFileLoading ? <><RefreshCw size={13} className="animate-spin" /> Uploading...</> : <><Upload size={13} /> Submit for Approval</>}
         </Button>
       </div>
       {papers.length > 0 && (
@@ -712,142 +733,65 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, deptI
   )
 }
 
-// ─── AI Notice Generator ─────────────────────────────────────────────────────
-function AiNoticeGenTab({ prompt, setPrompt, audience, setAudience, noticeType, setNoticeType, onGenerate, result, loading, onUse }) {
+// ─── Subject Assignments Tab ─────────────────────────────────────────────────────
+function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove, selectedSemesterId, setSelectedSemesterId, courseName, setCourseName }) {
   return (
     <div className="space-y-6">
-      <PageTitle icon={Sparkles} title="AI Notice Generator" subtitle="Describe the notice briefly and AI drafts a complete, professional version." accent="violet"
-        actions={<Badge variant="purple">AI Powered</Badge>} />
+      <PageTitle icon={BookUser} title="My Subject Assignments" subtitle="Assign yourself to courses for specific semesters. You can type any course name and select the semester." accent="violet"
+        actions={<Badge variant="purple">Full Independence</Badge>} />
+
       <div className="glass-card p-6 border border-white/60">
-        <h3 className="text-sm font-semibold text-slate-800 mb-1 flex items-center gap-2"><Sparkles size={15} className="text-violet-500" /> Generate a Notice</h3>
-        <p className="text-xs text-slate-500 mb-4">The AI will create a polished notice you can send to students.</p>
-        <div className="space-y-3">
-          <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Your Prompt</label><textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={3} placeholder="e.g., 'Inform students about mid-semester exam schedule starting next week'" className="collego-input resize-none" /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Audience</label>
-              <select value={audience} onChange={e => setAudience(e.target.value)} className="collego-input">
-                {['students', 'faculty', 'all'].map(a => <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Notice Type</label>
-              <select value={noticeType} onChange={e => setNoticeType(e.target.value)} className="collego-input">
-                {['GENERAL', 'ACADEMIC', 'EXAM', 'PLACEMENT', 'FEE'].map(t => <option key={t}>{t}</option>)}
-              </select>
-            </div>
+        <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={14} className="text-violet-500" /> Assign New Subject</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Name (type any course)</label>
+            <input
+              value={courseName}
+              onChange={e => setCourseName(e.target.value)}
+              placeholder="e.g., UI/UX Design, Prompt Engineering, Machine Learning, etc."
+              className="collego-input"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Semester</label>
+            <select value={selectedSemesterId} onChange={e => setSelectedSemesterId(e.target.value)} className="collego-input !w-48">
+              <option value="">Select semester</option>
+              {semesters.map(s => <option key={s.id} value={s.id}>{s.name} ({s.academicYear})</option>)}
+            </select>
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onGenerate} disabled={loading || !prompt.trim()}>
-          {loading ? (
-            <><span className="flex gap-0.5">{[0, 1, 2].map(i => <span key={i} className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}</span> Generating...</>
-          ) : (
-            <><Sparkles size={13} /> Generate with AI</>
-          )}
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onAssign} disabled={loading || !courseName.trim() || !selectedSemesterId}>
+          {loading ? <><RefreshCw size={14} className="animate-spin" /> Assigning...</> : <><Plus size={13} /> Assign Subject</>}
         </Button>
       </div>
 
-      {result && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 border border-violet-100/50 bg-violet-50/30">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-violet-700 flex items-center gap-2"><Bot size={14} /> AI Generated Notice</h3>
-            <Button variant="gradient" size="sm" onClick={onUse} className="px-4"><CheckCircle2 size={13} /> Use this Notice</Button>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Title</p>
-              <p className="text-sm font-semibold text-slate-800 bg-white border border-white/60 px-3 py-2 rounded-xl">{result.title}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Body</p>
-              <p className="text-sm text-slate-700 bg-white border border-white/60 px-3 py-3 rounded-xl leading-relaxed whitespace-pre-wrap">{result.body}</p>
-            </div>
-            {result.summary && (
-              <div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Summary</p>
-                <p className="text-xs text-slate-500 italic">{result.summary}</p>
+      {myAssignments.length > 0 && (
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="px-5 py-4 border-b border-white/50"><h3 className="text-sm font-semibold text-slate-800">My Assigned Subjects</h3></div>
+          <div className="divide-y divide-white/30">
+            {myAssignments.map(a => (
+              <div key={a.id} className="px-5 py-4 hover:bg-white/30 transition-colors flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{a.courseName}</p>
+                  <p className="text-xs text-slate-400 mt-1">{a.courseCode}</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <Badge variant="info">{a.semesterName}</Badge>
+                  <Button variant="destructive" size="sm" onClick={() => onRemove(a.id)} className="px-3 py-1.5">
+                    <X size={12} /> Remove
+                  </Button>
+                </div>
               </div>
-            )}
+            ))}
           </div>
-        </motion.div>
-      )}
-    </div>
-  )
-}
-
-// ─── AI Notice Summarizer ─────────────────────────────────────────────────────
-function AiNoticeSummarizerTab() {
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-
-  const summarize = async () => {
-    if (!title.trim() || !content.trim()) return
-    setLoading(true)
-    try {
-      const res = await api.post('/api/ai/summarize-notice', { title, content })
-      setResult(res.data)
-    } catch { setResult(null) }
-    finally { setLoading(false) }
-  }
-
-  return (
-    <div className="space-y-6">
-      <PageTitle icon={Bot} title="AI Notice Summarizer" subtitle="Summarize long notices into key points for quick reading." accent="violet"
-        actions={<Badge variant="purple">AI Powered</Badge>} />
-      <div className="glass-card p-6 border border-white/60">
-        <div className="space-y-4">
-          <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Notice Title</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Notice title" className="collego-input" />
-          </div>
-          <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Notice Content</label>
-            <textarea value={content} onChange={e => setContent(e.target.value)} rows={6} placeholder="Paste the full notice text here..." className="collego-input resize-none" />
-          </div>
-          <Button variant="gradient" onClick={summarize} disabled={loading || !title.trim() || !content.trim()} className="w-auto px-6">
-            {loading ? (
-              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Summarizing...</span>
-            ) : (
-              <span className="flex gap-1"><Bot size={14} /> Summarize</span>
-            )}
-          </Button>
         </div>
-      </div>
-      {result && (
-        <div className="glass-card p-6 border border-white/60">
-          <h3 className="text-sm font-semibold text-slate-800 mb-4">Summary</h3>
-          <div className="space-y-3">
-            {typeof result === 'string' ? (
-              <p className="text-sm text-slate-700">{result}</p>
-            ) : (
-              <div>
-                {result.summary && (
-                  <div>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Summary</p>
-                    <p className="text-sm text-slate-700">{result.summary}</p>
-                  </div>
-                )}
-                {result.keyPoints && Array.isArray(result.keyPoints) && (
-                  <div>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Key Points</p>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-slate-700">
-                      {result.keyPoints.map((p, i) => <li key={i}>{p}</li>)}
-                    </ul>
-                  </div>
-                )}
-                {result.actionItems && Array.isArray(result.actionItems) && (
-                  <div className="mt-3">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Action Items</p>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-slate-700">
-                      {result.actionItems.map((p, i) => <li key={i}>{p}</li>)}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+      )}
+
+      {myAssignments.length === 0 && !loading && (
+        <div className="glass-card p-12 border border-white/60 text-center">
+          <BookUser size={48} className="mx-auto text-slate-300 mb-4" />
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">No subject assignments yet</h3>
+          <p className="text-xs text-slate-400">Assign yourself to courses using the form above</p>
         </div>
       )}
     </div>
@@ -892,8 +836,9 @@ export default function FacultyDashboard() {
   const [sectionMaterials, setSectionMaterials] = useState([])
   const [assignmentFileRef, setAssignmentFileRef] = useState(null)
   const [materialFileRef, setMaterialFileRef] = useState(null)
+  const [qpFileRef, setQpFileRef] = useState(null)
   const [uploadFileLoading, setUploadFileLoading] = useState(false)
-  const [uploadFileType, setUploadFileType] = useState(null) // 'assignment' | 'material'
+  const [uploadFileType, setUploadFileType] = useState(null) // 'assignment' | 'material' | 'qp'
 
   // Notices
   const [noticeTitle, setNoticeTitle] = useState('')
@@ -913,12 +858,13 @@ export default function FacultyDashboard() {
   // Analytics
   const [analytics, setAnalytics] = useState(null)
 
-  // AI Notice Gen
-  const [aiPrompt, setAiPrompt] = useState('')
-  const [aiAudience, setAiAudience] = useState('students')
-  const [aiNoticeType, setAiNoticeType] = useState('GENERAL')
-  const [aiResult, setAiResult] = useState(null)
-  const [aiLoading, setAiLoading] = useState(false)
+  // Subject Assignments
+  const [mySubjectAssignments, setMySubjectAssignments] = useState([])
+  const [availableCourses, setAvailableCourses] = useState([])
+  const [availableSemesters, setAvailableSemesters] = useState([])
+  const [selectedSemesterId, setSelectedSemesterId] = useState('')
+  const [newCourseName, setNewCourseName] = useState('')
+  const [subjectAssignmentsLoading, setSubjectAssignmentsLoading] = useState(false)
 
   const sidebarWidth = collapsed ? 76 : 248
   const showMsg = useCallback((text, type = 'success') => setMessage({ text, type }), [])
@@ -1096,6 +1042,30 @@ export default function FacultyDashboard() {
     finally { setUploadFileLoading(false); setUploadFileType(null) }
   }
 
+  const handleUploadQPFile = async (fd) => {
+    setUploadFileLoading(true)
+    setUploadFileType('qp')
+    try {
+      const sec = sections.find(s => s.sectionId === parseInt(qpSelectedSectionId))
+      if (!sec) { showMsg('Please select a course/section', 'error'); return }
+      await api.post('/api/faculty/question-papers/with-file', fd, { 
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { 
+          courseId: sec.courseId, 
+          departmentId: sec.course.departmentId || departments[0]?.id || 1, 
+          examType: qpExamType, 
+          year: parseInt(qpYear), 
+          semesterNumber: sec.semesterNumber, 
+          fileName: qpFileName || `${sec.courseCode}_${qpExamType}_${qpYear}.pdf` 
+        }
+      })
+      showMsg('Question paper uploaded (pending admin approval)')
+      setQpFileName(''); loadMyQPs()
+      if (qpFileRef.current) qpFileRef.current.value = ''
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload question paper', 'error') }
+    finally { setUploadFileLoading(false); setUploadFileType(null) }
+  }
+
   const loadMaterials = async () => {
     setTabLoading(true)
     try { const res = await api.get(`/api/faculty/materials/${selectedSection.sectionId}`); setSectionMaterials(res.data) }
@@ -1158,6 +1128,51 @@ export default function FacultyDashboard() {
     catch { /* ignore */ } finally { setTabLoading(false) }
   }
 
+  const loadAvailableCourses = async () => {
+    try { const res = await api.get('/api/faculty/courses'); setAvailableCourses(res.data) } catch { /* ignore */ }
+  }
+
+  const loadAvailableSemesters = async () => {
+    try { const res = await api.get('/api/faculty/semesters'); setAvailableSemesters(res.data) } catch { /* ignore */ }
+  }
+
+  const loadMySubjectAssignments = async () => {
+    setSubjectAssignmentsLoading(true)
+    try { const res = await api.get('/api/faculty/subject-assignments'); setMySubjectAssignments(res.data) }
+    catch { /* ignore */ } finally { setSubjectAssignmentsLoading(false) }
+  }
+
+  const handleAssignSubject = async () => {
+    if (!newCourseName.trim() || !selectedSemesterId) return
+    setSubjectAssignmentsLoading(true)
+    try {
+      await api.post('/api/faculty/subject-assignments', { courseName: newCourseName.trim(), semesterId: parseInt(selectedSemesterId) })
+      showMsg('Subject assigned successfully')
+      setNewCourseName('')
+      setSelectedSemesterId('')
+      loadMySubjectAssignments()
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to assign subject', 'error') }
+    finally { setSubjectAssignmentsLoading(false) }
+  }
+
+  const handleRemoveSubjectAssignment = async (assignmentId) => {
+    setSubjectAssignmentsLoading(true)
+    try {
+      await api.delete(`/api/faculty/subject-assignments/${assignmentId}`)
+      showMsg('Subject assignment removed')
+      loadMySubjectAssignments()
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to remove assignment', 'error') }
+    finally { setSubjectAssignmentsLoading(false) }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'subjectAssignments') {
+      loadAvailableCourses()
+      loadAvailableSemesters()
+      loadMySubjectAssignments()
+    }
+  }, [activeTab])
+
   const navSections = [
     { items: GLOBAL_NAV },
     {
@@ -1180,10 +1195,9 @@ export default function FacultyDashboard() {
     if (!selectedSection) {
       switch (activeTab) {
         case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
-        case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} />
+        case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} />
+        case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} onUploadFile={fd => handleUploadQPFile(fd)} uploadFileLoading={uploadFileLoading && uploadFileType === 'qp'} fileInputRef={qpFileRef} />
         case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} deptId={noticeDeptId} setDeptId={setNoticeDeptId} departments={departments} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
-        case 'ai-notice-gen': return <AiNoticeGenTab prompt={aiPrompt} setPrompt={setAiPrompt} audience={aiAudience} setAudience={setAiAudience} noticeType={aiNoticeType} setNoticeType={setAiNoticeType} onGenerate={handleAiGenerateNotice} result={aiResult} loading={aiLoading} onUse={useAiNotice} />
-        case 'ai-notice-summary': return <AiNoticeSummarizerTab />
         default: return null
       }
     }
