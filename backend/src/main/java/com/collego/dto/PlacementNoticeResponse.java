@@ -15,7 +15,12 @@ public class PlacementNoticeResponse {
     private String description;
     private String eligibilityCriteria;
     private String packageOffered;
+    private LocalDate driveDate;
     private LocalDate lastDate;
+    private Long departmentId;
     private String departmentName;
+    private String attachmentName;
+    private boolean hasAttachment;
+    private boolean active;
     private LocalDateTime postedAt;
 }

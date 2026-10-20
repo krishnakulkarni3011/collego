@@ -31,13 +31,12 @@ public class StudentPortalService {
     private final SemesterMarksRepository semesterMarksRepository;
     private final SemesterRepository semesterRepository;
     private final TimetableSlotRepository timetableSlotRepository;
-    private final FeeRepository feeRepository;
     private final PlacementNoticeRepository placementNoticeRepository;
     private final NotificationRepository notificationRepository;
     private final AssignmentRepository assignmentRepository;
     private final AssignmentSubmissionRepository assignmentSubmissionRepository;
-    private final FeePaymentService feePaymentService;
     private final CourseMaterialRepository courseMaterialRepository;
+    private final QuestionPaperService questionPaperService;
     private final S3StorageService s3StorageService;
 
     @Value("${collego.aws.s3-bucket-assignments:collego-assignments-prod}")
@@ -323,36 +322,28 @@ public class StudentPortalService {
                 .build();
     }
 
-    // ==================== Fees ====================
+    // ==================== Question Papers ====================
 
-    public List<FeeResponse> getFees(String email) {
+    /** Approved question papers uploaded by faculty in the student's department. */
+    public List<QuestionPaperResponse> getQuestionPapers(String email) {
         StudentProfile student = getStudentByEmail(email);
-        List<Fee> fees = feeRepository.findByStudentId(student.getId());
+        if (student.getDepartment() == null) return List.of();
+        return questionPaperService.search(null, student.getDepartment().getId(), null, null, null);
+    }
 
-        return fees.stream().map(fee -> {
-            List<FeeItemResponse> items = fee.getItems().stream()
-                    .map(item -> FeeItemResponse.builder()
-                            .category(item.getCategory().name())
-                            .description(item.getDescription())
-                            .amount(item.getAmount())
-                            .build())
-                    .collect(Collectors.toList());
-
-            return FeeResponse.builder()
-                    .id(fee.getId())
-                    .semesterId(fee.getSemester().getId())
-                    .semesterName(fee.getSemester().getName())
-                    .totalAmount(fee.getTotalAmount())
-                    .paidAmount(fee.getPaidAmount())
-                    .balance(fee.getTotalAmount().subtract(fee.getPaidAmount()))
-                    .dueDate(fee.getDueDate())
-                    .status(fee.getStatus().name())
-                    .paidAt(fee.getPaidAt())
-                    .transactionRef(fee.getTransactionRef())
-                    .items(items)
-                    .payments(feePaymentService.listForFee(fee.getId()))
-                    .build();
-        }).collect(Collectors.toList());
+    public byte[] downloadQuestionPaper(String email, Long questionPaperId) throws IOException {
+        StudentProfile student = getStudentByEmail(email);
+        if (student.getDepartment() == null) {
+            throw new BadRequestException("Your department has not been assigned yet.");
+        }
+        boolean visible = questionPaperService
+                .search(null, student.getDepartment().getId(), null, null, null)
+                .stream()
+                .anyMatch(qp -> qp.getId().equals(questionPaperId));
+        if (!visible) {
+            throw new ResourceNotFoundException("Question paper not found: " + questionPaperId);
+        }
+        return questionPaperService.downloadFile(questionPaperId);
     }
 
     // ==================== Placement Notices ====================
@@ -375,8 +366,13 @@ public class StudentPortalService {
                 .description(notice.getDescription())
                 .eligibilityCriteria(notice.getEligibilityCriteria())
                 .packageOffered(notice.getPackageOffered())
+                .driveDate(notice.getDriveDate())
                 .lastDate(notice.getLastDate())
+                .departmentId(notice.getDepartment() != null ? notice.getDepartment().getId() : null)
                 .departmentName(notice.getDepartment() != null ? notice.getDepartment().getName() : "All Departments")
+                .attachmentName(notice.getAttachmentName())
+                .hasAttachment(notice.getAttachmentPath() != null && !notice.getAttachmentPath().isBlank())
+                .active(notice.isActive())
                 .postedAt(notice.getPostedAt())
                 .build()).collect(Collectors.toList());
     }

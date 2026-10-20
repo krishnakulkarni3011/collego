@@ -51,7 +51,8 @@ public class QuestionPaperService {
                                               Integer semesterNumber, Integer year,
                                               String examType) {
         List<QuestionPaper> papers = questionPaperRepository
-                .searchApproved(courseId, departmentId, semesterNumber, year, examType);
+                .searchApproved(courseId, departmentId, semesterNumber, year,
+                        examType != null ? examType.toUpperCase() : null);
 
         return papers.stream()
                 .map(this::mapToResponse)

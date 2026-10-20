@@ -11,6 +11,10 @@ import java.util.List;
 public interface PlacementNoticeRepository extends JpaRepository<PlacementNotice, Long> {
     List<PlacementNotice> findByIsActiveTrueOrderByPostedAtDesc();
 
+    List<PlacementNotice> findAllByOrderByDriveDateAscPostedAtDesc();
+
+    List<PlacementNotice> findByIsActiveTrueOrderByDriveDateAsc();
+
     List<PlacementNotice> findByIsActiveTrueAndLastDateGreaterThanEqualOrderByLastDateAsc(java.time.LocalDate date);
 
     @Query("SELECT p FROM PlacementNotice p WHERE p.isActive = true AND (p.department IS NULL OR p.department.id = :departmentId) ORDER BY p.postedAt DESC")

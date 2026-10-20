@@ -7,7 +7,7 @@ import {
   TrendingUp, Download, Send, FileText,
   GraduationCap, CheckCircle2, Bot,
   Layers, Award, Wallet, ScrollText, Search, AlertTriangle, RefreshCw,
-  BookOpen, FolderOpen, Upload, Clock, Paperclip, Settings, HelpCircle,
+  BookOpen, FolderOpen, Upload, Clock, Paperclip, Settings, HelpCircle, Users,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -18,6 +18,7 @@ import api from '../services/api'
 import { downloadFile } from '../lib/download'
 import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
+import { FacultyDirectoryTab } from '../components/dashboard/FacultyDirectoryTab'
 import { ExamsStudentTab } from '../components/dashboard/ExamsStudentTab'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
@@ -54,6 +55,8 @@ const NAV_SECTIONS = [
       { id: 'marks', label: 'Marks & CGPA', icon: BookMarked },
       { id: 'assignments', label: 'Assignments', icon: BookOpen },
       { id: 'materials', label: 'Study Materials', icon: FolderOpen },
+      { id: 'questionPapers', label: 'Question Papers', icon: FileText },
+      { id: 'facultyDirectory', label: 'Faculty Directory', icon: Users },
       { id: 'exams', label: 'Examinations', icon: CalendarDays },
       { id: 'timetable', label: 'Timetable', icon: Calendar },
       { id: 'documents', label: 'Documents', icon: FileText },
@@ -62,7 +65,6 @@ const NAV_SECTIONS = [
   {
     title: 'Services',
     items: [
-      { id: 'fees', label: 'Fee Status', icon: DollarSign },
       { id: 'placements', label: 'Placements', icon: Briefcase },
       { id: 'notifications', label: 'Notifications', icon: Bell },
       { id: 'settings', label: 'Settings', icon: Settings },
@@ -108,12 +110,11 @@ function AttBadge({ pct }) {
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ profile, overall, subjects, cgpa, fees, notifications, placements, timetable, onTabChange }) {
+function OverviewTab({ profile, overall, subjects, cgpa, notifications, placements, timetable, onTabChange }) {
   const now = new Date()
   const hour = now.getHours()
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
   const unread = notifications.filter(n => !n.read).length
-  const pendingFees = fees.filter(f => f.status === 'PENDING')
   const overallPct = overall?.overallPercentage || 0
 
   const sgpaData = (cgpa?.semesters || []).map(s => ({ name: s.semesterName?.substring(0, 4) || 'Sem', v: s.sgpa || 0 }))
@@ -126,10 +127,6 @@ function OverviewTab({ profile, overall, subjects, cgpa, fees, notifications, pl
     { label: 'Current CGPA', value: cgpa?.cumulativeCgpa ?? 0, decimals: 2, icon: GraduationCap, accent: 'violet',
       sub: `${cgpa?.totalCreditsAllSemesters?.toFixed(0) ?? 0} total credits`, onClick: () => onTabChange('marks'),
       spark: <Sparkline data={sgpaData.length ? sgpaData : [{ v: 0 }]} color="#8b5cf6" />, glow: true },
-    { label: 'Fee Status', value: pendingFees.length === 0 ? 'Clear' : `${pendingFees.length} Pending`, icon: Wallet,
-      accent: pendingFees.length === 0 ? 'emerald' : 'amber',
-      sub: pendingFees.length === 0 ? 'All paid' : 'Action required', onClick: () => onTabChange('fees'),
-      spark: <Sparkline data={[{ v: 80 }, { v: 60 }, { v: 90 }]} color="#f59e0b" />, glow: true },
     { label: 'Notifications', value: unread, icon: Bell, accent: 'blue',
       sub: `${notifications.length} total`, onClick: () => onTabChange('notifications'),
       spark: <Sparkline data={[{ v: 3 }, { v: 5 }, { v: 2 }, { v: 7 }, { v: 4 }]} color="#3b82f6" />, glow: true },
@@ -137,7 +134,10 @@ function OverviewTab({ profile, overall, subjects, cgpa, fees, notifications, pl
 
   const today = DAY_ORDER[now.getDay() === 0 ? 5 : now.getDay() - 1]
   const todaySlots = (timetable?.weeklySchedule?.[today] || []).slice().sort((a, b) => a.startTime?.localeCompare(b.startTime))
-  const upcomingPlacements = (placements || []).filter(p => !p.lastDate || new Date(p.lastDate) >= new Date()).slice(0, 3)
+  const upcomingPlacements = (placements || []).filter(p => {
+    const deadline = p.lastDate || p.driveDate
+    return !deadline || new Date(deadline) >= new Date()
+  }).slice(0, 3)
 
   return (
     <div className="space-y-8">
@@ -475,360 +475,39 @@ function TimetableTab({ timetable, loading }) {
   )
 }
 
-// ─── Fees ────────────────────────────────────────────────────────────────────
-function FeesTab({ fees, loading, onPay, onDownload }) {
-  const [config, setConfig] = useState(null)
-
-  useEffect(() => {
-    api.get('/api/student/fees/payment-config')
-      .then(res => setConfig(res.data))
-      .catch(() => setConfig({ onlineEnabled: false, mode: 'disabled' }))
-  }, [])
-
-  const outstanding = fees.reduce((sum, f) => sum + Number(f.balance ?? (Number(f.totalAmount || 0) - Number(f.paidAmount || 0))), 0)
-  const paidTotal = fees.reduce((sum, f) => sum + Number(f.paidAmount || 0), 0)
-
+// ─── Placements ──────────────────────────────────────────────────────────────
+function QuestionPapersTab({ papers, onDownload }) {
   return (
     <div className="space-y-6">
-      <PageTitle icon={Wallet} title="Fees & Payments" subtitle="Pay in installments, download receipts, and track what is outstanding." accent="amber"
-        actions={<Badge variant={outstanding > 0 ? 'warning' : 'success'}>{outstanding > 0 ? 'Balance due' : 'All clear'}</Badge>} />
-
-      {fees.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard index={0} label="Outstanding" value={outstanding} prefix="₹" icon={Wallet} accent={outstanding > 0 ? 'amber' : 'emerald'} sub="Across all semesters" glow />
-          <StatCard index={1} label="Paid so far" value={paidTotal} prefix="₹" icon={CheckCircle2} accent="emerald" glow />
-          <StatCard index={2} label="Fully paid" value={fees.filter(f => f.status === 'PAID').length} icon={ScrollText} accent="blue" sub={`of ${fees.length} records`} glow />
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex items-center justify-center py-16"><Spinner color="amber" /></div>
-      ) : fees.length === 0 ? (
-        <div className="glass-card p-12 border border-white/60"><EmptyState icon={Wallet} title="No fee records" accent="amber" description="Fee details will appear here once published." /></div>
-      ) : (
-        <div className="space-y-4">
-          {fees.map(fee => (
-            <FeeCard key={fee.id} fee={fee} config={config} onPay={onPay} onDownload={onDownload} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function FeeCard({ fee, config, onPay, onDownload }) {
-  const [amount, setAmount] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [showPayments, setShowPayments] = useState(false)
-
-  const total = Number(fee.totalAmount || 0)
-  const paid = Number(fee.paidAmount || 0)
-  const balance = Number(fee.balance ?? (total - paid))
-  const isPaid = fee.status === 'PAID'
-  const pct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0
-  const partial = !isPaid && paid > 0
-
-  const statusVariant = isPaid ? 'success' : partial ? 'info' : fee.status === 'OVERDUE' ? 'destructive' : 'warning'
-
-  useEffect(() => { setAmount(balance > 0 ? String(balance) : '') }, [fee.id, balance])
-
-  const pay = async () => {
-    const value = Number(amount)
-    if (!value || value <= 0) return
-    setBusy(true)
-    try {
-      await onPay(fee.id, {
-        amount: value,
-        method: config?.mode === 'demo' ? 'DEMO' : 'CARD',
-        remarks: 'Paid from student portal',
-      })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card overflow-hidden border border-white/60">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-white/50">
-        <div>
-          <p className="font-semibold text-slate-800">{fee.semesterName}</p>
-          <p className="text-xs text-slate-400">Due: {fmtDate(fee.dueDate)}</p>
-        </div>
-        <div className="flex items-center gap-5">
-          <div className="text-right">
-            <p className="text-lg font-bold text-slate-800">₹{total.toLocaleString('en-IN')}</p>
-            <p className="text-[10px] text-slate-400 uppercase tracking-wider">Total</p>
-          </div>
-          <div className="text-right">
-            <p className={`text-lg font-bold ${balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>₹{balance.toLocaleString('en-IN')}</p>
-            <p className="text-[10px] text-slate-400 uppercase tracking-wider">Balance</p>
-          </div>
-          <Badge variant={statusVariant}>{isPaid ? 'PAID' : partial ? 'PARTIALLY PAID' : fee.status}</Badge>
-        </div>
-      </div>
-
-      <div className="px-5 pt-4">
-        <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-          <span>₹{paid.toLocaleString('en-IN')} paid</span>
-          <span>{pct}%</span>
-        </div>
-        <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-          <div className={`h-full rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }} />
-        </div>
-      </div>
-
-      {fee.items?.length > 0 && (
-        <div className="mt-4">
-          {fee.items.map((item, i) => (
-            <div key={i} className="flex justify-between items-center px-5 py-2.5 text-sm border-t border-white/30 hover:bg-white/30 transition-colors">
-              <span className="text-slate-500">{item.description}</span>
-              <span className="text-slate-700 font-medium">₹{Number(item.amount).toLocaleString('en-IN')}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {fee.payments?.length > 0 && (
-        <div className="border-t border-white/40">
-          <button onClick={() => setShowPayments(v => !v)} className="w-full flex items-center justify-between px-5 py-3 text-xs font-medium text-indigo-600 hover:bg-white/30">
-            <span className="flex items-center gap-1.5"><ScrollText size={13} /> {fee.payments.length} payment{fee.payments.length > 1 ? 's' : ''}</span>
-            <span className="text-slate-400">{showPayments ? 'Hide' : 'Show'}</span>
-          </button>
-          {showPayments && (
-            <div className="divide-y divide-white/40 bg-white/20">
-              {fee.payments.map(p => (
-                <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 text-xs">
-                  <div>
-                    <p className="font-medium text-slate-700">₹{Number(p.amount).toLocaleString('en-IN')} <span className="text-slate-400">· {p.method}</span></p>
-                    <p className="text-[10px] text-slate-400">{fmtDate(p.paidAt)} · {p.receiptNumber}</p>
-                  </div>
-                  <button onClick={() => onDownload(`/api/student/fees/payments/${p.id}/receipt`, `receipt-${p.receiptNumber}.pdf`)}
-                    className="flex items-center gap-1 text-indigo-600 hover:underline">
-                    <Download size={12} /> Receipt
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {!isPaid && (
-        <div className="px-5 py-4 border-t border-white/40 bg-white/20">
-          {config?.onlineEnabled ? (
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="w-40">
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Amount (₹)</label>
-                <input type="number" min="1" max={balance} value={amount} onChange={e => setAmount(e.target.value)} className="collego-input" />
-              </div>
-              <Button variant="gradient" size="sm" onClick={pay} disabled={busy || !amount || Number(amount) <= 0 || Number(amount) > balance}>
-                {busy
-                  ? <span className="flex gap-1"><RefreshCw size={13} className="animate-spin" /> Processing...</span>
-                  : <span className="flex gap-1"><Wallet size={13} /> Pay {config?.mode === 'demo' ? '(demo)' : 'online'}</span>}
-              </Button>
-              <p className="text-[10px] text-slate-400 max-w-xs">
-                {config?.mode === 'demo'
-                  ? 'Demo mode: the payment is simulated and recorded instantly. Receipt is available above.'
-                  : config?.message}
-              </p>
-            </div>
-          ) : (
-            <p className="text-xs text-amber-700 flex items-center gap-1.5">
-              <AlertTriangle size={13} /> Online payment is not enabled. Please pay at the accounts office; the receipt will appear here.
-            </p>
-          )}
-        </div>
-      )}
-
-      {isPaid && (
-        <div className="px-5 py-3 bg-emerald-50/40 border-t border-emerald-100/50">
-          <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 size={11} /> Fully paid{fee.paidAt ? ` on ${fmtDate(fee.paidAt)}` : ''}</p>
-        </div>
-      )}
-    </motion.div>
-  )
-}
-
-// ─── Assignments ─────────────────────────────────────────────────────────────
-function AssignmentsTab({ assignments, loading, onSubmit, onDownload }) {
-  const pending = assignments.filter(a => !a.submissionStatus)
-  const graded = assignments.filter(a => a.submissionStatus === 'GRADED')
-
-  return (
-    <div className="space-y-6">
-      <PageTitle
-        icon={BookOpen}
-        title="Assignments"
-        subtitle="Download briefs, submit your work, and track marks and feedback."
-        accent="blue"
-        actions={<Badge variant={pending.length ? 'warning' : 'success'}>{pending.length ? `${pending.length} pending` : 'All submitted'}</Badge>}
-      />
-
-      {assignments.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard index={0} label="Total Assignments" value={assignments.length} icon={BookOpen} accent="blue" glow />
-          <StatCard index={1} label="Pending" value={pending.length} icon={Clock} accent={pending.length ? 'amber' : 'emerald'} glow />
-          <StatCard index={2} label="Graded" value={graded.length} icon={Award} accent="violet" glow />
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex items-center justify-center py-16"><Spinner color="blue" /></div>
-      ) : assignments.length === 0 ? (
+      <PageTitle icon={FileText} title="Question Papers" subtitle="Previous and current question papers published by your department faculty." accent="violet" />
+      {(!papers || papers.length === 0) ? (
         <div className="glass-card p-12 border border-white/60">
-          <EmptyState icon={BookOpen} title="No assignments yet" accent="blue" description="Assignments posted by your faculty will appear here." />
+          <EmptyState icon={FileText} title="No question papers yet" accent="violet" description="Papers uploaded by your department faculty will appear here." />
         </div>
       ) : (
-        <div className="space-y-4">
-          {assignments.map(a => <AssignmentCard key={a.id} a={a} onSubmit={onSubmit} onDownload={onDownload} />)}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function AssignmentCard({ a, onSubmit, onDownload }) {
-  const [file, setFile] = useState(null)
-  const [note, setNote] = useState('')
-  const [busy, setBusy] = useState(false)
-  const fileRef = useRef(null)
-
-  const graded = a.submissionStatus === 'GRADED'
-  const submitted = !!a.submissionStatus
-  const overdue = a.dueDate && new Date(`${a.dueDate}T23:59:59`) < new Date()
-
-  const statusBadge = graded
-    ? <Badge variant="success">Graded · {a.marks ?? '—'}/{a.maxMarks ?? 10}</Badge>
-    : submitted
-      ? <Badge variant="info">Submitted</Badge>
-      : <Badge variant={overdue ? 'destructive' : 'warning'}>{overdue ? 'Overdue' : 'Pending'}</Badge>
-
-  const submit = async () => {
-    if (!file) return
-    setBusy(true)
-    try {
-      await onSubmit(a.id, file, note)
-      setFile(null)
-      setNote('')
-      if (fileRef.current) fileRef.current.value = ''
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card overflow-hidden border border-white/60">
-      <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4 border-b border-white/50">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-slate-800">{a.title}</p>
-            {statusBadge}
-            {a.late && <Badge variant="warning">Late</Badge>}
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            {a.courseName} · {a.courseCode}
-            {a.dueDate && <span className="ml-2">Due {fmtDate(a.dueDate)}</span>}
-            <span className="ml-2">Max {a.maxMarks ?? 10} marks</span>
-          </p>
-        </div>
-        {a.hasFile && (
-          <Button variant="outline" size="sm" onClick={() => onDownload(`/api/student/assignments/${a.id}/file`, a.fileName || `assignment-${a.id}`)}>
-            <span className="flex gap-1"><Download size={13} /> Brief</span>
-          </Button>
-        )}
-      </div>
-
-      {a.description && <div className="px-5 py-3 text-sm text-slate-600 border-b border-white/30 whitespace-pre-wrap">{a.description}</div>}
-
-      {graded && (
-        <div className="px-5 py-4 bg-emerald-50/40 border-b border-emerald-100/50">
-          <p className="text-sm font-semibold text-emerald-700 flex items-center gap-1.5">
-            <CheckCircle2 size={14} /> {a.marks} / {a.maxMarks ?? 10} marks
-          </p>
-          {a.feedback && <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{a.feedback}</p>}
-          {a.submissionId && (
-            <button
-              onClick={() => onDownload(`/api/student/submissions/${a.submissionId}/file`, a.fileName || 'submission')}
-              className="text-xs text-emerald-700 hover:underline mt-2 inline-flex items-center gap-1"
-            >
-              <Paperclip size={12} /> Download my submission
-            </button>
-          )}
-        </div>
-      )}
-
-      {!graded && (
-        <div className="px-5 py-4 space-y-3">
-          {submitted && (
-            <p className="text-xs text-blue-600 flex items-center gap-1">
-              <CheckCircle2 size={12} /> Submitted {a.submittedAt ? `on ${fmtDate(a.submittedAt)}` : ''}. You can replace it until it is graded.
-            </p>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
-                {submitted ? 'Replace file' : 'Your file'}
-              </label>
-              <input
-                ref={fileRef}
-                type="file"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="collego-input file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-indigo-600"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Note (optional)</label>
-              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything your faculty should know" className="collego-input" />
-            </div>
-          </div>
-          <Button variant="gradient" size="sm" onClick={submit} disabled={!file || busy}>
-            {busy ? <span className="flex gap-1"><RefreshCw size={13} className="animate-spin" /> Uploading...</span>
-              : <span className="flex gap-1"><Upload size={13} /> {submitted ? 'Replace submission' : 'Submit assignment'}</span>}
-          </Button>
-        </div>
-      )}
-    </motion.div>
-  )
-}
-
-// ─── Course Materials ─────────────────────────────────────────────────────────
-function MaterialsTab({ materials, loading, onDownload }) {
-  return (
-    <div className="space-y-6">
-      <PageTitle
-        icon={FolderOpen}
-        title="Study Materials"
-        subtitle="Notes, slides, and reference material shared by your faculty."
-        accent="emerald"
-        actions={<Badge variant="purple">{materials.length} files</Badge>}
-      />
-
-      {loading ? (
-        <div className="flex items-center justify-center py-16"><Spinner color="emerald" /></div>
-      ) : materials.length === 0 ? (
-        <div className="glass-card p-12 border border-white/60">
-          <EmptyState icon={FolderOpen} title="No materials yet" accent="emerald" description="Material shared by faculty will appear here." />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {materials.map((m) => (
-            <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 border border-white/60 flex flex-col">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          {papers.map((qp, i) => (
+            <motion.div key={qp.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+              className="glass-card p-5 border border-white/60 flex flex-col gap-4">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-slate-800 truncate">{m.title}</p>
-                    {m.materialType && <Badge variant="info">{m.materialType}</Badge>}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">{m.courseName} · {m.courseCode} · {fmtDate(m.createdAt)}</p>
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">{qp.courseName}</p>
+                  <p className="text-[11px] text-slate-400">{qp.courseCode} · {qp.departmentName}</p>
                 </div>
-                {m.hasFile && (
-                  <Button variant="outline" size="sm" onClick={() => onDownload(`/api/student/materials/${m.id}/file`, m.fileName || `material-${m.id}`)}>
-                    <span className="flex gap-1"><Download size={13} /> Download</span>
-                  </Button>
-                )}
+                <Badge variant="info">{qp.examType}</Badge>
               </div>
-              {m.description && <p className="text-sm text-slate-500 mt-3 line-clamp-3">{m.description}</p>}
-              {m.fileName && <p className="text-[10px] text-slate-400 mt-3 flex items-center gap-1"><Paperclip size={11} /> {m.fileName}</p>}
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                <span className="flex items-center gap-1"><Calendar size={12} /> {qp.year}</span>
+                <span>Semester {qp.semesterNumber}</span>
+                {qp.uploadedByName && <span>By {qp.uploadedByName}</span>}
+                <span className="flex items-center gap-1"><Download size={12} /> {qp.downloadCount || 0}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-white/60 pt-3">
+                <p className="text-[11px] text-slate-400 truncate flex items-center gap-1"><Paperclip size={12} /> {qp.fileName || 'Question paper'}</p>
+                <Button variant="outline" size="sm" disabled={!qp.fileName} onClick={() => onDownload(`/api/student/question-papers/${qp.id}/file`, qp.fileName || `question-paper-${qp.id}.pdf`)}>
+                  <Download size={13} /> Download
+                </Button>
+              </div>
             </motion.div>
           ))}
         </div>
@@ -837,8 +516,7 @@ function MaterialsTab({ materials, loading, onDownload }) {
   )
 }
 
-// ─── Placements ──────────────────────────────────────────────────────────────
-function PlacementsTab({ notices }) {
+function PlacementsTab({ notices, onDownload }) {
   return (
     <div className="space-y-6">
       <PageTitle icon={Briefcase} title="Placement Notices" subtitle="Active campus drives and internship opportunities." accent="emerald" />
@@ -864,6 +542,15 @@ function PlacementsTab({ notices }) {
                       {notice.packageOffered && <Badge variant="success">₹ {notice.packageOffered}</Badge>}
                       {notice.departmentName && <Badge variant="info">{notice.departmentName}</Badge>}
                     </div>
+                    <div className="flex flex-wrap items-center gap-4 mt-4 text-[11px] text-slate-500">
+                      {notice.driveDate && <span className="flex items-center gap-1"><Calendar size={12} /> Drive: {fmtDate(notice.driveDate)}</span>}
+                      {notice.hasAttachment && (
+                        <button className="text-indigo-600 hover:underline flex items-center gap-1"
+                          onClick={() => onDownload?.(`/api/placement/notices/${notice.id}/attachment`, notice.attachmentName || 'placement-drive.pdf')}>
+                          <Paperclip size={12} /> {notice.attachmentName || 'Attachment'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {notice.lastDate && (
                     <div className={cn('text-right shrink-0', isExpired ? 'text-slate-400' : 'text-amber-600')}>
@@ -882,7 +569,7 @@ function PlacementsTab({ notices }) {
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────
-const NOTIF_TYPES = { ACADEMIC: { v: 'info', label: 'Academic' }, FEE: { v: 'warning', label: 'Fee' }, PLACEMENT: { v: 'purple', label: 'Placement' }, EXAM: { v: 'destructive', label: 'Exam' }, GENERAL: { v: 'secondary', label: 'General' } }
+const NOTIF_TYPES = { ACADEMIC: { v: 'info', label: 'Academic' }, PLACEMENT: { v: 'purple', label: 'Placement' }, EXAM: { v: 'destructive', label: 'Exam' }, GENERAL: { v: 'secondary', label: 'General' } }
 
 function NotificationsTab({ notifications, onMarkRead }) {
   return (
@@ -978,8 +665,8 @@ function DocumentsTab({ cgpa, showMessage }) {
 }
 
 // ─── AI Assistant ────────────────────────────────────────────────────────────
-function AiAssistantTab({ overall, cgpa, fees }) {
-  const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Collego AI 🤖 Ask me anything about your attendance, marks, fees, placements, timetable, and more!" }])
+function AiAssistantTab({ overall, cgpa }) {
+  const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Collego AI 🤖 Ask me anything about your attendance, marks, placements, timetable, and more!" }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -990,14 +677,14 @@ function AiAssistantTab({ overall, cgpa, fees }) {
     setInput('')
     setLoading(true)
     try {
-      const res = await api.post('/api/ai/chat', { message: text, history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })), context: { attendance: overall, cgpa, fees } })
+      const res = await api.post('/api/ai/chat', { message: text, history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })), context: { attendance: overall, cgpa } })
       setMessages(prev => [...prev, { role: 'assistant', content: res.data.reply || "I couldn't process that. Please try again." }])
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'AI service is temporarily offline. Please try again later.' }])
     } finally { setLoading(false) }
   }
 
-  const quickPrompts = ['What is my current attendance?', 'Show my CGPA', 'Any pending fees?', 'What placements are available?', 'Show my timetable']
+  const quickPrompts = ['What is my current attendance?', 'Show my CGPA', 'What placements are available?', 'Show my timetable', 'Where are my study materials?']
 
   return (
     <div className="space-y-4 flex flex-col h-[calc(100vh-160px)]">
@@ -1029,7 +716,7 @@ function AiAssistantTab({ overall, cgpa, fees }) {
         </div>
         <div className="border-t border-white/60 p-4 flex gap-2">
           <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder="Ask about attendance, marks, fees, placements..." className="collego-input flex-1" />
+            placeholder="Ask about attendance, marks, placements, timetable..." className="collego-input flex-1" />
           <Button variant="gradient" size="sm" onClick={sendMessage} disabled={loading || !input.trim()} className="px-5"><Send size={14} /> Send</Button>
         </div>
       </div>
@@ -1394,7 +1081,6 @@ export default function StudentDashboard() {
   const [overall, setOverall] = useState(null)
   const [subjects, setSubjects] = useState([])
   const [cgpa, setCgpa] = useState(null)
-  const [fees, setFees] = useState([])
   const [notifications, setNotifications] = useState([])
   const [timetable, setTimetable] = useState(null)
   const [internalMarks, setInternalMarks] = useState([])
@@ -1402,6 +1088,8 @@ export default function StudentDashboard() {
   const [semesters, setSemesters] = useState([])
   const [assignments, setAssignments] = useState([])
   const [materials, setMaterials] = useState([])
+  const [questionPapers, setQuestionPapers] = useState([])
+  const [facultyDirectory, setFacultyDirectory] = useState([])
   const [loadingTab, setLoadingTab] = useState(false)
 
   const sidebarWidth = collapsed ? 76 : 248
@@ -1420,25 +1108,6 @@ export default function StudentDashboard() {
       setMaterials(Array.isArray(res.data) ? res.data : [])
     } catch { /* ignore */ }
   }, [])
-
-  const refreshFees = useCallback(async () => {
-    try {
-      const res = await api.get('/api/student/fees')
-      setFees(Array.isArray(res.data) ? res.data : [])
-    } catch { /* ignore */ }
-  }, [])
-
-  const handlePayFee = useCallback(async (feeId, payload) => {
-    try {
-      const res = await api.post(`/api/student/fees/${feeId}/pay`, payload)
-      showMsg(`Payment of ₹${Number(payload.amount).toLocaleString('en-IN')} recorded`)
-      await refreshFees()
-      return res.data
-    } catch (err) {
-      showMsg(err.response?.data?.message || 'Payment failed', 'error')
-      throw err
-    }
-  }, [refreshFees, showMsg])
 
   const handleDownload = useCallback(async (url, name) => {
     try {
@@ -1464,12 +1133,11 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const [prRes, atRes, ovRes, cgRes, feRes, notRes, ttRes, imRes, plRes, semRes, asRes, maRes] = await Promise.allSettled([
+      const [prRes, atRes, ovRes, cgRes, notRes, ttRes, imRes, plRes, semRes, asRes, maRes, qpRes, fdRes] = await Promise.allSettled([
         api.get('/api/student/profile'),
         api.get('/api/student/attendance'),
         api.get('/api/student/attendance/overall'),
         api.get('/api/student/cgpa'),
-        api.get('/api/student/fees'),
         api.get('/api/student/notifications'),
         api.get('/api/student/timetable'),
         api.get('/api/student/marks/internal'),
@@ -1477,12 +1145,13 @@ export default function StudentDashboard() {
         api.get('/api/semesters'),
         api.get('/api/student/assignments'),
         api.get('/api/student/materials'),
+        api.get('/api/student/question-papers'),
+        api.get('/api/faculty-directory'),
       ])
       if (prRes.status === 'fulfilled') setProfile(prRes.value.data)
       if (atRes.status === 'fulfilled') setSubjects(Array.isArray(atRes.value.data) ? atRes.value.data : [])
       if (ovRes.status === 'fulfilled') setOverall(ovRes.value.data)
       if (cgRes.status === 'fulfilled') setCgpa(cgRes.value.data)
-      if (feRes.status === 'fulfilled') setFees(Array.isArray(feRes.value.data) ? feRes.value.data : [])
       if (notRes.status === 'fulfilled') setNotifications(Array.isArray(notRes.value.data) ? notRes.value.data : [])
       if (ttRes.status === 'fulfilled') setTimetable(ttRes.value.data)
       if (imRes.status === 'fulfilled') setInternalMarks(Array.isArray(imRes.value.data) ? imRes.value.data : [])
@@ -1490,6 +1159,8 @@ export default function StudentDashboard() {
       if (semRes.status === 'fulfilled') setSemesters(Array.isArray(semRes.value.data) ? semRes.value.data : [])
       if (asRes.status === 'fulfilled') setAssignments(Array.isArray(asRes.value.data) ? asRes.value.data : [])
       if (maRes.status === 'fulfilled') setMaterials(Array.isArray(maRes.value.data) ? maRes.value.data : [])
+      if (qpRes.status === 'fulfilled') setQuestionPapers(Array.isArray(qpRes.value.data) ? qpRes.value.data : [])
+      if (fdRes.status === 'fulfilled') setFacultyDirectory(Array.isArray(fdRes.value.data) ? fdRes.value.data : [])
     }
     load()
   }, [])
@@ -1514,18 +1185,19 @@ export default function StudentDashboard() {
 
   const renderTab = () => {
     switch (activeTab) {
-      case 'overview': return <OverviewTab profile={profile} overall={overall} subjects={subjects} cgpa={cgpa} fees={fees} notifications={notifications} placements={placements} timetable={timetable} onTabChange={setActiveTab} />
+      case 'overview': return <OverviewTab profile={profile} overall={overall} subjects={subjects} cgpa={cgpa} notifications={notifications} placements={placements} timetable={timetable} onTabChange={setActiveTab} />
       case 'attendance': return <AttendanceTab overall={overall} subjects={subjects} semesters={semesters} onSemesterChange={handleSemesterChange} loading={loadingTab} />
       case 'marks': return <MarksTab internalMarks={internalMarks} cgpa={cgpa} />
       case 'assignments': return <AssignmentsTab assignments={assignments} loading={loadingTab} onSubmit={handleSubmitAssignment} onDownload={handleDownload} />
       case 'materials': return <MaterialsTab materials={materials} loading={loadingTab} onDownload={handleDownload} />
+      case 'questionPapers': return <QuestionPapersTab papers={questionPapers} onDownload={handleDownload} />
+      case 'facultyDirectory': return <FacultyDirectoryTab faculty={facultyDirectory} onDownload={handleDownload} />
       case 'exams': return <ExamsStudentTab showMsg={showMsg} onDownload={handleDownload} />
       case 'timetable': return <TimetableTab timetable={timetable} loading={loadingTab} />
-      case 'fees': return <FeesTab fees={fees} loading={loadingTab} onPay={handlePayFee} onDownload={handleDownload} />
-      case 'placements': return <PlacementsTab notices={placements} />
+      case 'placements': return <PlacementsTab notices={placements} onDownload={handleDownload} />
       case 'notifications': return <NotificationsTab notifications={notifications} onMarkRead={handleMarkRead} />
       case 'documents': return <DocumentsTab cgpa={cgpa} showMessage={showMsg} />
-      case 'aiAssistant': return <AiAssistantTab overall={overall} cgpa={cgpa} fees={fees} />
+      case 'aiAssistant': return <AiAssistantTab overall={overall} cgpa={cgpa} />
       case 'aiPrediction': return <AiPredictionTab />
       case 'aiSmartSearch': return <AiSmartSearchTab />
       case 'aiAttendanceRisk': return <AiAttendanceRiskTab />

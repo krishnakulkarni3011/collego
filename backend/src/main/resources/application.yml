@@ -52,19 +52,12 @@ collego:
     first-name: System
     last-name: Admin
 
-  # Email delivery (password reset, fee reminders). Disabled = log only.
+  # Email delivery (password reset). Disabled = log only.
   mail:
     enabled: ${MAIL_ENABLED:false}
     from: ${MAIL_FROM:no-reply@collego.local}
 
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
-
-  # Online fee payments: disabled | demo (simulated) | razorpay
-  payments:
-    mode: ${PAYMENT_MODE:demo}
-
-  fees:
-    reminder-cron: ${FEE_REMINDER_CRON:0 0 9 * * *}
 
   # Phase 6 & 7: Local storage paths (used when use-s3=false)
   storage:

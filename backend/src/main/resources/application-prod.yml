@@ -75,13 +75,6 @@ collego:
 
   frontend-url: ${FRONTEND_URL:https://65-0-244-196.sslip.io}
 
-  # Online fee payments: disabled | demo (simulated) | razorpay
-  payments:
-    mode: ${PAYMENT_MODE:disabled}
-
-  fees:
-    reminder-cron: ${FEE_REMINDER_CRON:0 0 9 * * *}
-
   storage:
     # In prod, storage paths are S3 URIs — handled by S3StorageService
     question-papers: s3://collego-question-papers-prod/question-papers

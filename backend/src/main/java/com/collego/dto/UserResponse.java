@@ -18,9 +18,18 @@ public class UserResponse {
     private String lastName;
     private String role;
     private boolean active;
+    private Long departmentId;
     private String departmentName;
+    private String departmentCode;
+    private String enrollmentNumber;
     private Integer semester;
     private String section;
+    private Integer admissionYear;
+    private Long facultyProfileId;
+    private String employeeId;
+    private String designation;
+    private String resumeFileName;
+    private boolean hasResume;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;

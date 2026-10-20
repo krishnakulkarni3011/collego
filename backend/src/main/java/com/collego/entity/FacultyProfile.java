@@ -27,4 +27,10 @@ public class FacultyProfile {
     private String employeeId;
 
     private String designation;
+
+    @Column(length = 500)
+    private String resumeFileName;
+
+    @Column(length = 1000)
+    private String resumePath;
 }

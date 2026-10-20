@@ -55,6 +55,8 @@ services:
       collego.ai-service.url: http://collego-ai-service:8000
     ports:
       - "8081:8080"
+    volumes:
+      - collego_storage:/root/collego-storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,4 +79,5 @@ services:
 
 volumes:
   postgres_data:
+  collego_storage:
 

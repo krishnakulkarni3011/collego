@@ -9,7 +9,7 @@ import {
   Clock, MapPin, Activity, BookMarked, Briefcase, X,
   RefreshCw, Upload, Edit, Power, Filter, Trophy, Zap,
   TrendingUp, Percent, XCircle, Wallet, Home, Landmark, Download,
-  UsersRound, CalendarDays, ScrollText, Layers,
+  UsersRound, CalendarDays, ScrollText, Layers, ChevronRight, ArrowLeft,
 } from 'lucide-react'
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
@@ -47,7 +47,6 @@ const PIE_COLORS = ['#4f46e5', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4
 const RANK_COLORS = ['#f59e0b', '#94a3b8', '#cd7f32', '#6366f1', '#6366f1']
 const NOTICE_TYPES = {
   ACADEMIC: { variant: 'info', label: 'Academic' },
-  FEE: { variant: 'warning', label: 'Fee' },
   PLACEMENT: { variant: 'purple', label: 'Placement' },
   EXAM: { variant: 'destructive', label: 'Exam' },
   GENERAL: { variant: 'secondary', label: 'General' },
@@ -59,8 +58,6 @@ const NAV_SECTIONS = [
   {
     title: 'Management',
     items: [
-      { id: 'users', label: 'Students', icon: GraduationCap },
-      { id: 'faculty', label: 'Faculty', icon: Users },
       { id: 'academics', label: 'Academics', icon: BookOpen },
       { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
       { id: 'examinations', label: 'Examinations', icon: BookMarked },
@@ -68,9 +65,8 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    title: 'Finance & Admin',
+    title: 'Administration',
     items: [
-      { id: 'fees', label: 'Fees & Finance', icon: DollarSign },
       { id: 'announcements', label: 'Notices & Events', icon: Megaphone },
     ],
   },
@@ -105,8 +101,8 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
   const upcomingEvents = insights?.upcomingEvents || []
 
   const quickActions = [
-    { icon: GraduationCap, label: 'Add Student', tab: 'users', accent: 'blue', grad: 'from-blue-500 to-cyan-500' },
-    { icon: Users, label: 'Add Faculty', tab: 'faculty', accent: 'violet', grad: 'from-violet-500 to-fuchsia-500' },
+    { icon: GraduationCap, label: 'Manage Students', tab: 'academics', accent: 'blue', grad: 'from-blue-500 to-cyan-500' },
+    { icon: Users, label: 'Manage Faculty', tab: 'academics', accent: 'violet', grad: 'from-violet-500 to-fuchsia-500' },
     { icon: Megaphone, label: 'Create Notice', tab: 'announcements', accent: 'amber', grad: 'from-amber-500 to-orange-500' },
     { icon: BarChart3, label: 'Generate Report', tab: 'reports', accent: 'indigo', grad: 'from-indigo-500 to-blue-500' },
     { icon: BookOpen, label: 'Manage Courses', tab: 'academics', accent: 'emerald', grad: 'from-emerald-500 to-teal-500' },
@@ -128,9 +124,9 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
       {/* Stat cards row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard index={0} label="Total Students" value={overview?.totalStudents ?? 0} icon={GraduationCap} accent="blue"
-          sub={`across ${overview?.totalDepartments ?? 0} departments`} onClick={() => onTabChange('users')} glow />
+          sub={`across ${overview?.totalDepartments ?? 0} departments`} onClick={() => onTabChange('academics')} glow />
         <StatCard index={1} label="Faculty Members" value={overview?.totalFaculty ?? 0} icon={UsersRound} accent="violet"
-          sub={`${overview?.totalSections ?? 0} sections running`} onClick={() => onTabChange('faculty')} glow />
+          sub={`${overview?.totalSections ?? 0} sections running`} onClick={() => onTabChange('academics')} glow />
         <StatCard index={2} label="Average Attendance" value={overview?.overallAverageAttendance ?? 0} decimals={1} suffix="%" icon={ClipboardCheck} accent="emerald"
           sub="college-wide average" onClick={() => onTabChange('attendance')} glow />
         <StatCard index={3} label="Placed Students" value={placementStats?.studentsPlaced ?? 0} icon={Trophy} accent="amber"
@@ -567,297 +563,371 @@ function DirectoryTab({
 }
 
 // ─── Academics ───────────────────────────────────────────────────────────────
-function AcademicsTab({ departments, overview, semesters, deptReports, showMsg }) {
+const YEAR_OPTIONS = [
+  { label: 'I Year', value: 1 },
+  { label: 'II Year', value: 2 },
+  { label: 'III Year', value: 3 },
+  { label: 'Final Year', value: 4 },
+]
+
+function studentYear(user) {
+  const sem = Number(user.semester || 0)
+  return sem > 0 ? Math.ceil(sem / 2) : 0
+}
+
+function AcademicsTab({
+  users, departments, overview, semesters, deptReports, showMsg,
+  onCreateUser, onEditUser, onToggleActive, onUploadResume,
+}) {
+  const [selectedDept, setSelectedDept] = useState(null)
+  const [mode, setMode] = useState(null)
+  const [year, setYear] = useState(1)
+  const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [resumeBusy, setResumeBusy] = useState(null)
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', enrollmentNumber: '', section: 'A', employeeId: '', designation: '' })
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', semester: '', section: '', enrollmentNumber: '', employeeId: '', designation: '' })
+
+  const departmentList = useMemo(() => {
+    if (deptReports?.length) return deptReports
+    return (departments || []).map(d => ({
+      departmentId: d.id,
+      departmentName: d.name,
+      departmentCode: d.code,
+      totalStudents: 0,
+      totalFaculty: 0,
+      totalCourses: 0,
+    }))
+  }, [deptReports, departments])
+
   const stats = [
-    { label: 'Departments', value: overview?.totalDepartments ?? departments.length, icon: Layers, accent: 'blue', grad: 'from-blue-500 to-cyan-500' },
+    { label: 'Departments', value: overview?.totalDepartments ?? departmentList.length, icon: Layers, accent: 'blue', grad: 'from-blue-500 to-cyan-500' },
     { label: 'Courses', value: overview?.totalCourses ?? 0, icon: BookOpen, accent: 'violet', grad: 'from-violet-500 to-fuchsia-500' },
     { label: 'Sections', value: overview?.totalSections ?? 0, icon: UsersRound, accent: 'emerald', grad: 'from-emerald-500 to-teal-500' },
     { label: 'Enrollments', value: overview?.totalEnrollments ?? 0, icon: ScrollText, accent: 'amber', grad: 'from-amber-500 to-orange-500' },
   ]
-  const [sections, setSections] = useState([])
-  const [selectedSection, setSelectedSection] = useState(null)
-  const [timetableMeta, setTimetableMeta] = useState(null)
-  const [sectionStudents, setSectionStudents] = useState([])
-  const [loadingSections, setLoadingSections] = useState(false)
-  const [uploadingTimetable, setUploadingTimetable] = useState(false)
-  const [classRepLoading, setClassRepLoading] = useState(false)
-  const [timetableFile, setTimetableFile] = useState(null)
 
-  useEffect(() => {
-    loadSections()
-  }, [])
-
-  const loadSections = async () => {
-    setLoadingSections(true)
-    try {
-      const res = await api.get('/api/sections')
-      setSections(Array.isArray(res.data) ? res.data : [])
-    } catch { /* ignore */ } finally { setLoadingSections(false) }
+  const openDepartment = (dept) => {
+    setSelectedDept(dept)
+    setMode(null)
+    setShowCreate(false)
+    setEditing(null)
   }
 
-  const loadSectionStudents = async (sectionId) => {
-    try {
-      const res = await api.get(`/api/sections/${sectionId}/students`)
-      setSectionStudents(Array.isArray(res.data) ? res.data : [])
-    } catch {
-      // Try alternative endpoint
-      try {
-        const res = await api.get(`/api/faculty/attendance/${sectionId}`)
-        setSectionStudents(Array.isArray(res.data) ? res.data.map(s => ({ studentName: s.studentName, enrollmentNumber: s.enrollmentNumber })) : [])
-      } catch { /* ignore */ }
+  const goBack = () => {
+    if (mode) { setMode(null); setShowCreate(false); setEditing(null); return }
+    setSelectedDept(null)
+    setShowCreate(false)
+    setEditing(null)
+  }
+
+  const resetForm = () => setForm({ firstName: '', lastName: '', email: '', password: '', enrollmentNumber: '', section: 'A', employeeId: '', designation: '' })
+
+  const submitCreate = async (e) => {
+    e.preventDefault()
+    if (!selectedDept) return
+    setBusy(true)
+    const payload = mode === 'faculty'
+      ? { ...form, role: 'FACULTY', departmentId: selectedDept.departmentId, employeeId: form.employeeId, designation: form.designation }
+      : {
+          ...form,
+          role: 'STUDENT',
+          departmentId: selectedDept.departmentId,
+          semester: Number(year) * 2 - 1,
+          admissionYear: new Date().getFullYear() - (Number(year) - 1),
+        }
+    const ok = await onCreateUser(payload)
+    setBusy(false)
+    if (ok) { setShowCreate(false); resetForm() }
+  }
+
+  const startEdit = (u) => {
+    setEditing(u)
+    setEditForm({
+      firstName: u.firstName || '', lastName: u.lastName || '', email: u.email || '',
+      semester: u.semester || '', section: u.section || '', enrollmentNumber: u.enrollmentNumber || '',
+      employeeId: u.employeeId || '', designation: u.designation || '',
+    })
+  }
+
+  const submitEdit = async () => {
+    if (!editing) return
+    setBusy(true)
+    const payload = mode === 'faculty'
+      ? { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email, employeeId: editForm.employeeId, designation: editForm.designation, departmentId: selectedDept.departmentId }
+      : {
+          firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email,
+          enrollmentNumber: editForm.enrollmentNumber, semester: editForm.semester ? Number(editForm.semester) : null,
+          section: editForm.section, departmentId: selectedDept.departmentId,
+        }
+    const ok = await onEditUser(editing.id, payload)
+    setBusy(false)
+    if (ok) setEditing(null)
+  }
+
+  const uploadResume = async (u, file) => {
+    if (!file || !u.facultyProfileId) {
+      showMsg('Faculty profile not ready for resume upload', 'error')
+      return
     }
+    setResumeBusy(u.id)
+    const ok = await onUploadResume(u.facultyProfileId, file)
+    setResumeBusy(null)
+    return ok
   }
 
-  const handleUpdateClassReps = async (sectionId, maleRep, femaleRep) => {
-    setClassRepLoading(true)
-    try {
-      await api.put(`/api/admin/sections/${sectionId}/class-reps`, { maleClassRep: maleRep, femaleClassRep: femaleRep })
-      showMsg('Class representatives updated')
-      loadSections()
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to update class reps', 'error') }
-    finally { setClassRepLoading(false) }
-  }
+  const departmentFaculty = useMemo(() => {
+    if (!selectedDept) return []
+    return (users || []).filter(u => u.role === 'FACULTY' && u.departmentId === selectedDept.departmentId && u.active)
+  }, [users, selectedDept])
 
-  const handleUploadTimetable = async (file) => {
-    if (!selectedSection) return
-    setUploadingTimetable(true)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      await api.post(`/api/admin/sections/${selectedSection.sectionId}/timetable`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      showMsg('Timetable uploaded successfully')
-      setTimetableFile(null)
-      const res = await api.get(`/api/sections/${selectedSection.sectionId}/timetable/meta`)
-      setTimetableMeta(res.data)
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload timetable', 'error') }
-    finally { setUploadingTimetable(false) }
-  }
+  const departmentStudents = useMemo(() => {
+    if (!selectedDept) return []
+    return (users || []).filter(u => u.role === 'STUDENT' && u.departmentId === selectedDept.departmentId && u.active && studentYear(u) === Number(year))
+  }, [users, selectedDept, year])
 
-  const handleDeleteTimetable = async () => {
-    if (!selectedSection) return
-    try {
-      await api.delete(`/api/admin/sections/${selectedSection.sectionId}/timetable`)
-      showMsg('Timetable deleted')
-      setTimetableMeta(null)
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to delete timetable', 'error') }
-  }
-
-  const viewTimetable = () => {
-    if (!selectedSection) return
-    window.open(`/api/sections/${selectedSection.sectionId}/timetable`, '_blank')
-  }
-
-  const sectionOptions = sections.map(s => ({
-    label: `${s.courseName} - Sec ${s.sectionName} (${s.semesterName})`,
-    value: s.sectionId,
-    section: s,
-  }))
-
-  return (
-    <div className="space-y-6">
-      <PageTitle icon={BookOpen} title="Academic Management" subtitle="Departments, courses, sections, semesters and enrolments." />
+  const renderDepartmentHome = () => (
+    <>
+      <PageTitle icon={BookOpen} title="Academics" subtitle="Choose a department to manage its students and faculty." />
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {stats.map((s, i) => <StatCard key={s.label} index={i} label={s.label} value={s.value} icon={s.icon} accent={s.accent} glow />)}
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Panel title="Departments" icon={Building2} accent="blue" className="xl:col-span-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {(deptReports || []).map(d => (
-              <div key={d.departmentId} className="flex items-center gap-3 p-4 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-colors group">
-                <div className="w-10 h-10 rounded-xl bg-white border border-white/60 flex items-center justify-center font-bold text-xs text-indigo-600 shrink-0 shadow-sm">
-                  {d.departmentCode}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{d.departmentName}</p>
-                  <p className="text-[11px] text-slate-400">{d.totalStudents} students · {d.totalFaculty} faculty · {d.totalCourses} courses</p>
-                </div>
+      <Panel title="Departments" icon={Building2} accent="blue">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {departmentList.map(d => (
+            <button key={d.departmentId} onClick={() => openDepartment(d)}
+              className="flex items-center gap-3 p-4 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white hover:border-indigo-200 hover:-translate-y-0.5 transition-all text-left group">
+              <div className="w-11 h-11 rounded-xl bg-white border border-white/60 flex items-center justify-center font-bold text-xs text-indigo-600 shrink-0 shadow-sm">
+                {d.departmentCode}
               </div>
-            ))}
-            {(!deptReports || deptReports.length === 0) && <EmptyState icon={Building2} title="No departments" accent="blue" />}
-          </div>
-        </Panel>
-        <Panel title="Semesters" icon={CalendarDays} accent="violet">
-          <div className="space-y-2">
-            {(semesters || []).map(s => (
-              <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-colors group">
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">{s.name}</p>
-                  <p className="text-[11px] text-slate-400">{s.academicYear}</p>
-                </div>
-                <Badge variant={s.active ? 'success' : 'secondary'}>{s.active ? 'Active' : 'Inactive'}</Badge>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-800 truncate">{d.departmentName}</p>
+                <p className="text-[11px] text-slate-400">{d.totalStudents} students · {d.totalFaculty} faculty</p>
               </div>
-            ))}
-            {(!semesters || semesters.length === 0) && <EmptyState icon={CalendarDays} title="No semesters" accent="violet" />}
-          </div>
-        </Panel>
+              <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors" />
+            </button>
+          ))}
+          {departmentList.length === 0 && <EmptyState icon={Building2} title="No departments" accent="blue" />}
+        </div>
+      </Panel>
+      <div className="glass-card p-5 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2"><CalendarDays size={14} className="text-violet-500" /> Semesters</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+          {(semesters || []).map(s => (
+            <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-white/60 bg-white/70">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">{s.name}</p>
+                <p className="text-[11px] text-slate-400">{s.academicYear}</p>
+              </div>
+              <Badge variant={s.active ? 'success' : 'secondary'}>{s.active ? 'Active' : 'Inactive'}</Badge>
+            </div>
+          ))}
+          {(!semesters || semesters.length === 0) && <p className="text-xs text-slate-400">No semesters configured.</p>}
+        </div>
       </div>
+    </>
+  )
 
-      {/* Section Management Panel */}
-      <Panel title="Section Management & Timetable" icon={Layers} accent="emerald">
-        <div className="space-y-5">
-          <div className="glass-card p-5 border border-white/60">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Select Section</label>
-                <select value={selectedSection?.sectionId || ''} onChange={e => {
-                  const sec = sections.find(s => s.sectionId === Number(e.target.value))
-                  if (sec) {
-                    setSelectedSection(sec)
-                    setTimetableMeta(null)
-                    loadSectionStudents(sec.sectionId)
-                  }
-                }} className="collego-input">
-                  <option value="">Select a section</option>
-                  {sectionOptions.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-              <button
-                onClick={loadSections}
-                className="px-3 py-2 rounded-xl text-xs text-slate-400 border border-white/60 hover:border-indigo-300 hover:text-indigo-600 transition-colors bg-white/50"
-              >
-                <RefreshCw size={14} /> Refresh
-              </button>
-              {loadingSections && <span className="text-xs text-indigo-500 animate-pulse">Loading...</span>}
-            </div>
+  const renderChoice = () => (
+    <>
+      <PageTitle icon={Building2} title={selectedDept.departmentName} subtitle="Select what you want to manage in this department." />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <button onClick={() => { setMode('students'); setYear(1) }}
+          className="glass-card p-8 border border-white/60 text-left hover:-translate-y-1 hover:border-emerald-200 transition-all group">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 mb-5">
+            <GraduationCap size={24} />
           </div>
+          <h3 className="text-lg font-bold text-slate-900">Students</h3>
+          <p className="text-sm text-slate-500 mt-2">View and manage students by year, including enrolment details and sections.</p>
+          <p className="text-xs font-semibold text-emerald-600 mt-5 flex items-center gap-1">{selectedDept.totalStudents || departmentStudents.length} students <ChevronRight size={13} /></p>
+        </button>
+        <button onClick={() => setMode('faculty')}
+          className="glass-card p-8 border border-white/60 text-left hover:-translate-y-1 hover:border-violet-200 transition-all group">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/20 mb-5">
+            <Users size={24} />
           </div>
-          {selectedSection && (
-            <div className="glass-card p-5 border border-white/60">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-slate-800">{selectedSection.courseName}</h3>
-                  <p className="text-[10px] text-slate-500">{selectedSection.courseCode} · Sec {selectedSection.sectionName} · {selectedSection.semesterName}</p>
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Male Class Rep:</span>
-                      <input
-                        value={selectedSection.maleClassRep || ''}
-                        onChange={e => {
-                          const updated = { ...selectedSection, maleClassRep: e.target.value }
-                          setSelectedSection(updated)
-                        }}
-                        className="collego-input text-sm w-40"
-                        placeholder="Name"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Female Class Rep:</span>
-                      <input
-                        value={selectedSection.femaleClassRep || ''}
-                        onChange={e => {
-                          const updated = { ...selectedSection, femaleClassRep: e.target.value }
-                          setSelectedSection(updated)
-                        }}
-                        className="collego-input text-sm w-40"
-                        placeholder="Name"
-                      />
-                    </div>
-                    <button
-                      onClick={() => handleUpdateClassReps(selectedSection.sectionId, selectedSection.maleClassRep, selectedSection.femaleClassRep)}
-                      disabled={classRepLoading}
-                      className="px-3 py-1.5 rounded-xl text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors disabled:opacity-50"
-                    >
-                      {classRepLoading ? <span className="flex gap-1"><RefreshCw size={12} className="animate-spin" /> Saving...</span> : <span className="flex gap-1"><UsersRound size={12} /> Save Class Reps</span>}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {timetableMeta ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">Timetable uploaded:</span>
-                      <button
-                        onClick={() => downloadFile(`/api/sections/${selectedSection.sectionId}/timetable`, timetableMeta.fileName || 'timetable').catch(() => {})}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                      >
-                        <Download size={12} /> {timetableMeta.fileName}
-                      </button>
-                      <button
-                        onClick={handleDeleteTimetable}
-                        className="px-2 py-1.5 rounded-lg text-xs text-red-500 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors"
-                        title="Delete Timetable"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Upload Timetable (PDF)</label>
-                      <div className="relative group">
-                        <input
-                          ref={null}
-                          type="file"
-                          className="sr-only"
-                          accept=".pdf"
-                          onChange={e => {
-                            if (e.target.files?.[0]) {
-                              setTimetableFile(e.target.files[0])
-                              handleUploadTimetable(e.target.files[0])
-                            }
-                          }}
-                        />
-                        <button type="button" className="collego-input px-4 py-2 text-[10px] text-slate-400 border border-white/60 rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-all bg-white/50 w-full text-left">
-                          {timetableFile ? <span className="text-xs text-indigo-600 font-medium">{timetableFile.name}</span> : <span>Choose PDF</span>}
-                        </button>
-                        {uploadingTimetable && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                            <span className="flex gap-1 text-xs"><RefreshCw size={12} className="animate-spin" /> Uploading...</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-          {sectionStudents.length > 0 && (
-            <div className="glass-card overflow-hidden border border-white/60 mt-6">
-              <div className="px-5 py-4 border-b border-white/50 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-800">Students in Section</h3>
-                <span className="text-xs font-semibold text-slate-400">{sectionStudents.length} students</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="collego-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Student Name</th>
-                      <th style={{ textAlign: 'center' }}>Enrollment</th>
-                      <th style={{ textAlign: 'center' }}>Role</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sectionStudents.map((s, i) => {
-                      const isMaleRep = s.studentName === selectedSection.maleClassRep
-                      const isFemaleRep = s.studentName === selectedSection.femaleClassRep
-                      return (
-                        <tr key={i} className="hover:bg-white/30 transition-colors">
-                          <td className="text-slate-400">{i + 1}</td>
-                          <td className="text-slate-800 font-medium">{s.studentName}</td>
-                          <td style={{ textAlign: 'center' }} className="text-slate-500 text-xs font-mono">{s.enrollmentNumber}</td>
-                          <td style={{ textAlign: 'center' }}>
-                            <div className="flex items-center justify-center gap-1">
-                              {isMaleRep && <span className="px-2 py-0.5 rounded text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-100">♂ Class Rep</span>}
-                              {isFemaleRep && <span className="px-2 py-0.5 rounded text-[9px] font-bold text-pink-600 bg-pink-50 border border-pink-100">♀ Class Rep</span>}
-                              {!isMaleRep && !isFemaleRep && <span className="text-[9px] text-slate-400">Student</span>}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </Panel>
+          <h3 className="text-lg font-bold text-slate-900">Faculty</h3>
+          <p className="text-sm text-slate-500 mt-2">Manage department faculty and upload their resumes for students to view.</p>
+          <p className="text-xs font-semibold text-violet-600 mt-5 flex items-center gap-1">{selectedDept.totalFaculty || departmentFaculty.length} faculty <ChevronRight size={13} /></p>
+        </button>
       </div>
-    )
+    </>
+  )
+
+  const renderCreateForm = () => (
+    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 border border-white/60">
+      <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={15} className="text-indigo-500" /> Add {mode === 'faculty' ? 'Faculty' : `${YEAR_OPTIONS.find(y => y.value === Number(year))?.label || ''} Student`}</h3>
+      <form onSubmit={submitCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">First Name</label><input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} className="collego-input" required /></div>
+        <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Last Name</label><input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} className="collego-input" required /></div>
+        <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Email</label><input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="collego-input" required /></div>
+        <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Temporary Password</label><input type="password" minLength={6} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="collego-input" required /></div>
+        {mode === 'faculty' ? (
+          <>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Employee ID</label><input value={form.employeeId} onChange={e => setForm({ ...form, employeeId: e.target.value })} className="collego-input" /></div>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Designation</label><input value={form.designation} onChange={e => setForm({ ...form, designation: e.target.value })} placeholder="e.g., Assistant Professor" className="collego-input" /></div>
+          </>
+        ) : (
+          <>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">USN / Enrollment No.</label><input value={form.enrollmentNumber} onChange={e => setForm({ ...form, enrollmentNumber: e.target.value })} placeholder="e.g., 1CG24CS001" className="collego-input" required /></div>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Section</label><select value={form.section} onChange={e => setForm({ ...form, section: e.target.value })} className="collego-input"><option>A</option><option>B</option><option>C</option></select></div>
+          </>
+        )}
+        <div className="col-span-full flex gap-3">
+          <Button type="submit" variant="gradient" size="sm" disabled={busy}>{busy ? <><RefreshCw size={13} className="animate-spin" /> Saving...</> : <><Plus size={13} /> Create {mode === 'faculty' ? 'Faculty' : 'Student'}</>}</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+        </div>
+      </form>
+    </motion.div>
+  )
+
+  const renderEditForm = () => (
+    <div className="glass-card p-6 border border-violet-100/50 bg-violet-50/30">
+      <h3 className="text-sm font-semibold text-violet-700 mb-4 flex items-center gap-2"><Edit size={14} className="text-violet-500" /> Edit {editing.firstName} {editing.lastName}</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <input value={editForm.firstName} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} placeholder="First name" className="collego-input" />
+        <input value={editForm.lastName} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} placeholder="Last name" className="collego-input" />
+        <input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} placeholder="Email" className="collego-input" />
+        {mode === 'faculty' ? (
+          <>
+            <input value={editForm.employeeId} onChange={e => setEditForm({ ...editForm, employeeId: e.target.value })} placeholder="Employee ID" className="collego-input" />
+            <input value={editForm.designation} onChange={e => setEditForm({ ...editForm, designation: e.target.value })} placeholder="Designation" className="collego-input" />
+          </>
+        ) : (
+          <>
+            <input value={editForm.enrollmentNumber} onChange={e => setEditForm({ ...editForm, enrollmentNumber: e.target.value })} placeholder="USN" className="collego-input" />
+            <select value={editForm.semester} onChange={e => setEditForm({ ...editForm, semester: e.target.value })} className="collego-input">
+              <option value="">Select semester</option>
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(s => <option key={s} value={s}>Semester {s}</option>)}
+            </select>
+            <input value={editForm.section} onChange={e => setEditForm({ ...editForm, section: e.target.value })} placeholder="Section" className="collego-input" />
+          </>
+        )}
+      </div>
+      <div className="flex gap-3 mt-5">
+        <Button onClick={submitEdit} variant="gradient" size="sm" disabled={busy}>{busy ? 'Saving...' : 'Save Changes'}</Button>
+        <Button onClick={() => setEditing(null)} variant="outline" size="sm">Cancel</Button>
+      </div>
+    </div>
+  )
+
+  const renderFaculty = () => (
+    <>
+      <PageTitle icon={Users} title={`${selectedDept.departmentName} Faculty`} subtitle="Add, edit or remove faculty and manage resume documents."
+        actions={<Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Faculty'}</Button>} />
+      {showCreate && renderCreateForm()}
+      {editing && renderEditForm()}
+      <div className="glass-card overflow-hidden border border-white/60">
+        <div className="overflow-x-auto">
+          <table className="collego-table">
+            <thead><tr><th>Faculty</th><th>Employee ID</th><th>Designation</th><th style={{ textAlign: 'center' }}>Resume</th><th style={{ textAlign: 'center' }}>Actions</th></tr></thead>
+            <tbody>
+              {departmentFaculty.map(u => (
+                <tr key={u.id} className="hover:bg-white/30 transition-colors">
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">{u.firstName?.[0]}{u.lastName?.[0]}</div>
+                      <div><p className="font-medium text-slate-800">{u.firstName} {u.lastName}</p><p className="text-[11px] text-slate-400">{u.email}</p></div>
+                    </div>
+                  </td>
+                  <td className="text-slate-500 text-xs font-mono">{u.employeeId || '—'}</td>
+                  <td className="text-slate-500 text-xs">{u.designation || 'Faculty'}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <div className="flex items-center justify-center gap-2">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-600 hover:text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
+                        {resumeBusy === u.id ? <RefreshCw size={12} className="animate-spin" /> : <Upload size={12} />}
+                        {u.hasResume ? 'Replace' : 'Upload'}
+                        <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadResume(u, f); e.target.value = '' }} />
+                      </label>
+                      {u.hasResume && (
+                        <button onClick={() => downloadFile(`/api/faculty-directory/${u.facultyProfileId}/resume`, u.resumeFileName || 'faculty-resume.pdf').catch(() => {})}
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:underline" title={u.resumeFileName || 'Download resume'}>
+                          <Download size={12} /> View
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => startEdit(u)} className="p-2.5 rounded-xl hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors" title="Edit"><Edit size={14} /></button>
+                      <button onClick={() => onToggleActive(u)} className="p-2.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors" title="Remove faculty"><Power size={14} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {departmentFaculty.length === 0 && <tr><td colSpan={5} className="text-center text-slate-400 py-14">No faculty in this department yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+
+  const renderStudents = () => (
+    <>
+      <PageTitle icon={GraduationCap} title={`${selectedDept.departmentName} Students`} subtitle="Choose a year and manage the students enrolled in it."
+        actions={<Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Student'}</Button>} />
+      <div className="flex flex-wrap gap-2">
+        {YEAR_OPTIONS.map(y => (
+          <button key={y.value} onClick={() => { setYear(y.value); setShowCreate(false); setEditing(null) }}
+            className={cn('px-4 py-2 rounded-xl text-xs font-semibold border transition-all', Number(year) === y.value ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-500/20' : 'bg-white text-slate-500 border-white/60 hover:border-emerald-300 hover:text-slate-800')}>
+            {y.label}
+          </button>
+        ))}
+        <span className="ml-auto self-center text-[10px] text-slate-400 font-medium">{departmentStudents.length} students</span>
+      </div>
+      {showCreate && renderCreateForm()}
+      {editing && renderEditForm()}
+      <div className="glass-card overflow-hidden border border-white/60">
+        <div className="overflow-x-auto">
+          <table className="collego-table">
+            <thead><tr><th>Student</th><th>USN</th><th style={{ textAlign: 'center' }}>Semester</th><th style={{ textAlign: 'center' }}>Section</th><th style={{ textAlign: 'center' }}>Actions</th></tr></thead>
+            <tbody>
+              {departmentStudents.map(u => (
+                <tr key={u.id} className="hover:bg-white/30 transition-colors">
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">{u.firstName?.[0]}{u.lastName?.[0]}</div>
+                      <div><p className="font-medium text-slate-800">{u.firstName} {u.lastName}</p><p className="text-[11px] text-slate-400">{u.email}</p></div>
+                    </div>
+                  </td>
+                  <td className="text-slate-500 text-xs font-mono">{u.enrollmentNumber || '—'}</td>
+                  <td style={{ textAlign: 'center' }} className="text-slate-500">{u.semester || '—'}</td>
+                  <td style={{ textAlign: 'center' }}><Badge variant="info">{u.section || '—'}</Badge></td>
+                  <td style={{ textAlign: 'center' }}>
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => startEdit(u)} className="p-2.5 rounded-xl hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors" title="Edit"><Edit size={14} /></button>
+                      <button onClick={() => onToggleActive(u)} className="p-2.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors" title="Remove student"><Power size={14} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {departmentStudents.length === 0 && <tr><td colSpan={5} className="text-center text-slate-400 py-14">No students in this year yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+
+  return (
+    <div className="space-y-6">
+      {selectedDept && (
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <button onClick={goBack} className="inline-flex items-center gap-1 hover:text-indigo-600 transition-colors"><ArrowLeft size={13} /> Back</button>
+          <span>/</span>
+          <button onClick={() => { setMode(null); setShowCreate(false); setEditing(null) }} className="hover:text-indigo-600 transition-colors">Academics</button>
+          <span>/</span>
+          <span className="text-slate-600 font-medium">{selectedDept.departmentName}</span>
+          {mode && <><span>/</span><span className="text-slate-600 font-medium capitalize">{mode}</span></>}
+        </div>
+      )}
+      {!selectedDept ? renderDepartmentHome() : !mode ? renderChoice() : mode === 'faculty' ? renderFaculty() : renderStudents()}
+    </div>
+  )
 }
 
-// ─── Attendance ──────────────────────────────────────────────────────────────
 function AttendanceTab({ attendanceSummary, overview }) {
   const chartData = (attendanceSummary || []).map(d => ({
     name: d.departmentName?.split(' ')[0] || 'N/A',
@@ -918,57 +988,111 @@ function AttendanceTab({ attendanceSummary, overview }) {
   )
 }
 
-// ─── Examinations ────────────────────────────────────────────────────────────
-function ExaminationsTab({ pendingQPs, onApprove, onReject, loading }) {
+function PlacementsTab({ placementStats, notices = [], departments = [], onCreatePlacement, onDeactivatePlacement }) {
+  const s = placementStats
+  const deptData = s?.departmentBreakdown || []
+  const [showCreate, setShowCreate] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [file, setFile] = useState(null)
+  const [form, setForm] = useState({
+    title: '', companyName: '', driveDate: '', lastDate: '', packageOffered: '',
+    description: '', eligibilityCriteria: '', departmentId: '',
+  })
+
+  const today = new Date().toISOString().split('T')[0]
+  const upcoming = (notices || []).filter(n => n.active && (!n.driveDate || n.driveDate >= today))
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    const ok = await onCreatePlacement({ ...form, file })
+    setBusy(false)
+    if (ok) {
+      setForm({ title: '', companyName: '', driveDate: '', lastDate: '', packageOffered: '', description: '', eligibilityCriteria: '', departmentId: '' })
+      setFile(null)
+      setShowCreate(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <PageTitle icon={BookMarked} title="Examinations & Marks" subtitle="Approve question papers and monitor examination readiness." />
+      <PageTitle icon={Briefcase} title="Placement Management" subtitle="Create upcoming drives, share attachments and monitor placements."
+        actions={<Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Upcoming Placement'}</Button>} />
+
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard index={0} label="Pending Approvals" value={pendingQPs.length} icon={Clock} accent="amber" glow />
-        <StatCard index={1} label="Approved" value={pendingQPs.filter(q => q.status === 'APPROVED').length} icon={CheckCircle2} accent="emerald" glow />
-        <StatCard index={2} label="Rejected" value={pendingQPs.filter(q => q.status === 'REJECTED').length} icon={XCircle} accent="violet" glow />
-        <StatCard index={3} label="Total Papers" value={pendingQPs.length} icon={FileText} accent="blue" glow />
+        <StatCard index={0} label="Students Placed" value={s?.studentsPlaced ?? 0} icon={Trophy} accent="emerald" glow />
+        <StatCard index={1} label="Offers Extended" value={s?.totalOffersExtended ?? 0} icon={Award} accent="amber" glow />
+        <StatCard index={2} label="Upcoming Drives" value={upcoming.length} icon={CalendarDays} accent="blue" glow />
+        <StatCard index={3} label="Placement Rate" value={s?.placementRate ?? 0} decimals={1} suffix="%" icon={TrendingUp} accent="violet" glow />
       </div>
-      <Panel title="Question Papers Awaiting Approval" icon={FileText} accent="indigo">
-        {pendingQPs.length === 0 ? (
-          <EmptyState icon={CheckCircle2} title="All caught up" description="No question papers are pending approval." accent="indigo" />
+
+      {showCreate && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 border border-white/60">
+          <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={15} className="text-emerald-500" /> Add Upcoming Placement</h3>
+          <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Drive Title</label><input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g., Software Engineer Drive" className="collego-input" required /></div>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Company</label><input value={form.companyName} onChange={e => setForm({ ...form, companyName: e.target.value })} placeholder="Company name" className="collego-input" required /></div>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Salary Range</label><input value={form.packageOffered} onChange={e => setForm({ ...form, packageOffered: e.target.value })} placeholder="e.g., 8-12 LPA" className="collego-input" /></div>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Drive Date</label><input type="date" value={form.driveDate} onChange={e => setForm({ ...form, driveDate: e.target.value })} className="collego-input" required /></div>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Last Date to Apply</label><input type="date" value={form.lastDate} onChange={e => setForm({ ...form, lastDate: e.target.value })} className="collego-input" /></div>
+            <div>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Department</label>
+              <select value={form.departmentId} onChange={e => setForm({ ...form, departmentId: e.target.value })} className="collego-input">
+                <option value="">All Departments</option>
+                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+            <div className="sm:col-span-2 lg:col-span-3"><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Description</label><textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Role, location, rounds and other drive details..." className="collego-input resize-none" /></div>
+            <div className="sm:col-span-2"><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Eligibility Criteria</label><input value={form.eligibilityCriteria} onChange={e => setForm({ ...form, eligibilityCriteria: e.target.value })} placeholder="e.g., CGPA >= 7.0, no active backlogs" className="collego-input" /></div>
+            <div>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Attachment (optional)</label>
+              <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={e => setFile(e.target.files?.[0] || null)}
+                className="collego-input file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-emerald-600" />
+              {file && <p className="text-[10px] text-slate-400 mt-1 truncate">{file.name}</p>}
+            </div>
+            <div className="sm:col-span-2 lg:col-span-3 flex gap-3">
+              <Button type="submit" variant="gradient" size="sm" disabled={busy}>{busy ? <><RefreshCw size={13} className="animate-spin" /> Creating...</> : <><Plus size={13} /> Create Placement Drive</>}</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+            </div>
+          </form>
+        </motion.div>
+      )}
+
+      <Panel title="Upcoming Placement Drives" icon={CalendarDays} accent="emerald">
+        {upcoming.length === 0 ? (
+          <EmptyState icon={Briefcase} title="No upcoming placements" accent="emerald" description="Use “Add Upcoming Placement” to announce a new drive." />
         ) : (
-          <div className="space-y-3">
-            {pendingQPs.map(qp => (
-              <div key={qp.id} className="flex flex-wrap items-center gap-3 p-4 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-all group">
-                <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/10">
-                  <FileText size={17} className="text-indigo-600" />
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {upcoming.map(n => (
+              <div key={n.id} className="rounded-2xl border border-white/60 bg-white/70 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{n.title}</p>
+                    <p className="text-[11px] text-emerald-600 font-medium mt-0.5">{n.companyName}</p>
+                  </div>
+                  <Badge variant="success">{n.driveDate ? fmtDate(n.driveDate) : 'Upcoming'}</Badge>
                 </div>
-                <div className="flex-1 min-w-[180px]">
-                  <p className="text-sm font-semibold text-slate-800">{qp.courseName} <span className="text-slate-400 font-normal text-xs">({qp.courseCode})</span></p>
-                  <p className="text-[11px] text-slate-400">{qp.examType} · {qp.year} · Sem {qp.semesterNumber} · {qp.uploadedByName}</p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {n.packageOffered && <Badge variant="success">₹ {n.packageOffered}</Badge>}
+                  {n.departmentName && <Badge variant="info">{n.departmentName}</Badge>}
+                  {n.lastDate && <Badge variant="secondary">Apply by {fmtDate(n.lastDate)}</Badge>}
                 </div>
-                <div className="flex items-center gap-3">
-                  <Button variant="success" size="sm" disabled={loading} onClick={() => onApprove(qp.id)} className="px-4"><CheckCircle2 size={13} /> Approve</Button>
-                  <Button variant="destructive" size="sm" disabled={loading} onClick={() => onReject(qp.id)} className="px-4"><X size={13} /> Reject</Button>
+                {n.description && <p className="text-xs text-slate-500 mt-3 line-clamp-3">{n.description}</p>}
+                <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-white/60">
+                  <div>
+                    {n.hasAttachment ? (
+                      <button onClick={() => downloadFile(`/api/placement/notices/${n.id}/attachment`, n.attachmentName || 'placement-drive.pdf').catch(() => {})}
+                        className="text-[11px] text-indigo-600 hover:underline inline-flex items-center gap-1"><Download size={12} /> {n.attachmentName || 'Attachment'}</button>
+                    ) : <span className="text-[10px] text-slate-400">No attachment</span>}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => onDeactivatePlacement(n.id)}><X size={12} /> Remove</Button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </Panel>
-    </div>
-  )
-}
 
-// ─── Placements ──────────────────────────────────────────────────────────────
-function PlacementsTab({ placementStats }) {
-  const s = placementStats
-  const deptData = s?.departmentBreakdown || []
-  return (
-    <div className="space-y-6">
-      <PageTitle icon={Briefcase} title="Placement Management" subtitle="Company drives, applications and placement analytics." />
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard index={0} label="Students Placed" value={s?.studentsPlaced ?? 0} icon={Trophy} accent="emerald" glow />
-        <StatCard index={1} label="Offers Extended" value={s?.totalOffersExtended ?? 0} icon={Award} accent="amber" glow />
-        <StatCard index={2} label="Open Postings" value={s?.openJobPostings ?? 0} icon={Briefcase} accent="blue" glow />
-        <StatCard index={3} label="Placement Rate" value={s?.placementRate ?? 0} decimals={1} suffix="%" icon={TrendingUp} accent="violet" glow />
-      </div>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <Panel title="Department Placements" icon={Layers} accent="indigo" className="xl:col-span-2">
           {deptData.length === 0 ? <EmptyState icon={Briefcase} title="No placement data" accent="indigo" /> : (
@@ -994,9 +1118,7 @@ function PlacementsTab({ placementStats }) {
           <div className="space-y-2">
             {(s?.topCompanies || []).map((c, i) => (
               <div key={c.companyId} className="flex items-center gap-3 p-3.5 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-colors">
-                <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-bold shrink-0 shadow-sm shadow-amber-500/10">
-                  {i + 1}
-                </div>
+                <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-bold shrink-0 shadow-sm shadow-amber-500/10">{i + 1}</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-800 truncate">{c.companyName}</p>
                   <p className="text-[10px] text-slate-400">Highest {c.highestPackage || '—'}</p>
@@ -1012,7 +1134,6 @@ function PlacementsTab({ placementStats }) {
   )
 }
 
-// ─── Reports ─────────────────────────────────────────────────────────────────
 function ReportsTab({ deptReports, subjectReports }) {
   const [view, setView] = useState('department')
   return (
@@ -1028,9 +1149,6 @@ function ReportsTab({ deptReports, subjectReports }) {
             </Button>
             <Button variant="outline" size="sm" onClick={() => downloadFile('/api/admin/export/faculty', 'faculty.csv').catch(() => {})}>
               <span className="flex gap-1"><Download size={12} /> Faculty</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => downloadFile('/api/admin/export/fees', 'fees.csv').catch(() => {})}>
-              <span className="flex gap-1"><Download size={12} /> Fees</span>
             </Button>
             <div className="flex bg-white border border-white/60 rounded-2xl p-1 backdrop-blur-sm">
               {[['department', 'Departments'], ['subject', 'Subjects']].map(([id, label]) => (
@@ -1139,248 +1257,7 @@ function NoticesTab({ insights }) {
   )
 }
 
-// ─── Fee Management Tab ──────────────────────────────────────────────────────
-function FeeRow({ fee, onRecordPayment }) {
-  const [open, setOpen] = useState(false)
-  const [payments, setPayments] = useState([])
-  const [loadingPayments, setLoadingPayments] = useState(false)
-  const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState('CASH')
-  const [reference, setReference] = useState('')
-  const [remarks, setRemarks] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  const total = Number(fee.totalAmount || 0)
-  const paid = Number(fee.paidAmount || 0)
-  const balance = Number(fee.balance ?? (total - paid))
-  const isPaid = fee.status === 'PAID'
-  const partial = !isPaid && paid > 0
-
-  useEffect(() => {
-    if (!open) return
-    setAmount(balance > 0 ? String(balance) : '')
-    let cancelled = false
-    const load = async () => {
-      setLoadingPayments(true)
-      try {
-        const res = await api.get(`/api/admin/fees/${fee.id}/payments`)
-        if (!cancelled) setPayments(Array.isArray(res.data) ? res.data : [])
-      } catch {
-        if (!cancelled) setPayments([])
-      } finally {
-        if (!cancelled) setLoadingPayments(false)
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [open, fee.id, balance])
-
-  const submit = async (e) => {
-    e.preventDefault()
-    setBusy(true)
-    try {
-      const ok = await onRecordPayment(fee.id, {
-        amount: Number(amount),
-        method,
-        reference: reference || null,
-        remarks: remarks || null,
-      })
-      if (ok !== false) {
-        setOpen(false)
-        setReference('')
-        setRemarks('')
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <>
-      <tr className="hover:bg-white/30 transition-colors">
-        <td className="text-slate-800 font-medium">#{fee.studentId}</td>
-        <td className="text-slate-500">{fee.semesterName || '—'}</td>
-        <td style={{ textAlign: 'center' }} className="font-medium">₹{total.toLocaleString('en-IN')}</td>
-        <td style={{ textAlign: 'center' }} className="font-medium">₹{paid.toLocaleString('en-IN')}</td>
-        <td style={{ textAlign: 'center' }} className={balance > 0 ? 'text-amber-600 font-medium' : 'text-emerald-600 font-medium'}>
-          ₹{balance.toLocaleString('en-IN')}
-        </td>
-        <td style={{ textAlign: 'center' }} className="text-slate-500">{fee.dueDate || '—'}</td>
-        <td style={{ textAlign: 'center' }}>
-          <Badge variant={isPaid ? 'success' : partial ? 'info' : fee.status === 'OVERDUE' ? 'destructive' : 'warning'}>{isPaid ? 'PAID' : partial ? 'PARTIAL' : fee.status}</Badge>
-        </td>
-        <td style={{ textAlign: 'center' }}>
-          <Button variant="outline" size="sm" onClick={() => setOpen(o => !o)} className="px-3">
-            <span className="flex gap-1"><Wallet size={13} /> Record</span>
-          </Button>
-        </td>
-      </tr>
-      {open && (
-        <tr>
-          <td colSpan={8} className="bg-slate-50/60">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-4">
-              <form onSubmit={submit} className="space-y-3">
-                <p className="text-xs font-semibold text-slate-700">Record a payment (cash, cheque, DD or settled online)</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Amount</label>
-                    <input type="number" min="1" max={balance} value={amount} onChange={e => setAmount(e.target.value)} className="collego-input" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Method</label>
-                    <select value={method} onChange={e => setMethod(e.target.value)} className="collego-input">
-                      {['CASH', 'CHEQUE', 'DD', 'UPI', 'CARD', 'NET_BANKING'].map(m => <option key={m}>{m}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Reference</label>
-                    <input value={reference} onChange={e => setReference(e.target.value)} placeholder="Cheque/UTR no." className="collego-input" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Remarks</label>
-                    <input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional" className="collego-input" />
-                  </div>
-                </div>
-                <Button type="submit" variant="gradient" size="sm" disabled={busy || !amount || Number(amount) <= 0 || Number(amount) > balance}>
-                  {busy ? <span className="flex gap-1"><RefreshCw size={13} className="animate-spin" /> Saving...</span> : 'Record payment'}
-                </Button>
-              </form>
-
-              <div>
-                <p className="text-xs font-semibold text-slate-700 mb-2">Payment history</p>
-                {loadingPayments ? (
-                  <p className="text-xs text-slate-400">Loading...</p>
-                ) : payments.length === 0 ? (
-                  <p className="text-xs text-slate-400">No payments recorded yet.</p>
-                ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {payments.map(p => (
-                      <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-white/70 bg-white/60 px-3 py-2">
-                        <div>
-                          <p className="text-xs font-medium text-slate-700">₹{Number(p.amount).toLocaleString('en-IN')} · {p.method}</p>
-                          <p className="text-[10px] text-slate-400">{p.receiptNumber} · {fmtDate(p.paidAt)}</p>
-                        </div>
-                        <button
-                          onClick={() => downloadFile(`/api/admin/fees/payments/${p.id}/receipt`, `receipt-${p.receiptNumber}.pdf`).catch(() => {})}
-                          className="text-indigo-600 hover:underline text-[11px] flex items-center gap-1"
-                        >
-                          <Download size={11} /> Receipt
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
-  )
-}
-
-function FeeTab({ fees, onCreateFee, onUpdateFee, onRecordPayment, onAddFeeItem }) {
-  const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ studentId: '', semesterId: '', totalAmount: '', paidAmount: '', dueDate: '', status: 'PENDING', items: [] })
-
-  const totalOutstanding = fees.reduce((s, f) => s + (f.status !== 'PAID' ? Number(f.totalAmount || 0) : 0), 0)
-  const totalPaid = fees.reduce((s, f) => s + (Number(f.paidAmount || 0)), 0)
-
-  return (
-    <div className="space-y-6">
-      <PageTitle icon={Wallet} title="Fee Management" subtitle="Student fee structures, payment tracking, and financial reports." />
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard index={0} label="Total Outstanding" value={totalOutstanding} prefix="₹" icon={Wallet} accent="amber" glow />
-        <StatCard index={1} label="Total Paid" value={totalPaid} prefix="₹" icon={CheckCircle2} accent="emerald" glow />
-        <StatCard index={2} label="Fee Records" value={fees.length} icon={ScrollText} accent="blue" glow />
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <Panel title="Create Fee Record" icon={Plus} accent="emerald">
-          <div className="glass-card p-5 border border-white/60">
-            <form onSubmit={(e) => { e.preventDefault(); onCreateFee({ ...form, totalAmount: Number(form.totalAmount), paidAmount: Number(form.paidAmount || 0), items: form.items.filter(i => i.description) })}} className="space-y-4">
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Student ID</label>
-                <input value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} placeholder="e.g., 10" className="collego-input" required />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Semester ID</label>
-                <input value={form.semesterId} onChange={e => setForm({ ...form, semesterId: e.target.value })} placeholder="e.g., 20" className="collego-input" required />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Total Amount (₹)</label>
-                <input type="number" value={form.totalAmount} onChange={e => setForm({ ...form, totalAmount: e.target.value })} placeholder="0" className="collego-input" required />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Paid Amount (₹)</label>
-                <input type="number" value={form.paidAmount} onChange={e => setForm({ ...form, paidAmount: e.target.value })} placeholder="0" className="collego-input" />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Due Date</label>
-                <input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} className="collego-input" required />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Status</label>
-                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="collego-input">
-                  <option value="PENDING">Pending</option>
-                  <option value="PAID">Paid</option>
-                  <option value="OVERDUE">Overdue</option>
-                </select>
-              </div>
-              <Button type="submit" variant="gradient" size="sm" className="w-full">
-                <Plus size={13} /> Create Fee Record
-              </Button>
-            </form>
-          </div>
-        </Panel>
-
-        <Panel title="Fee Records" icon={ScrollText} accent="blue">
-          <div className="flex justify-end mb-3">
-            <Button variant="outline" size="sm" onClick={() => downloadFile('/api/admin/export/fees', 'fees.csv').catch(() => {})}>
-              <span className="flex gap-1"><Download size={13} /> Export CSV</span>
-            </Button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="collego-table">
-              <thead>
-                <tr>
-                  <th>Student ID</th>
-                  <th>Semester</th>
-                  <th style={{ textAlign: 'center' }}>Total</th>
-                  <th style={{ textAlign: 'center' }}>Paid</th>
-                  <th style={{ textAlign: 'center' }}>Balance</th>
-                  <th style={{ textAlign: 'center' }}>Due Date</th>
-                  <th style={{ textAlign: 'center' }}>Status</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fees.map(f => (
-                  <FeeRow key={f.id} fee={f} onRecordPayment={onRecordPayment} />
-                ))}
-                {fees.length === 0 && <tr><td colSpan={8} className="text-center text-slate-400 py-12">No fee records found.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-      </div>
-
-      {showCreate && (
-        <div className="glass-card p-6 border border-white/60">
-          <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2"><Plus size={15} className="text-emerald-500" /> Create New Fee</h3>
-          <p className="text-xs text-slate-500 mb-4">Fee records will appear in the table above once created.</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Coming soon / informational ─────────────────────────────────────────────
 const COMING_SOON = {
-  fees: { title: 'Fees & Finance', icon: Wallet, accent: 'amber', copy: 'Student fee structures, payment tracking, receipts and financial reports will be managed here.' },
   hostel: { title: 'Hostel & Facilities', icon: Home, accent: 'violet', copy: 'Hostel allocation, room availability, facility bookings and complaint tracking.' },
   library: { title: 'Library', icon: Landmark, accent: 'blue', copy: 'Book catalogue, issue and return workflow, fines and resource reservations.' },
   aiAssistant: { title: 'AI Assistant', icon: Sparkles, accent: 'violet', copy: 'AI-powered insights, risk detection, smart search and automated decision support are available across portals.' },
@@ -1421,12 +1298,11 @@ export default function AdminDashboard() {
   const [deptReports, setDeptReports] = useState([])
   const [subjectReports, setSubjectReports] = useState([])
   const [attendanceSummary, setAttendanceSummary] = useState([])
-  const [pendingQPs, setPendingQPs] = useState([])
   const [placementStats, setPlacementStats] = useState(null)
+  const [placementNotices, setPlacementNotices] = useState([])
   const [insights, setInsights] = useState(null)
   const [semesters, setSemesters] = useState([])
   const [importResult, setImportResult] = useState(null)
-  const [fees, setFees] = useState([])
 
   const sidebarWidth = collapsed ? 76 : 248
   const showMsg = useCallback((text, type = 'success') => setToast({ text, type }), [])
@@ -1439,18 +1315,17 @@ export default function AdminDashboard() {
   }, [])
 
   const loadAll = useCallback(async () => {
-    const [ovRes, usRes, dpRes, drRes, srRes, asRes, qpRes, psRes, inRes, semRes, feesRes] = await Promise.allSettled([
+    const [ovRes, usRes, dpRes, drRes, srRes, asRes, psRes, pnRes, inRes, semRes] = await Promise.allSettled([
       api.get('/api/admin/overview'),
       api.get('/api/admin/users'),
       api.get('/api/departments'),
       api.get('/api/admin/reports/departments'),
       api.get('/api/admin/reports/subjects'),
       api.get('/api/admin/reports/attendance'),
-      api.get('/api/admin/question-papers/pending'),
       api.get('/api/placement/stats'),
+      api.get('/api/placement/notices'),
       api.get('/api/admin/dashboard/insights'),
       api.get('/api/semesters'),
-      api.get('/api/admin/fees'),
     ])
     if (ovRes.status === 'fulfilled') setOverview(ovRes.value.data)
     if (usRes.status === 'fulfilled') setUsers(Array.isArray(usRes.value.data) ? usRes.value.data : usRes.value.data?.content || [])
@@ -1458,11 +1333,10 @@ export default function AdminDashboard() {
     if (drRes.status === 'fulfilled') setDeptReports(Array.isArray(drRes.value.data) ? drRes.value.data : [])
     if (srRes.status === 'fulfilled') setSubjectReports(Array.isArray(srRes.value.data) ? srRes.value.data : [])
     if (asRes.status === 'fulfilled') setAttendanceSummary(Array.isArray(asRes.value.data) ? asRes.value.data : [])
-    if (qpRes.status === 'fulfilled') setPendingQPs(Array.isArray(qpRes.value.data) ? qpRes.value.data : [])
     if (psRes.status === 'fulfilled') setPlacementStats(psRes.value.data)
+    if (pnRes.status === 'fulfilled') setPlacementNotices(Array.isArray(pnRes.value.data) ? pnRes.value.data : [])
     if (inRes.status === 'fulfilled') setInsights(inRes.value.data)
     if (semRes.status === 'fulfilled') setSemesters(Array.isArray(semRes.value.data) ? semRes.value.data : [])
-    if (feesRes.status === 'fulfilled') setFees(Array.isArray(feesRes.value.data) ? feesRes.value.data : [])
   }, [])
 
   const handleSemesterChange = async (semId) => {
@@ -1511,6 +1385,52 @@ export default function AdminDashboard() {
     }
   }
 
+  const onUploadResume = async (facultyProfileId, file) => {
+    if (!facultyProfileId) {
+      showMsg('Faculty profile not found', 'error')
+      return false
+    }
+    const fd = new FormData()
+    fd.append('file', file)
+    try {
+      await api.post(`/api/admin/faculty/${facultyProfileId}/resume`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      showMsg('Faculty resume uploaded')
+      await loadUsers()
+      await loadAll()
+      return true
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to upload resume', 'error')
+      return false
+    }
+  }
+
+  const onCreatePlacement = async ({ file, ...payload }) => {
+    const fd = new FormData()
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value !== '' && value !== null && value !== undefined) fd.append(key, value)
+    })
+    if (file) fd.append('file', file)
+    try {
+      await api.post('/api/placement/notices', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      showMsg('Upcoming placement created')
+      await loadAll()
+      return true
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to create placement', 'error')
+      return false
+    }
+  }
+
+  const onDeactivatePlacement = async (id) => {
+    try {
+      await api.put(`/api/placement/notices/${id}/deactivate`)
+      showMsg('Placement drive removed')
+      await loadAll()
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to remove placement', 'error')
+    }
+  }
+
   const onCsvImport = async (file) => {
     const fd = new FormData(); fd.append('file', file)
     setLoading(true)
@@ -1524,71 +1444,6 @@ export default function AdminDashboard() {
     } finally { setLoading(false) }
   }
 
-  const handleApproveQP = async (id) => {
-    try {
-      await api.put(`/api/admin/question-papers/${id}/approve`)
-      showMsg('Question paper approved')
-      loadAll()
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to approve', 'error') }
-  }
-
-  const handleRejectQP = async (id) => {
-    try {
-      await api.put(`/api/admin/question-papers/${id}/reject`)
-      showMsg('Question paper rejected')
-      loadAll()
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to reject', 'error') }
-  }
-
-  // ─── Fee CRUD handlers ─────────────────────────────────────────────────────
-  const onCreateFee = async (payload) => {
-    try {
-      await api.post('/api/admin/fees', payload)
-      showMsg('Fee created successfully')
-      loadAll()
-      return true
-    } catch (err) {
-      showMsg(err.response?.data?.message || 'Failed to create fee', 'error')
-      return false
-    }
-  }
-
-  const onUpdateFee = async (id, payload) => {
-    try {
-      await api.put(`/api/admin/fees/${id}`, payload)
-      showMsg('Fee updated successfully')
-      loadAll()
-      return true
-    } catch (err) {
-      showMsg(err.response?.data?.message || 'Failed to update fee', 'error')
-      return false
-    }
-  }
-
-  const onRecordPayment = async (id, payload) => {
-    try {
-      await api.post(`/api/admin/fees/${id}/payments`, payload)
-      showMsg('Payment recorded and receipt generated')
-      loadAll()
-      return true
-    } catch (err) {
-      showMsg(err.response?.data?.message || 'Failed to record payment', 'error')
-      return false
-    }
-  }
-
-  const onAddFeeItem = async (feeId, payload) => {
-    try {
-      await api.post(`/api/admin/fees/${feeId}/items`, payload)
-      showMsg('Fee item added')
-      loadAll()
-      return true
-    } catch (err) {
-      showMsg(err.response?.data?.message || 'Failed to add fee item', 'error')
-      return false
-    }
-  }
-
   useEffect(() => { loadAll() }, [loadAll])
 
   const unreadCount = insights?.recentNotices?.filter(n => !n.read).length || 0
@@ -1596,20 +1451,12 @@ export default function AdminDashboard() {
   const renderTab = () => {
     switch (activeTab) {
       case 'overview': return <OverviewTab overview={overview} deptReports={deptReports} attendanceSummary={attendanceSummary} placementStats={placementStats} insights={insights} semesters={semesters} onTabChange={setActiveTab} onSemesterChange={handleSemesterChange} />
-      case 'users': return <DirectoryTab users={users} departments={departments} loading={loading} query={query} fixedRole="STUDENT" title="Student Directory" subtitle="Manage and enroll students across departments." icon={GraduationCap} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onCsvImport={onCsvImport} importResult={importResult} enableYearFilter />
-      case 'faculty': return <DirectoryTab users={users} departments={departments} loading={loading} query={query} fixedRole="FACULTY" title="Faculty Directory" subtitle="Manage faculty members and teaching assignments." icon={Users} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onCsvImport={onCsvImport} importResult={null} />
-      case 'academics': return <AcademicsTab departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} showMsg={showMsg} />
+      case 'academics': return <AcademicsTab users={users} departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} showMsg={showMsg} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onUploadResume={onUploadResume} />
       case 'attendance': return <AttendanceTab attendanceSummary={attendanceSummary} overview={overview} />
-      case 'examinations': return (
-        <div className="space-y-6">
-          <ExamsAdminTab showMsg={showMsg} />
-          <ExaminationsTab pendingQPs={pendingQPs} onApprove={handleApproveQP} onReject={handleRejectQP} loading={loading} />
-        </div>
-      )
-      case 'placements': return <PlacementsTab placementStats={placementStats} />
+      case 'examinations': return <ExamsAdminTab showMsg={showMsg} />
+      case 'placements': return <PlacementsTab placementStats={placementStats} notices={placementNotices} departments={departments} onCreatePlacement={onCreatePlacement} onDeactivatePlacement={onDeactivatePlacement} />
       case 'reports': return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} />
       case 'announcements': return <NoticesTab insights={insights} />
-      case 'fees': return <FeeTab fees={fees} onCreateFee={onCreateFee} onUpdateFee={onUpdateFee} onRecordPayment={onRecordPayment} onAddFeeItem={onAddFeeItem} />
       case 'settings': return <SettingsTab showMsg={showMsg} accent="indigo" />
       case 'help': return <HelpTab accent="indigo" />
       default: return null

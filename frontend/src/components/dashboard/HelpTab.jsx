@@ -20,8 +20,8 @@ const FAQS = [
     a: 'Students can find both under Academics in the sidebar. Assignments show their due date and submission status; materials are grouped by course.',
   },
   {
-    q: 'Who do I contact for fee or document issues?',
-    a: 'Fee records and documents are managed by the college accounts office. Raise the issue with the office along with your USN and the relevant semester.',
+    q: 'Who do I contact for document issues?',
+    a: 'Marksheets, transcripts and other academic documents are issued by the college examination office. Raise the issue with the office along with your USN and the relevant semester.',
   },
 ]
 

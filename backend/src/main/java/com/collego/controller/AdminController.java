@@ -4,6 +4,7 @@ import com.collego.dto.*;
 import com.collego.repository.AuditLogRepository;
 import com.collego.service.AdminPortalService;
 import com.collego.service.DepartmentService;
+import com.collego.service.FacultyDirectoryService;
 import com.collego.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -11,12 +12,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,6 +34,7 @@ public class AdminController {
     private final DepartmentService departmentService;
     private final AuditLogRepository auditLogRepository;
     private final AdminPortalService adminPortalService;
+    private final FacultyDirectoryService facultyDirectoryService;
 
     // ==================== User Management (Phase 1) ====================
 
@@ -141,6 +145,20 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
+    // ==================== Faculty Resumes ====================
+
+    @PostMapping(value = "/faculty/{facultyId}/resume", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<FacultyDirectoryResponse> uploadFacultyResume(
+            @PathVariable Long facultyId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(facultyDirectoryService.uploadResume(facultyId, file));
+    }
+
+    @DeleteMapping("/faculty/{facultyId}/resume")
+    public ResponseEntity<FacultyDirectoryResponse> removeFacultyResume(@PathVariable Long facultyId) {
+        return ResponseEntity.ok(facultyDirectoryService.removeResume(facultyId));
+    }
+
     // ==================== Bulk Import (Phase 5) ====================
 
     @PostMapping("/users/import")
@@ -249,37 +267,7 @@ public class AdminController {
         return ResponseEntity.ok(adminPortalService.getAttendanceSummary());
     }
 
-    // ==================== Question Paper Approval (Phase 5) ====================
-
-    @GetMapping("/question-papers")
-    public ResponseEntity<List<QuestionPaperResponse>> getAllQuestionPapers() {
-        return ResponseEntity.ok(adminPortalService.getAllQuestionPapers());
-    }
-
-    @GetMapping("/question-papers/pending")
-    public ResponseEntity<List<QuestionPaperResponse>> getPendingQuestionPapers() {
-        return ResponseEntity.ok(adminPortalService.getPendingQuestionPapers());
-    }
-
-    @PutMapping("/question-papers/{id}/approve")
-    public ResponseEntity<QuestionPaperResponse> approveQuestionPaper(
-            @PathVariable Long id,
-            Authentication auth,
-            HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(adminPortalService.approveQuestionPaper(
-                id, auth.getName(), httpRequest.getRemoteAddr()));
-    }
-
-    @PutMapping("/question-papers/{id}/reject")
-    public ResponseEntity<QuestionPaperResponse> rejectQuestionPaper(
-            @PathVariable Long id,
-            Authentication auth,
-            HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(adminPortalService.rejectQuestionPaper(
-                id, auth.getName(), httpRequest.getRemoteAddr()));
-    }
-
-    // ==================== Backup (Phase 5 — Stub) ====================
+    // ==================== Backup (Phase 5 - Stub) ====================
 
     @PostMapping("/backup")
     public ResponseEntity<Map<String, Object>> triggerBackup(

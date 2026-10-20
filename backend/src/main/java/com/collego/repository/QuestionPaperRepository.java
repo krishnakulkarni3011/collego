@@ -33,7 +33,7 @@ public interface QuestionPaperRepository extends JpaRepository<QuestionPaper, Lo
            "AND (:departmentId IS NULL OR qp.department.id = :departmentId) " +
            "AND (:semesterNumber IS NULL OR qp.semesterNumber = :semesterNumber) " +
            "AND (:year IS NULL OR qp.year = :year) " +
-           "AND (:examType IS NULL OR UPPER(qp.examType) = UPPER(:examType)) " +
+           "AND (:examType IS NULL OR qp.examType = :examType) " +
            "ORDER BY qp.year DESC, qp.createdAt DESC")
     List<QuestionPaper> searchApproved(@Param("courseId") Long courseId,
                                        @Param("departmentId") Long departmentId,

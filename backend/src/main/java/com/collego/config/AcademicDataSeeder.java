@@ -14,7 +14,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -40,9 +39,6 @@ public class AcademicDataSeeder implements CommandLineRunner {
     private final AttendanceRepository attendanceRepository;
     private final InternalMarksRepository internalMarksRepository;
     private final SemesterMarksRepository semesterMarksRepository;
-    private final FeeRepository feeRepository;
-    private final FeeItemRepository feeItemRepository;
-    private final PlacementNoticeRepository placementNoticeRepository;
     private final NotificationRepository notificationRepository;
     private final AdminProfileRepository adminProfileRepository;
     private final PasswordEncoder passwordEncoder;
@@ -56,6 +52,15 @@ public class AcademicDataSeeder implements CommandLineRunner {
 
     private static final int EXPECTED_STUDENT_COUNT = 120;
     private static final int EXPECTED_SEMESTER_COUNT = 8;
+
+    /**
+     * Companies used by the old placement-notice seeder. Production databases
+     * created before placement drives became admin-managed can still contain
+     * these rows; remove only the seed-shaped ones (no drive date, no file).
+     */
+    private static final String LEGACY_SEEDED_PLACEMENTS_SQL =
+            "DELETE FROM placement_notices WHERE drive_date IS NULL AND attachment_path IS NULL "
+                    + "AND company_name IN ('Google', 'Goldman Sachs', 'Amazon', 'Microsoft', 'Cisco')";
 
     private final Random random = new Random(42); // Fixed seed for reproducibility
 
@@ -166,6 +171,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        cleanupLegacySeededPlacementNotices();
         if (isSeedUpToDate()) {
             log.info("Academic seed data is up to date (7 faculty, 120 students, 8 semesters). Skipping seed.");
             return;
@@ -203,11 +209,8 @@ public class AcademicDataSeeder implements CommandLineRunner {
         // 8. Create timetable for all semesters
         seedTimetableForAllSections(semSections);
 
-        // 9. Create sample attendance, marks, fees, notifications
+        // 9. Create sample attendance, marks and notifications
         seedAcademicData(semSections, studentsByYear, semesters);
-
-        // 10. Seed placement notices
-        seedPlacementNotices(Map.of("CSE", cseDept));
 
         log.info("=== Academic Data Seeder Complete ===");
         log.info("Created: 1 department (CSE), {} courses, 7 faculty, 120 students (30 per year × 4 years)",
@@ -215,6 +218,17 @@ public class AcademicDataSeeder implements CommandLineRunner {
         log.info("Sample student login: USN format 1CG24CS001 / Student@123");
 
         ensureAdminProfile();
+    }
+
+    private void cleanupLegacySeededPlacementNotices() {
+        try {
+            int removed = jdbcTemplate.update(LEGACY_SEEDED_PLACEMENTS_SQL);
+            if (removed > 0) {
+                log.info("Removed {} legacy seeded placement notice(s).", removed);
+            }
+        } catch (Exception e) {
+            log.debug("Legacy placement cleanup skipped: {}", e.getMessage());
+        }
     }
 
     private void ensureAdminProfile() {
@@ -244,7 +258,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
             if (departmentRepository.findByCode("CSE").isEmpty()) return false;
             if (semesterRepository.count() != EXPECTED_SEMESTER_COUNT) return false;
             if (courseRepository.count() < expectedCourseCount()) return false;
-            if (studentProfileRepository.count() != EXPECTED_STUDENT_COUNT) return false;
+            if (studentProfileRepository.count() < EXPECTED_STUDENT_COUNT) return false;
             for (String[] faculty : FACULTY_DATA) {
                 if (userRepository.findByEmailIgnoreCase(faculty[1]).isEmpty()) return false;
             }
@@ -615,19 +629,6 @@ public class AcademicDataSeeder implements CommandLineRunner {
             seedSemesterMarks(sections, sectionAStudents, sectionBStudents);
         }
 
-        // Seed fees for all students
-        for (List<StudentProfile> yearStudents : studentsByYear.values()) {
-            List<StudentProfile> sectionAStudents = new ArrayList<>();
-            List<StudentProfile> sectionBStudents = new ArrayList<>();
-            for (StudentProfile s : yearStudents) {
-                if (s.getSection().equals("A")) sectionAStudents.add(s);
-                else sectionBStudents.add(s);
-            }
-            for (Semester semester : semesters) {
-                seedFees(sectionAStudents, sectionBStudents, semester);
-            }
-        }
-
         // Seed notifications
         for (List<StudentProfile> yearStudents : studentsByYear.values()) {
             List<StudentProfile> sectionAStudents = new ArrayList<>();
@@ -722,91 +723,6 @@ public class AcademicDataSeeder implements CommandLineRunner {
         }
     }
 
-    private void seedFees(List<StudentProfile> sectionA, List<StudentProfile> sectionB, Semester semester) {
-        List<StudentProfile> allStudents = new ArrayList<>();
-        allStudents.addAll(sectionA);
-        allStudents.addAll(sectionB);
-
-        for (StudentProfile student : allStudents) {
-            FeeStatus status = random.nextDouble() < 0.7 ? FeeStatus.PAID : FeeStatus.PENDING;
-            createFee(student, semester, status);
-        }
-    }
-
-    private void createFee(StudentProfile student, Semester semester, FeeStatus status) {
-        BigDecimal tuition = BigDecimal.valueOf(50000);
-        BigDecimal labFee = BigDecimal.valueOf(5000);
-        BigDecimal hostelFee = BigDecimal.valueOf(30000);
-        BigDecimal libraryFee = BigDecimal.valueOf(2000);
-        BigDecimal examFee = BigDecimal.valueOf(3000);
-        BigDecimal totalAmount = tuition.add(labFee).add(hostelFee).add(libraryFee).add(examFee);
-
-        Fee fee = Fee.builder()
-                .student(student)
-                .semester(semester)
-                .totalAmount(totalAmount)
-                .paidAmount(status == FeeStatus.PAID ? totalAmount : BigDecimal.ZERO)
-                .dueDate(semester.getStartDate() != null ? semester.getStartDate().plusDays(30) : LocalDate.now().plusDays(30))
-                .status(status)
-                .paidAt(status == FeeStatus.PAID ? semester.getStartDate() != null ? semester.getStartDate().plusDays(10).atTime(10, 0) : null : null)
-                .transactionRef(status == FeeStatus.PAID ? "TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase() : null)
-                .build();
-        fee = feeRepository.save(fee);
-
-        List<FeeItem> items = List.of(
-                FeeItem.builder().fee(fee).category(FeeCategory.ACADEMIC).description("Tuition Fee").amount(tuition).build(),
-                FeeItem.builder().fee(fee).category(FeeCategory.ACADEMIC).description("Laboratory Fee").amount(labFee).build(),
-                FeeItem.builder().fee(fee).category(FeeCategory.HOSTEL).description("Hostel Charges").amount(hostelFee).build(),
-                FeeItem.builder().fee(fee).category(FeeCategory.MISCELLANEOUS).description("Library Fee").amount(libraryFee).build(),
-                FeeItem.builder().fee(fee).category(FeeCategory.MISCELLANEOUS).description("Examination Fee").amount(examFee).build()
-        );
-        feeItemRepository.saveAll(items);
-    }
-
-    private void seedPlacementNotices(Map<String, Department> departments) {
-        User admin = userRepository.findByEmail("admin@collego.edu").orElse(null);
-
-        createPlacementNotice("Software Engineer — Google", "Google", null, admin,
-                "Google is hiring for the role of Software Engineer (L3). Open to all engineering branches.",
-                "CGPA >= 7.0, No active backlogs", "₹25-40 LPA", LocalDate.now().plusDays(15));
-
-        createPlacementNotice("Analyst — Goldman Sachs", "Goldman Sachs", null, admin,
-                "Goldman Sachs is looking for bright analysts for their Bangalore office.",
-                "CGPA >= 7.5, Strong analytical skills", "₹18-25 LPA", LocalDate.now().plusDays(20));
-
-        createPlacementNotice("SDE Intern — Amazon", "Amazon", null, admin,
-                "Amazon Summer Internship 2026. 6-month internship with PPO opportunity.",
-                "CGPA >= 6.5, Proficiency in DSA", "₹60,000/month + benefits", LocalDate.now().plusDays(10));
-
-        createPlacementNotice("ML Engineer — Microsoft", "Microsoft",
-                departments.get("CSE"), admin,
-                "Microsoft AI division is hiring ML Engineers.",
-                "CGPA >= 8.0, Experience with ML frameworks", "₹30-45 LPA", LocalDate.now().plusDays(25));
-
-        createPlacementNotice("Network Engineer — Cisco", "Cisco",
-                departments.get("CSE"), admin,
-                "Cisco is hiring network engineers for their R&D center.",
-                "CGPA >= 7.0, Networking fundamentals", "₹15-20 LPA", LocalDate.now().plusDays(18));
-
-        log.info("Seeded 5 placement notices");
-    }
-
-    private void createPlacementNotice(String title, String company, Department dept, User postedBy,
-                                        String description, String eligibility, String pkg, LocalDate lastDate) {
-        PlacementNotice notice = PlacementNotice.builder()
-                .title(title)
-                .companyName(company)
-                .department(dept)
-                .postedBy(postedBy)
-                .description(description)
-                .eligibilityCriteria(eligibility)
-                .packageOffered(pkg)
-                .lastDate(lastDate)
-                .isActive(true)
-                .build();
-        placementNoticeRepository.save(notice);
-    }
-
     private void seedNotifications(List<StudentProfile> sectionA, List<StudentProfile> sectionB) {
         List<StudentProfile> allStudents = new ArrayList<>();
         allStudents.addAll(sectionA);
@@ -815,8 +731,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
         String[][] notifications = {
                 {"Welcome to New Semester!", "Your semester classes have started. Check your timetable for schedule details.", "ACADEMIC"},
                 {"IA-1 Marks Published", "Internal Assessment 1 marks have been published. Check your marks section.", "ACADEMIC"},
-                {"Fee Payment Reminder", "Your semester fee payment is due. Please clear your dues before the deadline.", "FEE"},
-                {"New Placement Drive", "Google is visiting campus soon. Check placement notices for details.", "PLACEMENT"},
+                {"New Placement Drive", "A new placement drive has been announced. Check placement notices for details.", "PLACEMENT"},
                 {"Library Book Due", "You have library books due for return. Please return them to avoid fines.", "GENERAL"}
         };
 

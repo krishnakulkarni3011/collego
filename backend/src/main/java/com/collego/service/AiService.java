@@ -85,26 +85,10 @@ public class AiService {
         return post("/placement-assistant", request);
     }
 
-    // ── Feature 7: Notice Summarizer ─────────────────────────────────────────
-
-    public Map<String, Object> summarizeNotice(String title, String content) {
-        return post("/summarize-notice", Map.of("noticeTitle", title, "noticeContent", content));
-    }
-
-    // ── Feature 8: Question Paper Insights ───────────────────────────────────
+    // ── Feature 7: Question Paper Insights ───────────────────────────────────
 
     public Map<String, Object> questionPaperInsights(Map<String, Object> request) {
         return post("/question-paper-insights", request);
-    }
-
-    // ── Feature 9: Generate Notice ────────────────────────────────────────────
-
-    public Map<String, Object> generateNotice(String prompt, String audience, String noticeType) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("prompt", prompt);
-        payload.put("audience", audience != null ? audience : "students");
-        payload.put("noticeType", noticeType != null ? noticeType : "GENERAL");
-        return post("/generate-notice", payload);
     }
 
     // ── HTTP helpers ──────────────────────────────────────────────────────────

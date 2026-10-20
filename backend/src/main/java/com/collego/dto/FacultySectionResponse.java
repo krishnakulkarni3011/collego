@@ -16,5 +16,6 @@ public class FacultySectionResponse {
     private Long semesterId;
     private String semesterName;
     private Integer semesterNumber;
+    private Integer year;
     private long enrolledStudents;
 }

@@ -8,12 +8,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -175,6 +177,53 @@ public class PlacementController {
             @RequestParam String outcome,
             @RequestParam(required = false) String notes) {
         return ResponseEntity.ok(placementService.updateInterviewOutcome(id, outcome, notes));
+    }
+
+    // ==================== Upcoming Placement Drives (Admin) ====================
+
+    @GetMapping("/notices")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<PlacementNoticeResponse>> getAllNotices() {
+        return ResponseEntity.ok(placementService.getAllNotices());
+    }
+
+    @PostMapping(value = "/notices", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PlacementNoticeResponse> createNotice(
+            Authentication auth,
+            @RequestParam String title,
+            @RequestParam String companyName,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) String eligibilityCriteria,
+            @RequestParam(required = false) String packageOffered,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate driveDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate lastDate,
+            @RequestParam(required = false) Long departmentId,
+            @RequestParam(value = "file", required = false) MultipartFile file) throws IOException {
+        return ResponseEntity.status(HttpStatus.CREATED).body(placementService.createNotice(
+                auth.getName(), title, companyName, description, eligibilityCriteria,
+                packageOffered, driveDate, lastDate, departmentId, file));
+    }
+
+    @PutMapping("/notices/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PlacementNoticeResponse> deactivateNotice(@PathVariable Long id) {
+        return ResponseEntity.ok(placementService.deactivateNotice(id));
+    }
+
+    @GetMapping("/notices/{id}/attachment")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> downloadNoticeAttachment(@PathVariable Long id) throws IOException {
+        PlacementNoticeResponse notice = placementService.getNotice(id);
+        if (!notice.isHasAttachment()) {
+            throw new com.collego.exception.BadRequestException("No attachment uploaded for this placement drive.");
+        }
+        String filename = notice.getAttachmentName() != null ? notice.getAttachmentName() : "placement-drive.pdf";
+        byte[] bytes = placementService.downloadNoticeAttachment(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(bytes);
     }
 
     // ==================== Placement Statistics (Admin) ====================

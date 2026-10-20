@@ -11,6 +11,10 @@ import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 
 /**
  * Phase 8 — Central S3 storage abstraction.
@@ -32,6 +36,14 @@ public class S3StorageService {
     @Value("${collego.aws.use-s3:false}")
     private boolean useS3;
 
+    /**
+     * Local development fallback. When S3 is disabled, files are stored under
+     * this directory instead of being silently discarded, so upload/download
+     * flows remain testable without AWS credentials.
+     */
+    @Value("${collego.aws.local-root:${user.home}/collego-storage}")
+    private String localRoot;
+
     // ==================== Upload ====================
 
     /**
@@ -46,7 +58,14 @@ public class S3StorageService {
     public void upload(String bucket, String key, InputStream inputStream,
                        long contentLength, String contentType) {
         if (!useS3) {
-            log.warn("[S3 STUB] upload skipped (use-s3=false): s3://{}/{}", bucket, key);
+            try {
+                Path target = localPath(bucket, key);
+                Files.createDirectories(target.getParent());
+                Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
+                log.info("[local storage] saved {}/{}", bucket, key);
+            } catch (IOException e) {
+                throw new RuntimeException("Local file upload failed: " + e.getMessage(), e);
+            }
             return;
         }
         try {
@@ -75,9 +94,11 @@ public class S3StorageService {
      */
     public byte[] download(String bucket, String key) throws IOException {
         if (!useS3) {
-            log.warn("[S3 STUB] download skipped (use-s3=false): s3://{}/{}", bucket, key);
-            throw new RuntimeException("S3 storage not configured for local dev. " +
-                    "File not available without USE_S3=true and a real S3 bucket.");
+            Path source = localPath(bucket, key);
+            if (!Files.exists(source)) {
+                throw new RuntimeException("File not found in local storage: " + source);
+            }
+            return Files.readAllBytes(source);
         }
         try {
             GetObjectRequest req = GetObjectRequest.builder()
@@ -107,7 +128,11 @@ public class S3StorageService {
      */
     public void delete(String bucket, String key) {
         if (!useS3) {
-            log.warn("[S3 STUB] delete skipped (use-s3=false): s3://{}/{}", bucket, key);
+            try {
+                Files.deleteIfExists(localPath(bucket, key));
+            } catch (IOException e) {
+                log.warn("[local storage] could not delete {}/{}: {}", bucket, key, e.getMessage());
+            }
             return;
         }
         try {
@@ -130,7 +155,7 @@ public class S3StorageService {
      */
     public boolean exists(String bucket, String key) {
         if (!useS3) {
-            return false;
+            return Files.exists(localPath(bucket, key));
         }
         try {
             s3Client.headObject(HeadObjectRequest.builder()
@@ -145,6 +170,15 @@ public class S3StorageService {
     }
 
     // ==================== Helper ====================
+
+    private Path localPath(String bucket, String key) {
+        Path root = Paths.get(localRoot).toAbsolutePath().normalize();
+        Path target = root.resolve(bucket).resolve(key).normalize();
+        if (!target.startsWith(root)) {
+            throw new IllegalArgumentException("Invalid storage path");
+        }
+        return target;
+    }
 
     /**
      * Detect a reasonable content-type based on file extension.

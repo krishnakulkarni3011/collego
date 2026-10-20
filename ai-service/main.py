@@ -1,6 +1,6 @@
 """
 Collego AI Service — Phase 9
-FastAPI microservice implementing all 9 AI features called by Spring Boot backend.
+FastAPI microservice implementing AI features called by the Spring Boot backend.
 
 Features:
   1. AI College Assistant (RAG chatbot)
@@ -9,9 +9,7 @@ Features:
   4. Attendance Risk Prediction (early-warning model)
   5. AI Resume Analyzer (ATS compatibility)
   6. AI Placement Assistant (company recommendations + mock interview)
-  7. AI Notice Summarizer
-  8. AI Question Paper Insights (topic weightage)
-  9. AI Email & Notification Generator
+  7. AI Question Paper Insights (topic weightage)
 
 All LLM features gracefully degrade to intelligent stubs when OPENROUTER_API_KEY is not set.
 ML features (3 & 4) use scikit-learn locally with no external key needed.
@@ -91,7 +89,7 @@ async def health_check():
         "features": [
             "chat", "smart-search", "performance-prediction",
             "attendance-risk", "resume-analyzer", "placement-assistant",
-            "notice-summarizer", "question-paper-insights", "generate-notice"
+            "question-paper-insights"
         ]
     }
 
@@ -816,86 +814,7 @@ def _stub_placement_assistant(
     )
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-# FEATURE 7: AI NOTICE SUMMARIZER
-# ════════════════════════════════════════════════════════════════════════════════
-
-class NoticeSummarizeRequest(BaseModel):
-    noticeTitle: str
-    noticeContent: str
-
-class NoticeSummarizeResponse(BaseModel):
-    summary: str
-    keyDates: List[str]
-    keyActions: List[str]
-    urgency: str  # "LOW" | "MEDIUM" | "HIGH"
-
-@app.post("/summarize-notice", response_model=NoticeSummarizeResponse)
-async def summarize_notice(req: NoticeSummarizeRequest):
-    """
-    Feature 7: AI Notice Summarizer.
-    Extracts key dates, actions, and urgency from long notices.
-    """
-    if not AI_ENABLED:
-        return _stub_notice_summarizer(req.noticeTitle, req.noticeContent)
-
-    system = (
-        "You are a notice summarizer for a college ERP. Extract key information from notices. "
-        "Return JSON: {"
-        "\"summary\": string (2-3 sentences), "
-        "\"keyDates\": list of strings (e.g., 'Submission deadline: 15 Nov 2026'), "
-        "\"keyActions\": list of action items students must do, "
-        "\"urgency\": one of 'LOW', 'MEDIUM', 'HIGH'"
-        "}"
-    )
-    user_prompt = f"Title: {req.noticeTitle}\n\nContent:\n{req.noticeContent}"
-
-    try:
-        content = await call_llm(system, user_prompt, max_tokens=600)
-        parsed = json.loads(content)
-        return NoticeSummarizeResponse(
-            summary=parsed.get("summary", req.noticeContent[:200]),
-            keyDates=parsed.get("keyDates", []),
-            keyActions=parsed.get("keyActions", []),
-            urgency=parsed.get("urgency", "MEDIUM")
-        )
-    except Exception:
-        return _stub_notice_summarizer(req.noticeTitle, req.noticeContent)
-
-
-def _stub_notice_summarizer(title: str, content: str) -> NoticeSummarizeResponse:
-    # Extract dates using regex
-    date_pattern = r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4}\b'
-    dates_found = re.findall(date_pattern, content, re.IGNORECASE)
-
-    summary = content[:250] + ("..." if len(content) > 250 else "")
-
-    urgency = "LOW"
-    urgent_keywords = ["urgent", "immediate", "deadline", "mandatory", "compulsory", "last date", "final"]
-    if any(k in content.lower() for k in urgent_keywords):
-        urgency = "HIGH"
-    elif any(k in content.lower() for k in ["important", "submit", "attend", "register"]):
-        urgency = "MEDIUM"
-
-    actions = []
-    action_keywords = ["submit", "register", "attend", "fill", "upload", "report", "apply"]
-    sentences = content.split(".")
-    for sentence in sentences[:10]:
-        if any(k in sentence.lower() for k in action_keywords):
-            actions.append(sentence.strip())
-            if len(actions) >= 3:
-                break
-
-    return NoticeSummarizeResponse(
-        summary=summary,
-        keyDates=[f"Date found: {d}" for d in dates_found[:3]],
-        keyActions=actions[:3] or ["Read the full notice for required actions."],
-        urgency=urgency
-    )
-
-
-# ════════════════════════════════════════════════════════════════════════════════
-# FEATURE 8: AI QUESTION PAPER INSIGHTS
+# FEATURE 7: AI QUESTION PAPER INSIGHTS
 # ════════════════════════════════════════════════════════════════════════════════
 
 class QuestionPaperData(BaseModel):
@@ -926,7 +845,7 @@ class QuestionPaperInsightsResponse(BaseModel):
 @app.post("/question-paper-insights", response_model=QuestionPaperInsightsResponse)
 async def question_paper_insights(req: QuestionPaperInsightsRequest):
     """
-    Feature 8: AI Question Paper Topic Weightage Analyzer.
+    Feature 7: AI Question Paper Topic Weightage Analyzer.
     Analyzes repository of question papers for frequently-tested topics and chapter-wise weightage.
     """
     if not req.questionPapers:
@@ -1009,57 +928,3 @@ def _stub_question_paper_insights(code: str, name: str, papers: List[QuestionPap
         ],
         totalPapersAnalyzed=n
     )
-
-
-# ════════════════════════════════════════════════════════════════════════════════
-# FEATURE 9: AI EMAIL & NOTIFICATION GENERATOR (upgraded from Phase 8 stub)
-# ════════════════════════════════════════════════════════════════════════════════
-
-class NoticeRequest(BaseModel):
-    prompt: str
-    audience: str = "students"
-    noticeType: Optional[str] = "GENERAL"
-
-class NoticeResponse(BaseModel):
-    title: str
-    body: str
-    summary: str
-
-@app.post("/generate-notice", response_model=NoticeResponse)
-async def generate_notice(req: NoticeRequest):
-    """
-    Feature 9: AI Email & Notification Generator.
-    Turns a Faculty's short prompt into a professionally formatted notice.
-    """
-    if not AI_ENABLED:
-        return NoticeResponse(
-            title=req.prompt.split(":")[0].strip() if ":" in req.prompt else "Notice",
-            body=f"Dear {req.audience.title()},\n\n{req.prompt}\n\nPlease note this important communication and act accordingly.\n\nRegards,\nFaculty",
-            summary=req.prompt[:120] + ("..." if len(req.prompt) > 120 else ""),
-        )
-
-    system_prompt = (
-        "You are a professional college administrator drafting official notices. "
-        "Given a short prompt from a faculty member, generate a well-formatted official notice. "
-        f"The notice is for: {req.audience}. Notice type: {req.noticeType}. "
-        "Return ONLY a JSON object with exactly three keys: "
-        "\"title\" (string, concise heading), "
-        "\"body\" (string, full notice text with proper salutation and sign-off, use \\n for line breaks), "
-        "\"summary\" (string, one sentence summary of key action/date). "
-        "Do not include markdown code fences or any text outside the JSON."
-    )
-
-    try:
-        content = await call_llm(system_prompt, f"Audience: {req.audience}\nPrompt: {req.prompt}", max_tokens=800)
-        parsed = json.loads(content)
-        return NoticeResponse(
-            title=parsed.get("title", "Notice"),
-            body=parsed.get("body", req.prompt),
-            summary=parsed.get("summary", req.prompt[:120]),
-        )
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=502, detail=f"AI response parsing failed: {str(e)}")
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=502, detail=f"AI API error: {e.response.status_code}")
-    except httpx.RequestError as e:
-        raise HTTPException(status_code=503, detail=f"AI service unreachable: {str(e)}")

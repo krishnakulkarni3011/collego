@@ -17,6 +17,7 @@ import { downloadFile } from '../lib/download'
 import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
 import { InvigilationsTab } from '../components/dashboard/InvigilationsTab'
+import { FacultyDirectoryTab } from '../components/dashboard/FacultyDirectoryTab'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -41,6 +42,7 @@ const GLOBAL_NAV = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'subjectAssignments', label: 'My Subject Assignments', icon: BookUser },
   { id: 'questionPapers', label: 'Question Papers', icon: FileText },
+  { id: 'facultyDirectory', label: 'Faculty Directory', icon: Users },
   { id: 'invigilations', label: 'Invigilation Duties', icon: CalendarDays },
   { id: 'notices', label: 'Notices', icon: Megaphone },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -735,7 +737,7 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={FileText} title="Question Papers" subtitle="Upload and track question papers for admin approval." accent="violet" />
+      <PageTitle icon={FileText} title="Question Papers" subtitle="Upload question papers. They are published instantly to students in your department." accent="violet" />
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Upload size={14} className="text-blue-500" /> Upload Question Paper</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -762,7 +764,7 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
           </div>
         </div>
         <div className="mt-4">
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Question Paper File (optional)</label>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Question Paper File</label>
           <input
             ref={fileRef}
             type="file"
@@ -773,7 +775,7 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
           {pendingFile && <p className="text-[10px] text-slate-400 mt-1">Selected: {pendingFile.name}</p>}
         </div>
         <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={handleSubmit} disabled={loading || uploadFileLoading || !selectedSectionId}>
-          {loading || uploadFileLoading ? <><RefreshCw size={13} className="animate-spin" /> Uploading...</> : <><Upload size={13} /> Submit for Approval</>}
+          {loading || uploadFileLoading ? <><RefreshCw size={13} className="animate-spin" /> Uploading...</> : <><Upload size={13} /> Publish Question Paper</>}
         </Button>
       </div>
       {papers.length > 0 && (
@@ -804,7 +806,7 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
 
 // ─── Notices Tab ─────────────────────────────────────────────────────────────
 function NoticesTab({ title, setTitle, message, setMessage, type, setType, deptId, setDeptId, departments, onSubmit, sentNotices, loading }) {
-  const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'FEE', 'EXAM']
+  const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'EXAM']
   return (
     <div className="space-y-6">
       <PageTitle icon={Megaphone} title="Notices" subtitle="Broadcast announcements to students across departments." accent="amber" />
@@ -977,6 +979,7 @@ export default function FacultyDashboard() {
   const [qpFileName, setQpFileName] = useState('')
   const [qpSelectedSectionId, setQpSelectedSectionId] = useState('')
   const [myQuestionPapers, setMyQuestionPapers] = useState([])
+  const [facultyDirectory, setFacultyDirectory] = useState([])
 
   // Analytics
   const [analytics, setAnalytics] = useState(null)
@@ -1025,6 +1028,14 @@ export default function FacultyDashboard() {
     setSelectedSection(null)
     setActiveTab(tabId)
     if (tabId === 'questionPapers') loadMyQPs()
+    if (tabId === 'facultyDirectory') loadFacultyDirectory()
+  }
+
+  const loadFacultyDirectory = async () => {
+    try {
+      const res = await api.get('/api/faculty-directory')
+      setFacultyDirectory(Array.isArray(res.data) ? res.data : [])
+    } catch { showMsg('Failed to load faculty directory', 'error') }
   }
 
   const handleSectionSelect = (section) => {
@@ -1186,6 +1197,7 @@ export default function FacultyDashboard() {
   const handleUploadQP = async (file) => {
     const sec = sections.find(s => s.sectionId === parseInt(qpSelectedSectionId))
     if (!sec) { showMsg('Please select a course/section', 'error'); throw new Error('No section') }
+    if (!file) { showMsg('Please choose a question paper file', 'error'); throw new Error('No file') }
     setLoading(true)
     try {
       const params = {
@@ -1203,7 +1215,7 @@ export default function FacultyDashboard() {
       } else {
         await api.post('/api/faculty/question-papers', params)
       }
-      showMsg('Question paper uploaded (pending admin approval)')
+      showMsg('Question paper published to your department')
       setQpFileName(''); loadMyQPs()
     } catch (err) {
       showMsg(err.response?.data?.message || 'Failed to upload question paper', 'error')
@@ -1303,6 +1315,7 @@ export default function FacultyDashboard() {
         case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
         case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} />
         case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
+        case 'facultyDirectory': return <FacultyDirectoryTab faculty={facultyDirectory} onDownload={handleDownload} accent="violet" />
         case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} deptId={noticeDeptId} setDeptId={setNoticeDeptId} departments={departments} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
         case 'settings': return <SettingsTab showMsg={showMsg} accent="violet" />
         case 'help': return <HelpTab accent="violet" />

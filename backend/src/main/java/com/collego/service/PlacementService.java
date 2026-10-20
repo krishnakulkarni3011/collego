@@ -45,6 +45,7 @@ public class PlacementService {
     private final DepartmentRepository departmentRepository;
     private final UserRepository userRepository;
     private final SemesterMarksRepository semesterMarksRepository;
+    private final PlacementNoticeRepository placementNoticeRepository;
     private final S3StorageService s3StorageService;
 
     @Value("${collego.aws.s3-bucket-resumes:collego-resumes-prod}")
@@ -604,6 +605,116 @@ public class PlacementService {
                 .sorted(Comparator.comparingLong(PlacementStatsResponse.CompanyPlacementEntry::getOffersExtended)
                         .reversed())
                 .collect(Collectors.toList());
+    }
+
+    // ============================================================
+    // UPCOMING PLACEMENT DRIVES (Admin-created notices)
+    // ============================================================
+
+    @Transactional
+    public PlacementNoticeResponse createNotice(String adminEmail, String title, String companyName,
+                                                String description, String eligibilityCriteria,
+                                                String packageOffered, java.time.LocalDate driveDate,
+                                                java.time.LocalDate lastDate, Long departmentId,
+                                                MultipartFile file) throws IOException {
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + adminEmail));
+        Department department = null;
+        if (departmentId != null) {
+            department = departmentRepository.findById(departmentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Department not found: " + departmentId));
+        }
+
+        PlacementNotice notice = PlacementNotice.builder()
+                .title(title.trim())
+                .companyName(companyName.trim())
+                .description(description)
+                .eligibilityCriteria(eligibilityCriteria)
+                .packageOffered(packageOffered)
+                .driveDate(driveDate)
+                .lastDate(lastDate)
+                .department(department)
+                .postedBy(admin)
+                .isActive(true)
+                .build();
+        notice = placementNoticeRepository.save(notice);
+
+        if (file != null && !file.isEmpty()) {
+            validateNoticeAttachment(file);
+            String uniqueName = UUID.randomUUID() + "_" + sanitizeFilename(file.getOriginalFilename());
+            String key = "placements/" + notice.getId() + "/" + uniqueName;
+            s3StorageService.upload(resumeS3Bucket, key, file.getInputStream(),
+                    file.getSize(), S3StorageService.detectContentType(file.getOriginalFilename()));
+            notice.setAttachmentName(file.getOriginalFilename() != null
+                    ? file.getOriginalFilename() : uniqueName);
+            notice.setAttachmentPath(key);
+            notice = placementNoticeRepository.save(notice);
+        }
+
+        log.info("Admin {} created placement drive '{}' for {}", adminEmail, notice.getTitle(), notice.getCompanyName());
+        return mapNoticeToResponse(notice);
+    }
+
+    public List<PlacementNoticeResponse> getAllNotices() {
+        return placementNoticeRepository.findAllByOrderByDriveDateAscPostedAtDesc().stream()
+                .map(this::mapNoticeToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public PlacementNoticeResponse deactivateNotice(Long noticeId) {
+        PlacementNotice notice = placementNoticeRepository.findById(noticeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Placement notice not found: " + noticeId));
+        notice.setActive(false);
+        placementNoticeRepository.save(notice);
+        return mapNoticeToResponse(notice);
+    }
+
+    public byte[] downloadNoticeAttachment(Long noticeId) throws IOException {
+        PlacementNotice notice = placementNoticeRepository.findById(noticeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Placement notice not found: " + noticeId));
+        if (notice.getAttachmentPath() == null || notice.getAttachmentPath().isBlank()) {
+            throw new BadRequestException("No attachment uploaded for this placement drive.");
+        }
+        return s3StorageService.download(resumeS3Bucket, notice.getAttachmentPath());
+    }
+
+    public PlacementNoticeResponse getNotice(Long noticeId) {
+        return mapNoticeToResponse(placementNoticeRepository.findById(noticeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Placement notice not found: " + noticeId)));
+    }
+
+    private void validateNoticeAttachment(MultipartFile file) {
+        if (file.getSize() > 15L * 1024 * 1024) {
+            throw new BadRequestException("Placement attachment must be 15 MB or smaller.");
+        }
+        String name = file.getOriginalFilename();
+        if (name == null) return;
+        String lower = name.toLowerCase();
+        if (!(lower.endsWith(".pdf") || lower.endsWith(".doc") || lower.endsWith(".docx")
+                || lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg"))) {
+            throw new BadRequestException("Attachment must be a PDF, Word document, PNG or JPEG.");
+        }
+    }
+
+    private PlacementNoticeResponse mapNoticeToResponse(PlacementNotice notice) {
+        return PlacementNoticeResponse.builder()
+                .id(notice.getId())
+                .title(notice.getTitle())
+                .companyName(notice.getCompanyName())
+                .description(notice.getDescription())
+                .eligibilityCriteria(notice.getEligibilityCriteria())
+                .packageOffered(notice.getPackageOffered())
+                .driveDate(notice.getDriveDate())
+                .lastDate(notice.getLastDate())
+                .departmentId(notice.getDepartment() != null ? notice.getDepartment().getId() : null)
+                .departmentName(notice.getDepartment() != null
+                        ? notice.getDepartment().getName() : "All Departments")
+                .attachmentName(notice.getAttachmentName())
+                .hasAttachment(notice.getAttachmentPath() != null && !notice.getAttachmentPath().isBlank())
+                .active(notice.isActive())
+                .postedAt(notice.getPostedAt())
+                .build();
     }
 
     // ============================================================

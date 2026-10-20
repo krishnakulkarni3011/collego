@@ -67,12 +67,18 @@ public class UserService {
             StudentProfile profile = StudentProfile.builder()
                     .user(user)
                     .department(department)
+                    .enrollmentNumber(request.getEnrollmentNumber())
+                    .semester(request.getSemester())
+                    .section(request.getSection())
+                    .admissionYear(request.getAdmissionYear())
                     .build();
             studentProfileRepository.save(profile);
         } else if (role == Role.FACULTY) {
             FacultyProfile profile = FacultyProfile.builder()
                     .user(user)
                     .department(department)
+                    .employeeId(request.getEmployeeId())
+                    .designation(request.getDesignation())
                     .build();
             facultyProfileRepository.save(profile);
         }
@@ -81,23 +87,19 @@ public class UserService {
         auditService.log(null, adminEmail, "USER_CREATED", "User", user.getId(),
                 "Created " + role + " account: " + user.getEmail(), ipAddress);
 
-        return mapToUserResponse(user, department);
+        return getUserById(user.getId());
     }
 
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
-                .map(user -> {
-                    StudentExtra extra = getStudentExtra(user);
-                    return mapToUserResponse(user, extra);
-                })
+                .map(user -> mapToUserResponse(user, getProfileExtra(user)))
                 .collect(Collectors.toList());
     }
 
     public UserResponse getUserById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        StudentExtra extra = getStudentExtra(user);
-        return mapToUserResponse(user, extra);
+        return mapToUserResponse(user, getProfileExtra(user));
     }
 
     @Transactional
@@ -116,7 +118,7 @@ public class UserService {
         auditService.log(null, adminEmail, "USER_DEACTIVATED", "User", user.getId(),
                 "Deactivated account: " + user.getEmail(), ipAddress);
 
-        return mapToUserResponse(user, getStudentExtra(user));
+        return mapToUserResponse(user, getProfileExtra(user));
     }
 
     @Transactional
@@ -130,30 +132,50 @@ public class UserService {
         auditService.log(null, adminEmail, "USER_ACTIVATED", "User", user.getId(),
                 "Activated account: " + user.getEmail(), ipAddress);
 
-        return mapToUserResponse(user, getStudentExtra(user));
+        return mapToUserResponse(user, getProfileExtra(user));
     }
 
     // ── helper: carries dept name + student-specific fields ──────────────────
-    private record StudentExtra(String departmentName, Integer semester, String section) {}
+    private record ProfileExtra(Long departmentId, String departmentName, String departmentCode,
+                                String enrollmentNumber, Integer semester, String section,
+                                Integer admissionYear, Long facultyProfileId, String employeeId,
+                                String designation, String resumeFileName, boolean hasResume) {}
 
-    private StudentExtra getStudentExtra(User user) {
+    private ProfileExtra getProfileExtra(User user) {
         if (user.getRole() == Role.STUDENT) {
             return studentProfileRepository.findByUserId(user.getId())
-                    .map(p -> new StudentExtra(
+                    .map(p -> new ProfileExtra(
+                            p.getDepartment() != null ? p.getDepartment().getId() : null,
                             p.getDepartment() != null ? p.getDepartment().getName() : null,
+                            p.getDepartment() != null ? p.getDepartment().getCode() : null,
+                            p.getEnrollmentNumber(),
                             p.getSemester(),
-                            p.getSection()))
-                    .orElse(new StudentExtra(null, null, null));
-        } else if (user.getRole() == Role.FACULTY) {
-            String deptName = facultyProfileRepository.findByUserId(user.getId())
-                    .map(p -> p.getDepartment() != null ? p.getDepartment().getName() : null)
-                    .orElse(null);
-            return new StudentExtra(deptName, null, null);
+                            p.getSection(),
+                            p.getAdmissionYear(),
+                            null, null, null, null, false))
+                    .orElse(emptyExtra());
         }
-        return new StudentExtra(null, null, null);
+        if (user.getRole() == Role.FACULTY) {
+            return facultyProfileRepository.findByUserId(user.getId())
+                    .map(p -> new ProfileExtra(
+                            p.getDepartment() != null ? p.getDepartment().getId() : null,
+                            p.getDepartment() != null ? p.getDepartment().getName() : null,
+                            p.getDepartment() != null ? p.getDepartment().getCode() : null,
+                            null, null, null, null, p.getId(),
+                            p.getEmployeeId(),
+                            p.getDesignation(),
+                            p.getResumeFileName(),
+                            p.getResumePath() != null && !p.getResumePath().isBlank()))
+                    .orElse(emptyExtra());
+        }
+        return emptyExtra();
     }
 
-    private UserResponse mapToUserResponse(User user, Department department) {
+    private ProfileExtra emptyExtra() {
+        return new ProfileExtra(null, null, null, null, null, null, null, null, null, null, null, false);
+    }
+
+    private UserResponse mapToUserResponse(User user, ProfileExtra extra) {
         return UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -161,22 +183,18 @@ public class UserService {
                 .lastName(user.getLastName())
                 .role(user.getRole().name())
                 .active(user.isActive())
-                .departmentName(department != null ? department.getName() : null)
-                .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now())
-                .build();
-    }
-
-    private UserResponse mapToUserResponse(User user, StudentExtra extra) {
-        return UserResponse.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .role(user.getRole().name())
-                .active(user.isActive())
+                .departmentId(extra.departmentId())
                 .departmentName(extra.departmentName())
+                .departmentCode(extra.departmentCode())
+                .enrollmentNumber(extra.enrollmentNumber())
                 .semester(extra.semester())
                 .section(extra.section())
+                .admissionYear(extra.admissionYear())
+                .facultyProfileId(extra.facultyProfileId())
+                .employeeId(extra.employeeId())
+                .designation(extra.designation())
+                .resumeFileName(extra.resumeFileName())
+                .hasResume(extra.hasResume())
                 .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now())
                 .build();
     }

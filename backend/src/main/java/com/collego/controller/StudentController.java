@@ -1,7 +1,6 @@
 package com.collego.controller;
 
 import com.collego.dto.*;
-import com.collego.service.FeePaymentService;
 import com.collego.service.MarksheetService;
 import com.collego.service.StudentPortalService;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +25,6 @@ public class StudentController {
 
     private final StudentPortalService studentPortalService;
     private final MarksheetService marksheetService;
-    private final FeePaymentService feePaymentService;
 
     @GetMapping("/profile")
     public ResponseEntity<StudentProfileResponse> getProfile(Authentication auth) {
@@ -69,33 +67,26 @@ public class StudentController {
         return ResponseEntity.ok(studentPortalService.getTimetable(auth.getName()));
     }
 
-    @GetMapping("/fees")
-    public ResponseEntity<List<FeeResponse>> getFees(Authentication auth) {
-        return ResponseEntity.ok(studentPortalService.getFees(auth.getName()));
+    @GetMapping("/question-papers")
+    public ResponseEntity<List<QuestionPaperResponse>> getQuestionPapers(Authentication auth) {
+        return ResponseEntity.ok(studentPortalService.getQuestionPapers(auth.getName()));
     }
 
-    @GetMapping("/fees/payment-config")
-    public ResponseEntity<Map<String, Object>> paymentConfig() {
-        return ResponseEntity.ok(feePaymentService.paymentConfig());
-    }
-
-    @PostMapping("/fees/{feeId}/pay")
-    public ResponseEntity<FeePaymentResponse> payFee(
+    @GetMapping("/question-papers/{id}/file")
+    public ResponseEntity<byte[]> downloadQuestionPaper(
             Authentication auth,
-            @PathVariable Long feeId,
-            @jakarta.validation.Valid @RequestBody RecordPaymentRequest request) {
-        return ResponseEntity.ok(feePaymentService.payAsStudent(auth.getName(), feeId, request));
-    }
-
-    @GetMapping("/fees/payments/{paymentId}/receipt")
-    public ResponseEntity<byte[]> downloadReceipt(
-            Authentication auth,
-            @PathVariable Long paymentId) {
-        byte[] pdf = feePaymentService.receipt(auth.getName(), paymentId, false);
+            @PathVariable Long id) throws IOException {
+        QuestionPaperResponse meta = studentPortalService.getQuestionPapers(auth.getName()).stream()
+                .filter(qp -> qp.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new com.collego.exception.ResourceNotFoundException(
+                        "Question paper not found: " + id));
+        byte[] bytes = studentPortalService.downloadQuestionPaper(auth.getName(), id);
+        String filename = meta.getFileName() != null ? meta.getFileName() : "question-paper.pdf";
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=receipt-" + paymentId + ".pdf")
-                .contentType(MediaType.APPLICATION_PDF)
-                .body(pdf);
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(bytes);
     }
 
     @GetMapping("/placements")

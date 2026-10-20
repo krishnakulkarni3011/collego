@@ -1,17 +1,14 @@
 package com.collego.service;
 
-import com.collego.entity.Fee;
 import com.collego.entity.FacultyProfile;
 import com.collego.entity.StudentProfile;
 import com.collego.entity.User;
 import com.collego.repository.FacultyProfileRepository;
-import com.collego.repository.FeeRepository;
 import com.collego.repository.StudentProfileRepository;
 import com.collego.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -27,7 +24,6 @@ public class ExportService {
     private final UserRepository userRepository;
     private final StudentProfileRepository studentProfileRepository;
     private final FacultyProfileRepository facultyProfileRepository;
-    private final FeeRepository feeRepository;
 
     public byte[] studentsCsv() {
         StringBuilder sb = new StringBuilder();
@@ -66,29 +62,6 @@ public class ExportService {
                             ? profile.getDepartment().getCode() : ""))
                     .append(',').append(csv(profile != null ? profile.getDesignation() : ""))
                     .append(',').append(user.isActive() ? "Yes" : "No")
-                    .append('\n');
-        }
-        return sb.toString().getBytes(StandardCharsets.UTF_8);
-    }
-
-    public byte[] feesCsv() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Student ID,USN,Name,Semester,Total,Paid,Balance,Status,Due Date\n");
-        List<Fee> fees = feeRepository.findAll();
-
-        for (Fee fee : fees) {
-            User user = fee.getStudent().getUser();
-            BigDecimal total = fee.getTotalAmount() != null ? fee.getTotalAmount() : BigDecimal.ZERO;
-            BigDecimal paid = fee.getPaidAmount() != null ? fee.getPaidAmount() : BigDecimal.ZERO;
-            sb.append(fee.getStudent().getId())
-                    .append(',').append(csv(fee.getStudent().getEnrollmentNumber()))
-                    .append(',').append(csv(user.getFirstName() + " " + user.getLastName()))
-                    .append(',').append(csv(fee.getSemester() != null ? fee.getSemester().getName() : ""))
-                    .append(',').append(total)
-                    .append(',').append(paid)
-                    .append(',').append(total.subtract(paid))
-                    .append(',').append(fee.getStatus() != null ? fee.getStatus().name() : "")
-                    .append(',').append(fee.getDueDate() != null ? fee.getDueDate() : "")
                     .append('\n');
         }
         return sb.toString().getBytes(StandardCharsets.UTF_8);

@@ -32,7 +32,17 @@ public class PlacementNotice {
 
     private String packageOffered;
 
+    /** Date on which the drive / interview is scheduled. */
+    private LocalDate driveDate;
+
+    /** Last date for students to apply. */
     private LocalDate lastDate;
+
+    @Column(length = 500)
+    private String attachmentName;
+
+    @Column(length = 1000)
+    private String attachmentPath;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")

@@ -38,10 +38,11 @@ public class AdminPortalService {
     private final SemesterMarksRepository semesterMarksRepository;
     private final QuestionPaperRepository questionPaperRepository;
     private final NotificationRepository notificationRepository;
+    // Question papers are published immediately by faculty; no admin approval step.
     private final PlacementNoticeRepository placementNoticeRepository;
     private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
-    private final QuestionPaperService questionPaperService;
+    private final UserService userService;
 
     /** Phase 8 — S3 bucket name for DB backups (blank = local dev, skip S3 upload) */
     @Value("${collego.aws.s3-backup-bucket:}")
@@ -76,22 +77,30 @@ public class AdminPortalService {
         }
         userRepository.save(user);
 
-        // Update department if provided
+        Department department = null;
         if (request.getDepartmentId() != null) {
-            Department department = departmentRepository.findById(request.getDepartmentId())
+            department = departmentRepository.findById(request.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found: " + request.getDepartmentId()));
+        }
 
-            if (user.getRole() == Role.STUDENT) {
-                studentProfileRepository.findByUserId(userId).ifPresent(p -> {
-                    p.setDepartment(department);
-                    studentProfileRepository.save(p);
-                });
-            } else if (user.getRole() == Role.FACULTY) {
-                facultyProfileRepository.findByUserId(userId).ifPresent(p -> {
-                    p.setDepartment(department);
-                    facultyProfileRepository.save(p);
-                });
-            }
+        if (user.getRole() == Role.STUDENT) {
+            final Department dept = department;
+            studentProfileRepository.findByUserId(userId).ifPresent(p -> {
+                if (dept != null) p.setDepartment(dept);
+                if (request.getEnrollmentNumber() != null) p.setEnrollmentNumber(request.getEnrollmentNumber());
+                if (request.getSemester() != null) p.setSemester(request.getSemester());
+                if (request.getSection() != null) p.setSection(request.getSection());
+                if (request.getAdmissionYear() != null) p.setAdmissionYear(request.getAdmissionYear());
+                studentProfileRepository.save(p);
+            });
+        } else if (user.getRole() == Role.FACULTY) {
+            final Department dept = department;
+            facultyProfileRepository.findByUserId(userId).ifPresent(p -> {
+                if (dept != null) p.setDepartment(dept);
+                if (request.getEmployeeId() != null) p.setEmployeeId(request.getEmployeeId());
+                if (request.getDesignation() != null) p.setDesignation(request.getDesignation());
+                facultyProfileRepository.save(p);
+            });
         }
 
         auditService.log(null, adminEmail, "USER_UPDATED", "User", userId,
@@ -292,8 +301,12 @@ public class AdminPortalService {
 
     private List<AdminDashboardInsightsResponse.EventItem> buildUpcomingEvents(int limit) {
         return placementNoticeRepository
-                .findByIsActiveTrueAndLastDateGreaterThanEqualOrderByLastDateAsc(LocalDate.now())
+                .findByIsActiveTrueOrderByDriveDateAsc()
                 .stream()
+                .filter(p -> {
+                    LocalDate date = p.getDriveDate() != null ? p.getDriveDate() : p.getLastDate();
+                    return date != null && !date.isBefore(LocalDate.now());
+                })
                 .limit(limit)
                 .map(p -> AdminDashboardInsightsResponse.EventItem.builder()
                         .id(p.getId())
@@ -301,7 +314,7 @@ public class AdminPortalService {
                         .category("Placement")
                         .location(p.getDepartment() != null ? p.getDepartment().getName() : "Placement Cell")
                         .subtitle(p.getCompanyName())
-                        .date(p.getLastDate())
+                        .date(p.getDriveDate() != null ? p.getDriveDate() : p.getLastDate())
                         .build())
                 .collect(Collectors.toList());
     }
@@ -489,60 +502,6 @@ public class AdminPortalService {
         }).collect(Collectors.toList());
     }
 
-    // ==================== Question Paper Approval ====================
-
-    public List<QuestionPaperResponse> getPendingQuestionPapers() {
-        return questionPaperRepository.findByStatus("PENDING").stream()
-                .map(this::mapQpToResponse)
-                .collect(Collectors.toList());
-    }
-
-    public List<QuestionPaperResponse> getAllQuestionPapers() {
-        return questionPaperRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(this::mapQpToResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional
-    public QuestionPaperResponse approveQuestionPaper(Long qpId, String adminEmail, String ipAddress) {
-        QuestionPaper qp = questionPaperRepository.findById(qpId)
-                .orElseThrow(() -> new ResourceNotFoundException("Question paper not found: " + qpId));
-
-        if (!"PENDING".equals(qp.getStatus())) {
-            throw new BadRequestException("Question paper is already " + qp.getStatus());
-        }
-
-        qp.setStatus("APPROVED");
-        questionPaperRepository.save(qp);
-
-        auditService.log(null, adminEmail, "QP_APPROVED", "QuestionPaper", qpId,
-                "Approved question paper for " + qp.getCourse().getName(), ipAddress);
-
-        log.info("Admin {} approved question paper {}", adminEmail, qpId);
-
-        return mapQpToResponse(qp);
-    }
-
-    @Transactional
-    public QuestionPaperResponse rejectQuestionPaper(Long qpId, String adminEmail, String ipAddress) {
-        QuestionPaper qp = questionPaperRepository.findById(qpId)
-                .orElseThrow(() -> new ResourceNotFoundException("Question paper not found: " + qpId));
-
-        if (!"PENDING".equals(qp.getStatus())) {
-            throw new BadRequestException("Question paper is already " + qp.getStatus());
-        }
-
-        qp.setStatus("REJECTED");
-        questionPaperRepository.save(qp);
-
-        auditService.log(null, adminEmail, "QP_REJECTED", "QuestionPaper", qpId,
-                "Rejected question paper for " + qp.getCourse().getName(), ipAddress);
-
-        log.info("Admin {} rejected question paper {}", adminEmail, qpId);
-
-        return mapQpToResponse(qp);
-    }
-
     // ==================== Backup Trigger ====================
 
     /**
@@ -710,24 +669,7 @@ public class AdminPortalService {
     }
 
     private UserResponse buildUserResponse(User user) {
-        String deptName = null;
-        if (user.getRole() == Role.STUDENT) {
-            deptName = studentProfileRepository.findByUserId(user.getId())
-                    .map(p -> p.getDepartment() != null ? p.getDepartment().getName() : null).orElse(null);
-        } else if (user.getRole() == Role.FACULTY) {
-            deptName = facultyProfileRepository.findByUserId(user.getId())
-                    .map(p -> p.getDepartment() != null ? p.getDepartment().getName() : null).orElse(null);
-        }
-
-        return UserResponse.builder()
-                .id(user.getId()).email(user.getEmail())
-                .firstName(user.getFirstName()).lastName(user.getLastName())
-                .role(user.getRole().name()).active(user.isActive())
-                .departmentName(deptName).createdAt(user.getCreatedAt())
-                .build();
+        return userService.getUserById(user.getId());
     }
 
-    private QuestionPaperResponse mapQpToResponse(QuestionPaper qp) {
-        return questionPaperService.mapToResponse(qp);
-    }
 }

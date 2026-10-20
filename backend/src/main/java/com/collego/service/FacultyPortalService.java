@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -54,12 +53,6 @@ public class FacultyPortalService {
     @Value("${collego.aws.s3-bucket-question-papers:collego-question-papers-prod}")
     private String questionPaperBucket;
 
-    /** Phase 8/9: URL of the AI microservice; blank = AI features disabled */
-    @Value("${collego.ai-service.url:http://collego-ai-service:8000}")
-    private String aiServiceUrl;
-
-    private final RestTemplate restTemplate = new RestTemplate();
-
     // ==================== Sections ====================
 
     public List<FacultySectionResponse> getAssignedSections(String email) {
@@ -79,6 +72,7 @@ public class FacultyPortalService {
                     .semesterId(section.getSemester().getId())
                     .semesterName(section.getSemester().getName())
                     .semesterNumber(section.getSemester().getNumber())
+                    .year((section.getSemester().getNumber() + 1) / 2)
                     .enrolledStudents(enrolledCount)
                     .build();
         }).collect(Collectors.toList());
@@ -597,7 +591,7 @@ public class FacultyPortalService {
                 .year(request.getYear())
                 .semesterNumber(request.getSemesterNumber())
                 .fileName(request.getFileName())
-                .status("PENDING")
+                .status("APPROVED")
                 .uploadedBy(facultyUser)
                 .build();
 
@@ -620,32 +614,6 @@ public class FacultyPortalService {
 
     @Transactional
     public Map<String, Object> draftNotice(String email, CreateNoticeRequest request) {
-
-        // Phase 8/9: AI Notice Enhancement
-        // When faculty sets enhance=true, call the ai-service to rewrite the notice
-        // professionally. Non-fatal: any failure falls back to the original text.
-        if (Boolean.TRUE.equals(request.getEnhance()) && aiServiceUrl != null && !aiServiceUrl.isBlank()) {
-            try {
-                Map<String, String> aiReq = Map.of(
-                        "prompt", request.getTitle() + ": " + request.getMessage(),
-                        "audience", "students"
-                );
-                @SuppressWarnings("unchecked")
-                Map<String, String> aiResp = restTemplate.postForObject(
-                        aiServiceUrl + "/generate-notice", aiReq, Map.class);
-                if (aiResp != null) {
-                    if (aiResp.containsKey("title") && aiResp.get("title") != null) {
-                        request.setTitle(aiResp.get("title"));
-                    }
-                    if (aiResp.containsKey("body") && aiResp.get("body") != null) {
-                        request.setMessage(aiResp.get("body"));
-                    }
-                    log.info("AI notice enhancement applied for faculty {}", email);
-                }
-            } catch (Exception e) {
-                log.warn("AI notice generation failed (using original text): {}", e.getMessage());
-            }
-        }
 
         NotificationType type;
         try {
@@ -1010,7 +978,7 @@ public class FacultyPortalService {
                 .year(request.getYear())
                 .semesterNumber(request.getSemesterNumber())
                 .fileName(request.getFileName())
-                .status("PENDING")
+                .status("APPROVED")
                 .uploadedBy(facultyUser)
                 .build();
 

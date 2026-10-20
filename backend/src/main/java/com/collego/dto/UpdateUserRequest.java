@@ -11,4 +11,11 @@ public class UpdateUserRequest {
     private String lastName;
     private String email;
     private Long departmentId;
+
+    private String enrollmentNumber;
+    private Integer semester;
+    private String section;
+    private Integer admissionYear;
+    private String employeeId;
+    private String designation;
 }

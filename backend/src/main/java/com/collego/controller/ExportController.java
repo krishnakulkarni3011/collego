@@ -30,11 +30,6 @@ public class ExportController {
         return csv(exportService.facultyCsv(), "faculty-" + LocalDate.now() + ".csv");
     }
 
-    @GetMapping("/fees")
-    public ResponseEntity<byte[]> exportFees() {
-        return csv(exportService.feesCsv(), "fees-" + LocalDate.now() + ".csv");
-    }
-
     private ResponseEntity<byte[]> csv(byte[] data, String filename) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)

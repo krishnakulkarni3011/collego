@@ -16,7 +16,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Phase 9: AI Controller — exposes all 9 AI features to the React frontend.
+ * Phase 9: AI Controller — exposes the AI features to the React frontend.
  *
  * All endpoints require authentication (JWT).
  * Role-specific endpoints add @PreAuthorize guards.
@@ -31,9 +31,7 @@ import java.util.stream.Collectors;
  *   GET  /api/ai/attendance-risk            — Feature 4: Attendance risk early-warning (student only)
  *   POST /api/ai/resume-analyze             — Feature 5: Resume ATS analyzer (student only)
  *   POST /api/ai/placement-assistant        — Feature 6: Placement recommendations + mock interviews
- *   POST /api/ai/summarize-notice           — Feature 7: Summarize a notice
- *   GET  /api/ai/question-paper-insights    — Feature 8: QP topic weightage for a course
- *   POST /api/ai/generate-notice            — Feature 9: AI email/notice generator (faculty only)
+ *   GET  /api/ai/question-paper-insights    – Feature 7: QP topic weightage for a course
  */
 @RestController
 @RequestMapping("/api/ai")
@@ -127,16 +125,7 @@ public class AiController {
         return ResponseEntity.ok(aiService.placementAssistant(request));
     }
 
-    // ── Feature 7: Notice Summarizer ──────────────────────────────────────────
-
-    @PostMapping("/summarize-notice")
-    public ResponseEntity<Map<String, Object>> summarizeNotice(@RequestBody Map<String, Object> body) {
-        String title = (String) body.getOrDefault("title", "");
-        String content = (String) body.getOrDefault("content", "");
-        return ResponseEntity.ok(aiService.summarizeNotice(title, content));
-    }
-
-    // ── Feature 8: Question Paper Insights ────────────────────────────────────
+    // ── Feature 7: Question Paper Insights ────────────────────────────────────
 
     @GetMapping("/question-paper-insights")
     public ResponseEntity<Map<String, Object>> questionPaperInsights(
@@ -167,17 +156,6 @@ public class AiController {
         return ResponseEntity.ok(aiService.questionPaperInsights(request));
     }
 
-    // ── Feature 9: AI Notice/Email Generator (Faculty only) ──────────────────
-
-    @PostMapping("/generate-notice")
-    @PreAuthorize("hasAnyRole('FACULTY', 'ADMIN')")
-    public ResponseEntity<Map<String, Object>> generateNotice(@RequestBody Map<String, Object> body) {
-        String prompt = (String) body.getOrDefault("prompt", "");
-        String audience = (String) body.getOrDefault("audience", "students");
-        String noticeType = (String) body.getOrDefault("noticeType", "GENERAL");
-        return ResponseEntity.ok(aiService.generateNotice(prompt, audience, noticeType));
-    }
-
     // ── Context builders ───────────────────────────────────────────────────────
 
     /**
@@ -193,11 +171,6 @@ public class AiController {
             } catch (Exception ignored) {}
             try {
                 ctx.put("cgpa", studentPortalService.calculateCgpa(email));
-            } catch (Exception ignored) {}
-            try {
-                List<FeeResponse> fees = studentPortalService.getFees(email);
-                ctx.put("fees", fees);
-                ctx.put("pendingFees", fees.stream().filter(f -> "PENDING".equals(f.getStatus())).count());
             } catch (Exception ignored) {}
             try {
                 ctx.put("notifications", studentPortalService.getNotifications(email).subList(0, Math.min(5, studentPortalService.getNotifications(email).size())));

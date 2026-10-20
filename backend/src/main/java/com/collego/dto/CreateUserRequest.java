@@ -25,4 +25,14 @@ public class CreateUserRequest {
     private String role;
 
     private Long departmentId;
+
+    // Student fields
+    private String enrollmentNumber;
+    private Integer semester;
+    private String section;
+    private Integer admissionYear;
+
+    // Faculty fields
+    private String employeeId;
+    private String designation;
 }
