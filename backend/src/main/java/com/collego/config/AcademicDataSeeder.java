@@ -4,16 +4,22 @@ import com.collego.entity.*;
 import com.collego.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.sql.Connection;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -39,6 +45,16 @@ public class AcademicDataSeeder implements CommandLineRunner {
     private final PlacementNoticeRepository placementNoticeRepository;
     private final NotificationRepository notificationRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Value("${collego.admin.email:admin@collego.edu}")
+    private String adminEmail;
+
+    private static final int EXPECTED_STUDENT_COUNT = 120;
+    private static final int EXPECTED_SEMESTER_COUNT = 8;
 
     private final Random random = new Random(42); // Fixed seed for reproducibility
 
@@ -149,10 +165,16 @@ public class AcademicDataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (departmentRepository.count() > 0) {
-            log.info("Academic data already exists. Skipping seed.");
+        if (isSeedUpToDate()) {
+            log.info("Academic seed data is up to date (7 faculty, 120 students, 8 semesters). Skipping seed.");
             return;
         }
+
+        log.warn("Academic seed data is missing or outdated. Resetting all academic data and reseeding...");
+        resetExistingAcademicData();
+        // The JDBC truncate bypasses Hibernate, so detach every entity loaded by
+        // the verification queries above before inserting the fresh dataset.
+        entityManager.clear();
 
         log.info("=== Starting Academic Data Seeder for CSE Department ===");
 
@@ -193,6 +215,66 @@ public class AcademicDataSeeder implements CommandLineRunner {
     }
 
     // ==================== Seeder Helpers ====================
+
+    /**
+     * Returns true only when the database already holds exactly the dataset this
+     * seeder is responsible for. Any legacy/partial seed therefore triggers a
+     * clean reseed instead of being silently skipped.
+     */
+    private boolean isSeedUpToDate() {
+        try {
+            if (departmentRepository.findByCode("CSE").isEmpty()) return false;
+            if (semesterRepository.count() != EXPECTED_SEMESTER_COUNT) return false;
+            if (courseRepository.count() < expectedCourseCount()) return false;
+            if (studentProfileRepository.count() != EXPECTED_STUDENT_COUNT) return false;
+            for (String[] faculty : FACULTY_DATA) {
+                if (userRepository.findByEmailIgnoreCase(faculty[1]).isEmpty()) return false;
+            }
+            return true;
+        } catch (Exception e) {
+            log.warn("Could not verify existing seed data ({}). A reseed will be attempted.", e.getMessage());
+            return false;
+        }
+    }
+
+    private int expectedCourseCount() {
+        return CSE_COURSES_BY_SEMESTER.values().stream().mapToInt(courses -> courses.length).sum();
+    }
+
+    /**
+     * Wipes every academic table (and all non-admin accounts) so the seeder can
+     * rebuild the dataset from scratch. The bootstrap admin account is preserved.
+     */
+    private void resetExistingAcademicData() {
+        String product = "";
+        try (Connection connection = Objects.requireNonNull(jdbcTemplate.getDataSource()).getConnection()) {
+            product = connection.getMetaData().getDatabaseProductName();
+        } catch (Exception e) {
+            log.warn("Unable to detect database vendor: {}", e.getMessage());
+        }
+
+        if (product != null && product.toLowerCase().contains("postgres")) {
+            List<String> tables = jdbcTemplate.queryForList(
+                    "SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename NOT IN ('users', 'admin_profiles')",
+                    String.class);
+            if (!tables.isEmpty()) {
+                String joined = tables.stream()
+                        .map(table -> "\"" + table + "\"")
+                        .collect(Collectors.joining(", "));
+                jdbcTemplate.execute("TRUNCATE TABLE " + joined + " RESTART IDENTITY CASCADE");
+                log.info("Truncated {} academic table(s).", tables.size());
+            }
+        } else {
+            log.warn("Database vendor '{}' is not PostgreSQL — skipping table truncate.", product);
+        }
+
+        String admin = (adminEmail != null && !adminEmail.isBlank())
+                ? adminEmail.trim().toLowerCase()
+                : "admin@collego.edu";
+        int removed = jdbcTemplate.update("DELETE FROM users WHERE LOWER(email) <> ?", admin);
+        log.info("Removed {} previously seeded account(s); kept admin '{}'.", removed, admin);
+    }
+
 
     private Department seedCSEDepartment() {
         Department existing = departmentRepository.findByCode("CSE").orElse(null);

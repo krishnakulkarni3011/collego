@@ -56,12 +56,6 @@ public class DataSeeder implements CommandLineRunner {
 
             admin = userRepository.save(admin);
 
-            AdminProfile profile = AdminProfile.builder()
-                    .user(admin)
-                    .adminLevel("SUPER_ADMIN")
-                    .build();
-            adminProfileRepository.save(profile);
-
             log.info("Bootstrap admin created: {} / {}", targetEmail, targetPassword);
         } else {
             // Ensure admin credentials match active configuration
@@ -71,44 +65,14 @@ public class DataSeeder implements CommandLineRunner {
             log.info("Admin account verified/updated: {} / {}", targetEmail, targetPassword);
         }
 
-        // Ensure demo student account exists and is active
-        User studentUser = userRepository.findByEmailIgnoreCase("student1.cse@collego.edu").orElse(null);
-        if (studentUser == null) {
-            studentUser = User.builder()
-                    .email("student1.cse@collego.edu")
-                    .passwordHash(passwordEncoder.encode("Student@123"))
-                    .firstName("Aarav")
-                    .lastName("Sharma")
-                    .role(Role.STUDENT)
-                    .isActive(true)
-                    .build();
-            userRepository.save(studentUser);
-            log.info("Seeded demo student user: student1.cse@collego.edu / Student@123");
-        } else {
-            studentUser.setPasswordHash(passwordEncoder.encode("Student@123"));
-            studentUser.setActive(true);
-            userRepository.save(studentUser);
-            log.info("Demo student account verified/updated: student1.cse@collego.edu");
-        }
-
-        // Ensure demo faculty account exists and is active
-        User facultyUser = userRepository.findByEmailIgnoreCase("faculty1.cse@collego.edu").orElse(null);
-        if (facultyUser == null) {
-            facultyUser = User.builder()
-                    .email("faculty1.cse@collego.edu")
-                    .passwordHash(passwordEncoder.encode("Faculty@123"))
-                    .firstName("Dr. Rajesh")
-                    .lastName("Kumar")
-                    .role(Role.FACULTY)
-                    .isActive(true)
-                    .build();
-            userRepository.save(facultyUser);
-            log.info("Seeded demo faculty user: faculty1.cse@collego.edu / Faculty@123");
-        } else {
-            facultyUser.setPasswordHash(passwordEncoder.encode("Faculty@123"));
-            facultyUser.setActive(true);
-            userRepository.save(facultyUser);
-            log.info("Demo faculty account verified/updated: faculty1.cse@collego.edu");
+        // The academic seeder truncates admin_profiles during a reset, so make sure
+        // the bootstrap admin always has its profile row.
+        if (adminProfileRepository.findByUserId(admin.getId()).isEmpty()) {
+            adminProfileRepository.save(AdminProfile.builder()
+                    .user(admin)
+                    .adminLevel("SUPER_ADMIN")
+                    .build());
+            log.info("Admin profile ensured for {}", targetEmail);
         }
     }
 }
