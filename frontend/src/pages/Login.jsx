@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, ChevronRight, ChevronLeft, Eye, EyeOff,
   Mail, Lock, AlertCircle, CheckCircle2, Sparkles,
-  Shield, BookOpen, BarChart3, Zap
+  Shield, BookOpen, BarChart3, Zap, RefreshCw
 } from 'lucide-react'
 import { authService } from '../services/authService'
 import { cn } from '../lib/utils'
@@ -79,6 +79,11 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [forgotStep, setForgotStep] = useState('email') // 'email' | 'reset' | 'success'
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [resetToken, setResetToken] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const navigate = useNavigate()
 
   const activeRole = ROLES.find(r => r.id === selectedRole)
@@ -121,6 +126,36 @@ export default function Login() {
 
   const handleGoogleSignIn = () => {
     alert('Google Sign-In is not yet configured. Add your Google OAuth Client ID to enable this.')
+  }
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      await authService.forgotPassword(forgotEmail)
+      setForgotStep('success')
+      showMsg('If an account exists, a reset link has been sent.')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to send reset link')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      await authService.resetPassword(resetToken, newPassword)
+      setForgotStep('success')
+      showMsg('Password reset successfully. You can now sign in.')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reset password')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const progress = step === 'role' ? 50 : 100
@@ -430,29 +465,158 @@ export default function Login() {
                         </motion.div>
                       )}
 
-                      <button
-                        id="btn-login-submit"
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-3.5 rounded-xl font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed mt-2 hover:shadow-lg"
-                        style={{
-                          background: activeRole
-                            ? `linear-gradient(135deg, ${activeRole.id === 'STUDENT' ? '#10b981, #0d9488' : activeRole.id === 'FACULTY' ? '#8b5cf6, #d946ef' : '#4f46e5, #3b82f6'})`
-                            : 'linear-gradient(135deg, #4f46e5, #3b82f6)',
-                          boxShadow: `0 10px 28px ${activeRole?.id === 'STUDENT' ? 'rgba(16,185,129,0.3)' : activeRole?.id === 'FACULTY' ? 'rgba(139,92,246,0.3)' : 'rgba(99,102,241,0.3)'}`
-                        }}
-                      >
-                        {loading ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                            </svg>
-                            Signing in…
-                          </span>
-                        ) : `Sign In as ${activeRole?.label}`}
-                      </button>
+                      <div className="flex items-center justify-between mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setStep('forgot')}
+                          className="text-xs text-indigo-600 hover:text-indigo-700 font-medium hover:underline"
+                        >
+                          Forgot password?
+                        </button>
+                        {step !== 'forgot' && (
+                          <button
+                            id="btn-login-submit"
+                            type="submit"
+                            disabled={loading}
+                            className="w-auto py-3 rounded-xl font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed hover:shadow-lg"
+                            style={{
+                              background: activeRole
+                                ? `linear-gradient(135deg, ${activeRole.id === 'STUDENT' ? '#10b981, #0d9488' : activeRole.id === 'FACULTY' ? '#8b5cf6, #d946ef' : '#4f46e5, #3b82f6'})`
+                                : 'linear-gradient(135deg, #4f46e5, #3b82f6)',
+                              boxShadow: `0 10px 28px ${activeRole?.id === 'STUDENT' ? 'rgba(16,185,129,0.3)' : activeRole?.id === 'FACULTY' ? 'rgba(139,92,246,0.3)' : 'rgba(99,102,241,0.3)'}`
+                            }}
+                          >
+                            {loading ? (
+                              <span className="flex items-center justify-center gap-2">
+                                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Signing in…
+                              </span>
+                            ) : `Sign In as ${activeRole?.label}`}
+                          </button>
+                        )}
+                      </div>
                     </form>
+
+                    {step === 'forgot' && forgotStep === 'email' && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-6 glass-card p-6 border border-white/60"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <button onClick={() => setStep('credentials')} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1">
+                            <ChevronLeft size={14} /> Back
+                          </button>
+                          <h3 className="text-sm font-semibold text-slate-800">Forgot Password</h3>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-5">Enter your email and we'll send you a reset link.</p>
+                        <form onSubmit={handleForgotPassword} className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
+                            <input
+                              type="email"
+                              value={forgotEmail}
+                              onChange={e => setForgotEmail(e.target.value)}
+                              placeholder="you@college.edu"
+                              className="collego-input"
+                              required
+                              autoFocus
+                            />
+                          </div>
+                          <Button variant="gradient" type="submit" className="w-full py-3" disabled={loading || !forgotEmail.trim()}>
+                            {loading ? (
+                              <span className="flex items-center justify-center gap-2"><RefreshCw size={14} className="animate-spin" /> Sending...</span>
+                            ) : (
+                              <span className="flex items-center justify-center gap-2"><Mail size={14} /> Send Reset Link</span>
+                            )}
+                          </Button>
+                        </form>
+                      </motion.div>
+                    )}
+
+                    {step === 'forgot' && forgotStep === 'reset' && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-6 glass-card p-6 border border-white/60"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <button onClick={() => setForgotStep('email')} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1">
+                            <ChevronLeft size={14} /> Back
+                          </button>
+                          <h3 className="text-sm font-semibold text-slate-800">Reset Password</h3>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-5">Enter your new password below.</p>
+                        <form onSubmit={handleResetPassword} className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Reset Token</label>
+                            <input
+                              type="text"
+                              value={resetToken}
+                              onChange={e => setResetToken(e.target.value)}
+                              placeholder="Token from reset email"
+                              className="collego-input"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">New Password</label>
+                            <input
+                              type="password"
+                              value={newPassword}
+                              onChange={e => setNewPassword(e.target.value)}
+                              placeholder="New password"
+                              className="collego-input"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Confirm Password</label>
+                            <input
+                              type="password"
+                              value={confirmPassword}
+                              onChange={e => setConfirmPassword(e.target.value)}
+                              placeholder="Confirm new password"
+                              className="collego-input"
+                              required
+                            />
+                          </div>
+                          {newPassword !== confirmPassword && newPassword && confirmPassword && (
+                            <p className="text-xs text-red-500">Passwords do not match</p>
+                          )}
+                          <Button variant="gradient" type="submit" className="w-full py-3" disabled={loading || !newPassword || !confirmPassword || newPassword !== confirmPassword}>
+                            {loading ? (
+                              <span className="flex items-center justify-center gap-2"><RefreshCw size={14} className="animate-spin" /> Resetting...</span>
+                            ) : (
+                              <span className="flex items-center justify-center gap-2"><Lock size={14} /> Reset Password</span>
+                            )}
+                          </Button>
+                        </form>
+                      </motion.div>
+                    )}
+
+                    {step === 'forgot' && forgotStep === 'success' && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-6 glass-card p-6 border border-white/60 text-center"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+                          <CheckCircle2 size={24} className="text-emerald-600" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-800 mb-2">Password Reset</h3>
+                        <p className="text-sm text-slate-500 mb-4">{forgotStep === 'success' && resetToken ? 'Your password has been reset successfully.' : 'A reset link has been sent to your email.'}</p>
+                        <button
+                          onClick={() => { setStep('credentials'); setForgotStep('email'); setResetToken(''); setNewPassword(''); setConfirmPassword(''); setForgotEmail('') }}
+                          className="w-full py-3 rounded-xl text-xs text-indigo-600 font-medium hover:bg-indigo-50 transition-colors border border-indigo-100"
+                        >
+                          Back to Sign In
+                        </button>
+                      </motion.div>
+                    )}
 
                     <div className="relative flex items-center gap-3 my-6">
                       <div className="flex-1 h-px bg-slate-200" />

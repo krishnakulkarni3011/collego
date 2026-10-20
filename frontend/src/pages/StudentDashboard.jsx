@@ -68,6 +68,7 @@ const NAV_SECTIONS = [
       { id: 'aiAttendanceRisk', label: 'Attendance Risk', icon: AlertTriangle },
       { id: 'aiResumeAnalyzer', label: 'Resume Analyzer', icon: FileText },
       { id: 'aiPlacementAssistant', label: 'Placement Assistant', icon: Briefcase },
+      { id: 'aiQpInsights', label: 'QP Insights', icon: FileText },
     ],
   },
 ]
@@ -968,6 +969,104 @@ function AiPlacementAssistantTab() {
   )
 }
 
+// ─── AI Question Paper Insights ───────────────────────────────────────────────
+function AiQuestionPaperInsightsTab() {
+  const [courseId, setCourseId] = useState('')
+  const [courseCode, setCourseCode] = useState('')
+  const [courseName, setCourseName] = useState('')
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const getInsights = async () => {
+    if (!courseId.trim()) return
+    setLoading(true)
+    try {
+      const res = await api.get('/api/ai/question-paper-insights', {
+        params: { courseId: Number(courseId), courseCode, courseName }
+      })
+      setResult(res.data)
+    } catch { setResult(null) }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={FileText} title="AI Question Paper Insights" subtitle="Analyze past question papers for topic weightage and trends." accent="indigo"
+        actions={<Badge variant="purple">AI Powered</Badge>} />
+      <div className="glass-card p-6 border border-white/60">
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course ID</label>
+            <input value={courseId} onChange={e => setCourseId(e.target.value)} placeholder="e.g., 101" className="collego-input" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Code (optional)</label>
+              <input value={courseCode} onChange={e => setCourseCode(e.target.value)} placeholder="CS101" className="collego-input" />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Name (optional)</label>
+              <input value={courseName} onChange={e => setCourseName(e.target.value)} placeholder="Data Structures" className="collego-input" />
+            </div>
+          </div>
+          <Button variant="gradient" onClick={getInsights} disabled={loading || !courseId.trim()} className="w-auto px-6">
+            {loading ? (
+              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Analyzing...</span>
+            ) : (
+              <span className="flex gap-1"><FileText size={14} /> Get Insights</span>
+            )}
+          </Button>
+        </div>
+      </div>
+      {result && (
+        <div className="glass-card p-6 border border-white/60">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Question Paper Analysis</h3>
+          <div className="space-y-4">
+            {typeof result === 'string' ? (
+              <p className="text-sm text-slate-700">{result}</p>
+            ) : (
+              <div>
+                {result.topicWeightage && (
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-2">Topic Weightage</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {Object.entries(result.topicWeightage).map(([topic, weight]) => (
+                        <div key={topic} className="p-3 rounded-xl border border-white/60 bg-white/50">
+                          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{topic}</p>
+                          <p className="text-sm font-bold text-slate-800">{weight}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {result.importantQuestions && Array.isArray(result.importantQuestions) && (
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-2">Important Questions</p>
+                    <ul className="space-y-2 text-sm text-slate-700">
+                      {result.importantQuestions.map((q, i) => (
+                        <li key={i} className="flex items-start gap-2 pl-3">
+                          <span className="text-indigo-500">•</span>
+                          {q}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {result.examPattern && (
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                    <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-1">Exam Pattern</p>
+                    <p className="text-sm text-slate-700">{result.examPattern}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default function StudentDashboard() {
   const navigate = useNavigate()
@@ -1052,6 +1151,7 @@ export default function StudentDashboard() {
       case 'aiAttendanceRisk': return <AiAttendanceRiskTab />
       case 'aiResumeAnalyzer': return <AiResumeAnalyzerTab />
       case 'aiPlacementAssistant': return <AiPlacementAssistantTab />
+      case 'aiQpInsights': return <AiQuestionPaperInsightsTab />
       default: return null
     }
   }

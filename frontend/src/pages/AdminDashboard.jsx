@@ -564,6 +564,85 @@ function AcademicsTab({ departments, overview, semesters, deptReports }) {
     { label: 'Sections', value: overview?.totalSections ?? 0, icon: UsersRound, accent: 'emerald', grad: 'from-emerald-500 to-teal-500' },
     { label: 'Enrollments', value: overview?.totalEnrollments ?? 0, icon: ScrollText, accent: 'amber', grad: 'from-amber-500 to-orange-500' },
   ]
+  const [sections, setSections] = useState([])
+  const [selectedSection, setSelectedSection] = useState(null)
+  const [timetableMeta, setTimetableMeta] = useState(null)
+  const [sectionStudents, setSectionStudents] = useState([])
+  const [loadingSections, setLoadingSections] = useState(false)
+  const [uploadingTimetable, setUploadingTimetable] = useState(false)
+  const [classRepLoading, setClassRepLoading] = useState(false)
+  const [timetableFile, setTimetableFile] = useState(null)
+
+  useEffect(() => {
+    loadSections()
+  }, [])
+
+  const loadSections = async () => {
+    setLoadingSections(true)
+    try {
+      const res = await api.get('/api/sections')
+      setSections(Array.isArray(res.data) ? res.data : [])
+    } catch { /* ignore */ } finally { setLoadingSections(false) }
+  }
+
+  const loadSectionStudents = async (sectionId) => {
+    try {
+      const res = await api.get(`/api/sections/${sectionId}/students`)
+      setSectionStudents(Array.isArray(res.data) ? res.data : [])
+    } catch {
+      // Try alternative endpoint
+      try {
+        const res = await api.get(`/api/faculty/attendance/${sectionId}`)
+        setSectionStudents(Array.isArray(res.data) ? res.data.map(s => ({ studentName: s.studentName, enrollmentNumber: s.enrollmentNumber })) : [])
+      } catch { /* ignore */ }
+    }
+  }
+
+  const handleUpdateClassReps = async (sectionId, maleRep, femaleRep) => {
+    setClassRepLoading(true)
+    try {
+      await api.put(`/api/admin/sections/${sectionId}/class-reps`, { maleClassRep: maleRep, femaleClassRep: femaleRep })
+      showMsg('Class representatives updated')
+      loadSections()
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to update class reps', 'error') }
+    finally { setClassRepLoading(false) }
+  }
+
+  const handleUploadTimetable = async (file) => {
+    if (!selectedSection) return
+    setUploadingTimetable(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      await api.post(`/api/admin/sections/${selectedSection.sectionId}/timetable`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      showMsg('Timetable uploaded successfully')
+      setTimetableFile(null)
+      const res = await api.get(`/api/sections/${selectedSection.sectionId}/timetable/meta`)
+      setTimetableMeta(res.data)
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload timetable', 'error') }
+    finally { setUploadingTimetable(false) }
+  }
+
+  const handleDeleteTimetable = async () => {
+    if (!selectedSection) return
+    try {
+      await api.delete(`/api/admin/sections/${selectedSection.sectionId}/timetable`)
+      showMsg('Timetable deleted')
+      setTimetableMeta(null)
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to delete timetable', 'error') }
+  }
+
+  const viewTimetable = () => {
+    if (!selectedSection) return
+    window.open(`/api/sections/${selectedSection.sectionId}/timetable`, '_blank')
+  }
+
+  const sectionOptions = sections.map(s => ({
+    label: `${s.courseName} - Sec ${s.sectionName} (${s.semesterName})`,
+    value: s.sectionId,
+    section: s,
+  }))
+
   return (
     <div className="space-y-6">
       <PageTitle icon={BookOpen} title="Academic Management" subtitle="Departments, courses, sections, semesters and enrolments." />
@@ -602,8 +681,171 @@ function AcademicsTab({ departments, overview, semesters, deptReports }) {
           </div>
         </Panel>
       </div>
-    </div>
-  )
+
+      {/* Section Management Panel */}
+      <Panel title="Section Management & Timetable" icon={Layers} accent="emerald">
+        <div className="space-y-5">
+          <div className="glass-card p-5 border border-white/60">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Select Section</label>
+                <select value={selectedSection?.sectionId || ''} onChange={e => {
+                  const sec = sections.find(s => s.sectionId === Number(e.target.value))
+                  if (sec) {
+                    setSelectedSection(sec)
+                    setTimetableMeta(null)
+                    loadSectionStudents(sec.sectionId)
+                  }
+                }} className="collego-input">
+                  <option value="">Select a section</option>
+                  {sectionOptions.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={loadSections}
+                className="px-3 py-2 rounded-xl text-xs text-slate-400 border border-white/60 hover:border-indigo-300 hover:text-indigo-600 transition-colors bg-white/50"
+              >
+                <RefreshCw size={14} /> Refresh
+              </button>
+              {loadingSections && <span className="text-xs text-indigo-500 animate-pulse">Loading...</span>}
+            </div>
+          </div>
+          </div>
+          {selectedSection && (
+            <div className="glass-card p-5 border border-white/60">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-slate-800">{selectedSection.courseName}</h3>
+                  <p className="text-[10px] text-slate-500">{selectedSection.courseCode} · Sec {selectedSection.sectionName} · {selectedSection.semesterName}</p>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Male Class Rep:</span>
+                      <input
+                        value={selectedSection.maleClassRep || ''}
+                        onChange={e => {
+                          const updated = { ...selectedSection, maleClassRep: e.target.value }
+                          setSelectedSection(updated)
+                        }}
+                        className="collego-input text-sm w-40"
+                        placeholder="Name"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Female Class Rep:</span>
+                      <input
+                        value={selectedSection.femaleClassRep || ''}
+                        onChange={e => {
+                          const updated = { ...selectedSection, femaleClassRep: e.target.value }
+                          setSelectedSection(updated)
+                        }}
+                        className="collego-input text-sm w-40"
+                        placeholder="Name"
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleUpdateClassReps(selectedSection.sectionId, selectedSection.maleClassRep, selectedSection.femaleClassRep)}
+                      disabled={classRepLoading}
+                      className="px-3 py-1.5 rounded-xl text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                    >
+                      {classRepLoading ? <span className="flex gap-1"><RefreshCw size={12} className="animate-spin" /> Saving...</span> : <span className="flex gap-1"><UsersRound size={12} /> Save Class Reps</span>}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {timetableMeta ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">Timetable uploaded:</span>
+                      <a
+                        href={`/api/sections/${selectedSection.sectionId}/timetable`}
+                        download={timetableMeta.fileName}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                      >
+                        <Download size={12} /> {timetableMeta.fileName}
+                      </a>
+                      <button
+                        onClick={handleDeleteTimetable}
+                        className="px-2 py-1.5 rounded-lg text-xs text-red-500 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors"
+                        title="Delete Timetable"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Upload Timetable (PDF)</label>
+                      <div className="relative group">
+                        <input
+                          ref={null}
+                          type="file"
+                          className="sr-only"
+                          accept=".pdf"
+                          onChange={e => {
+                            if (e.target.files?.[0]) {
+                              setTimetableFile(e.target.files[0])
+                              handleUploadTimetable(e.target.files[0])
+                            }
+                          }}
+                        />
+                        <button type="button" className="collego-input px-4 py-2 text-[10px] text-slate-400 border border-white/60 rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-all bg-white/50 w-full text-left">
+                          {timetableFile ? <span className="text-xs text-indigo-600 font-medium">{timetableFile.name}</span> : <span>Choose PDF</span>}
+                        </button>
+                        {uploadingTimetable && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                            <span className="flex gap-1 text-xs"><RefreshCw size={12} className="animate-spin" /> Uploading...</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {sectionStudents.length > 0 && (
+            <div className="glass-card overflow-hidden border border-white/60 mt-6">
+              <div className="px-5 py-4 border-b border-white/50 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-800">Students in Section</h3>
+                <span className="text-xs font-semibold text-slate-400">{sectionStudents.length} students</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="collego-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Student Name</th>
+                      <th style={{ textAlign: 'center' }}>Enrollment</th>
+                      <th style={{ textAlign: 'center' }}>Role</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sectionStudents.map((s, i) => {
+                      const isMaleRep = s.studentName === selectedSection.maleClassRep
+                      const isFemaleRep = s.studentName === selectedSection.femaleClassRep
+                      return (
+                        <tr key={i} className="hover:bg-white/30 transition-colors">
+                          <td className="text-slate-400">{i + 1}</td>
+                          <td className="text-slate-800 font-medium">{s.studentName}</td>
+                          <td style={{ textAlign: 'center' }} className="text-slate-500 text-xs font-mono">{s.enrollmentNumber}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div className="flex items-center justify-center gap-1">
+                              {isMaleRep && <span className="px-2 py-0.5 rounded text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-100">♂ Class Rep</span>}
+                              {isFemaleRep && <span className="px-2 py-0.5 rounded text-[9px] font-bold text-pink-600 bg-pink-50 border border-pink-100">♀ Class Rep</span>}
+                              {!isMaleRep && !isFemaleRep && <span className="text-[9px] text-slate-400">Student</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </Panel>
+      </div>
+    )
 }
 
 // ─── Attendance ──────────────────────────────────────────────────────────────

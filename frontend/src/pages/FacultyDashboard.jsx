@@ -5,7 +5,7 @@ import {
   LayoutDashboard, BookOpen, ClipboardCheck, FileText,
   Megaphone, ChevronRight, GraduationCap, Users, BookMarked,
   BarChart3, FolderOpen, Plus, CheckCircle2, X, Send, Sparkles,
-  ArrowLeft, Clock, Upload, RefreshCw, Bot, Zap, Layers, Award,
+  ArrowLeft, Clock, Upload, Download, RefreshCw, Bot, Zap, Layers, Award,
 } from 'lucide-react'
 import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -37,6 +37,7 @@ const GLOBAL_NAV = [
   { id: 'questionPapers', label: 'Question Papers', icon: FileText },
   { id: 'notices', label: 'Notices', icon: Megaphone },
   { id: 'ai-notice-gen', label: 'AI Notice Generator', icon: Sparkles },
+  { id: 'ai-notice-summary', label: 'AI Notice Summarizer', icon: Bot },
 ]
 
 const SECTION_TABS = [
@@ -397,7 +398,7 @@ function StudentPerformanceTab({ data, loading }) {
 }
 
 // ─── Assignments Tab ─────────────────────────────────────────────────────────
-function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, onSubmit, assignments, loading }) {
+function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, onSubmit, assignments, loading, onUploadFile, uploadFileLoading, fileInputRef }) {
   return (
     <div className="space-y-6">
       <div className="glass-card p-6 border border-white/60">
@@ -406,9 +407,33 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, o
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Assignment title" className="collego-input" /></div>
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="Assignment description..." className="collego-input resize-none" /></div>
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Due Date (optional)</label><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="collego-input !w-48" /></div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Attachment (optional)</label>
+            <div className="relative group">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="sr-only"
+                onChange={e => {
+                  if (e.target.files?.[0]) {
+                    const fd = new FormData()
+                    fd.append('file', e.target.files[0])
+                    onUploadFile(fd)
+                  }
+                }}
+              />
+              <button type="button" className="collego-input px-4 py-2 text-[10px] text-slate-400 border border-white/60 rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-all bg-white/50 w-full text-left">
+                Choose file
+              </button>
+            </div>
+          </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim()}>
-          {loading ? <><RefreshCw size={13} className="animate-spin" /> Creating...</> : <><Plus size={13} /> Create Assignment</>}
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim() || uploadFileLoading}>
+          {loading || uploadFileLoading ? (
+            <span className="flex gap-1"><RefreshCw size={13} className="animate-spin" /> Creating...</span>
+          ) : (
+            <span className="flex gap-1"><Plus size={13} /> Create Assignment</span>
+          )}
         </Button>
       </div>
       {assignments.length > 0 && (
@@ -422,7 +447,18 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, o
                     <p className="text-sm font-semibold text-slate-800">{a.title}</p>
                     <p className="text-xs text-slate-500 mt-1">{a.description}</p>
                   </div>
-                  {a.dueDate && <span className="text-xs text-amber-600 shrink-0 flex items-center gap-1.5"><Clock size={11} /> {fmtDate(a.dueDate)}</span>}
+                  <div className="flex items-center gap-3">
+                    {a.dueDate && <span className="text-xs text-amber-600 shrink-0 flex items-center gap-1.5"><Clock size={11} /> {fmtDate(a.dueDate)}</span>}
+                    {a.hasFile && (
+                      <a
+                        href={`/api/faculty/assignments/${a.id}/file`}
+                        download={a.fileName}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                      >
+                        <Download size={12} /> {a.fileName}
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -434,7 +470,7 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, o
 }
 
 // ─── Materials Tab ───────────────────────────────────────────────────────────
-function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit, materials, loading }) {
+function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit, materials, loading, onUploadFile, uploadFileLoading, fileInputRef }) {
   const MATERIAL_TYPES = ['NOTES', 'SLIDES', 'REFERENCE', 'VIDEO', 'ASSIGNMENT', 'OTHER']
   return (
     <div className="space-y-6">
@@ -449,22 +485,57 @@ function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit,
               {MATERIAL_TYPES.map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Attachment (optional)</label>
+            <div className="relative group">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="sr-only"
+                onChange={e => {
+                  if (e.target.files?.[0]) {
+                    const fd = new FormData()
+                    fd.append('file', e.target.files[0])
+                    onUploadFile(fd)
+                  }
+                }}
+              />
+              <button type="button" className="collego-input px-4 py-2 text-[10px] text-slate-400 border border-white/60 rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-all bg-white/50 w-full text-left">
+                Choose file
+              </button>
+            </div>
+          </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim()}>
-          {loading ? <><RefreshCw size={13} className="animate-spin" /> Adding...</> : <><Plus size={13} /> Add Material</>}
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim() || uploadFileLoading}>
+          {loading || uploadFileLoading ? (
+            <span className="flex gap-1"><RefreshCw size={13} className="animate-spin" /> Adding...</span>
+          ) : (
+            <span className="flex gap-1"><Plus size={13} /> Add Material</span>
+          )}
         </Button>
       </div>
       {materials.length > 0 && (
         <div className="glass-card overflow-hidden border border-white/60">
           <div className="overflow-x-auto">
             <table className="collego-table">
-              <thead><tr><th>Title</th><th>Type</th><th>Description</th></tr></thead>
+              <thead><tr><th>Title</th><th>Type</th><th>Description</th><th style={{ textAlign: 'center' }}>File</th></tr></thead>
               <tbody>
                 {materials.map(m => (
                   <tr key={m.id} className="hover:bg-white/30 transition-colors">
                     <td className="text-slate-800 font-medium">{m.title}</td>
                     <td><Badge variant="info">{m.materialType}</Badge></td>
                     <td className="text-slate-500 text-xs max-w-xs truncate">{m.description || '—'}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {m.hasFile && (
+                        <a
+                          href={`/api/faculty/materials/${m.id}/file`}
+                          download={m.fileName}
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                        >
+                          <Download size={12} /> {m.fileName}
+                        </a>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -704,6 +775,85 @@ function AiNoticeGenTab({ prompt, setPrompt, audience, setAudience, noticeType, 
   )
 }
 
+// ─── AI Notice Summarizer ─────────────────────────────────────────────────────
+function AiNoticeSummarizerTab() {
+  const [title, setTitle] = useState('')
+  const [content, setContent] = useState('')
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const summarize = async () => {
+    if (!title.trim() || !content.trim()) return
+    setLoading(true)
+    try {
+      const res = await api.post('/api/ai/summarize-notice', { title, content })
+      setResult(res.data)
+    } catch { setResult(null) }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={Bot} title="AI Notice Summarizer" subtitle="Summarize long notices into key points for quick reading." accent="violet"
+        actions={<Badge variant="purple">AI Powered</Badge>} />
+      <div className="glass-card p-6 border border-white/60">
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Notice Title</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Notice title" className="collego-input" />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Notice Content</label>
+            <textarea value={content} onChange={e => setContent(e.target.value)} rows={6} placeholder="Paste the full notice text here..." className="collego-input resize-none" />
+          </div>
+          <Button variant="gradient" onClick={summarize} disabled={loading || !title.trim() || !content.trim()} className="w-auto px-6">
+            {loading ? (
+              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Summarizing...</span>
+            ) : (
+              <span className="flex gap-1"><Bot size={14} /> Summarize</span>
+            )}
+          </Button>
+        </div>
+      </div>
+      {result && (
+        <div className="glass-card p-6 border border-white/60">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Summary</h3>
+          <div className="space-y-3">
+            {typeof result === 'string' ? (
+              <p className="text-sm text-slate-700">{result}</p>
+            ) : (
+              <div>
+                {result.summary && (
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Summary</p>
+                    <p className="text-sm text-slate-700">{result.summary}</p>
+                  </div>
+                )}
+                {result.keyPoints && Array.isArray(result.keyPoints) && (
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Key Points</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-slate-700">
+                      {result.keyPoints.map((p, i) => <li key={i}>{p}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {result.actionItems && Array.isArray(result.actionItems) && (
+                  <div className="mt-3">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">Action Items</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-slate-700">
+                      {result.actionItems.map((p, i) => <li key={i}>{p}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Faculty Dashboard ──────────────────────────────────────────────────
 export default function FacultyDashboard() {
   const navigate = useNavigate()
@@ -740,6 +890,10 @@ export default function FacultyDashboard() {
   const [materialDesc, setMaterialDesc] = useState('')
   const [materialType, setMaterialType] = useState('NOTES')
   const [sectionMaterials, setSectionMaterials] = useState([])
+  const [assignmentFileRef, setAssignmentFileRef] = useState(null)
+  const [materialFileRef, setMaterialFileRef] = useState(null)
+  const [uploadFileLoading, setUploadFileLoading] = useState(false)
+  const [uploadFileType, setUploadFileType] = useState(null) // 'assignment' | 'material'
 
   // Notices
   const [noticeTitle, setNoticeTitle] = useState('')
@@ -918,6 +1072,30 @@ export default function FacultyDashboard() {
     finally { setLoading(false) }
   }
 
+  const handleUploadAssignmentFile = async (assignmentId, fd) => {
+    setUploadFileLoading(true)
+    setUploadFileType('assignment')
+    try {
+      await api.post(`/api/faculty/assignments/${assignmentId}/file`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      showMsg('File uploaded successfully')
+      loadAssignments()
+      if (assignmentFileRef.current) assignmentFileRef.current.value = ''
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload file', 'error') }
+    finally { setUploadFileLoading(false); setUploadFileType(null) }
+  }
+
+  const handleUploadMaterialFile = async (materialId, fd) => {
+    setUploadFileLoading(true)
+    setUploadFileType('material')
+    try {
+      await api.post(`/api/faculty/materials/${materialId}/file`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      showMsg('File uploaded successfully')
+      loadMaterials()
+      if (materialFileRef.current) materialFileRef.current.value = ''
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload file', 'error') }
+    finally { setUploadFileLoading(false); setUploadFileType(null) }
+  }
+
   const loadMaterials = async () => {
     setTabLoading(true)
     try { const res = await api.get(`/api/faculty/materials/${selectedSection.sectionId}`); setSectionMaterials(res.data) }
@@ -1005,6 +1183,7 @@ export default function FacultyDashboard() {
         case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} />
         case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} deptId={noticeDeptId} setDeptId={setNoticeDeptId} departments={departments} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
         case 'ai-notice-gen': return <AiNoticeGenTab prompt={aiPrompt} setPrompt={setAiPrompt} audience={aiAudience} setAudience={setAiAudience} noticeType={aiNoticeType} setNoticeType={setAiNoticeType} onGenerate={handleAiGenerateNotice} result={aiResult} loading={aiLoading} onUse={useAiNotice} />
+        case 'ai-notice-summary': return <AiNoticeSummarizerTab />
         default: return null
       }
     }
@@ -1014,8 +1193,8 @@ export default function FacultyDashboard() {
       case 'internalMarks': return <InternalMarksTab examName={examName} setExamName={setExamName} maxMarks={maxMarks} setMaxMarks={setMaxMarks} marksEntries={marksEntries} setMarksEntries={setMarksEntries} onSubmit={handleUploadInternalMarks} sectionMarks={sectionMarks} loading={loading} />
       case 'semesterMarks': return <SemesterMarksTab semMaxMarks={semMaxMarks} setSemMaxMarks={setSemMaxMarks} semMarksEntries={semMarksEntries} setSemMarksEntries={setSemMarksEntries} onSubmit={handleUploadSemesterMarks} loading={loading} />
       case 'studentPerformance': return <StudentPerformanceTab data={studentPerformance} loading={tabLoading} />
-      case 'assignments': return <AssignmentsTab title={assignmentTitle} setTitle={setAssignmentTitle} desc={assignmentDesc} setDesc={setAssignmentDesc} dueDate={assignmentDueDate} setDueDate={setAssignmentDueDate} onSubmit={handleCreateAssignment} assignments={sectionAssignments} loading={loading} />
-      case 'materials': return <MaterialsTab title={materialTitle} setTitle={setMaterialTitle} desc={materialDesc} setDesc={setMaterialDesc} type={materialType} setType={setMaterialType} onSubmit={handleCreateMaterial} materials={sectionMaterials} loading={loading} />
+      case 'assignments': return <AssignmentsTab title={assignmentTitle} setTitle={setAssignmentTitle} desc={assignmentDesc} setDesc={setAssignmentDesc} dueDate={assignmentDueDate} setDueDate={setAssignmentDueDate} onSubmit={handleCreateAssignment} assignments={sectionAssignments} loading={loading} onUploadFile={fd => handleUploadAssignmentFile(null, fd)} uploadFileLoading={uploadFileLoading && uploadFileType === 'assignment'} fileInputRef={assignmentFileRef} />
+      case 'materials': return <MaterialsTab title={materialTitle} setTitle={setMaterialTitle} desc={materialDesc} setDesc={setMaterialDesc} type={materialType} setType={setMaterialType} onSubmit={handleCreateMaterial} materials={sectionMaterials} loading={loading} onUploadFile={fd => handleUploadMaterialFile(null, fd)} uploadFileLoading={uploadFileLoading && uploadFileType === 'material'} fileInputRef={materialFileRef} />
       case 'analytics': return <AnalyticsTab analytics={analytics} loading={tabLoading} />
       default: return null
     }
