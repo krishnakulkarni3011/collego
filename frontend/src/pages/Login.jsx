@@ -351,7 +351,8 @@ export default function Login() {
                             type="text"
                             value={username}
                             onChange={e => setUsername(e.target.value)}
-                            className="collego-input pl-9"
+                            className="collego-input"
+                            style={{ paddingLeft: '2.5rem' }}
                             placeholder={activeRole?.placeholder || 'you@college.edu'}
                             required
                             autoFocus
@@ -374,7 +375,8 @@ export default function Login() {
                             type={showPass ? 'text' : 'password'}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            className="collego-input pl-9 pr-10"
+                            className="collego-input"
+                            style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
                             placeholder="Enter your password"
                             required
                             autoComplete="current-password"
@@ -414,7 +416,7 @@ export default function Login() {
                             id="btn-login-submit"
                             type="submit"
                             disabled={loading}
-                            className="w-auto py-3 rounded-xl font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed hover:shadow-lg"
+                            className="w-auto shrink-0 whitespace-nowrap px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed hover:shadow-lg"
                             style={{
                               background: activeRole
                                 ? `linear-gradient(135deg, ${activeRole.id === 'STUDENT' ? '#10b981, #0d9488' : activeRole.id === 'FACULTY' ? '#8b5cf6, #d946ef' : '#4f46e5, #3b82f6'})`
