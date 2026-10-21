@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, BookOpen, ClipboardCheck, FileText,
+  LayoutDashboard, BookOpen, ClipboardCheck, ClipboardList, FileText,
   Megaphone, ChevronRight, GraduationCap, Users, BookMarked,
   BarChart3, FolderOpen, Plus, CheckCircle2, X, Send,
   ArrowLeft, Clock, Upload, Download, RefreshCw, Zap, Layers, Award,
@@ -86,6 +86,7 @@ const SECTION_TABS = [
   { id: 'semesterMarks', label: 'Semester Marks', icon: GraduationCap },
   { id: 'studentPerformance', label: 'Student Performance', icon: Users },
   { id: 'assignments', label: 'Assignments', icon: BookOpen },
+  { id: 'assignmentMarks', label: 'Assignment Marks', icon: ClipboardList },
   { id: 'materials', label: 'Materials', icon: FolderOpen },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
 ]
@@ -389,7 +390,7 @@ function InternalMarksTab({ examName, setExamName, maxMarks, setMaxMarks, marksE
 }
 
 // ─── Semester Marks Tab ──────────────────────────────────────────────────────
-function SemesterMarksTab({ semMaxMarks, setSemMaxMarks, semMarksEntries, setSemMarksEntries, onSubmit, loading }) {
+function SemesterMarksTab({ semMaxMarks, setSemMaxMarks, semMarksEntries, setSemMarksEntries, onSubmit, sectionMarks, loading }) {
   return (
     <div className="space-y-6">
       <div className="glass-card p-6 border border-white/60">
@@ -422,6 +423,121 @@ function SemesterMarksTab({ semMaxMarks, setSemMaxMarks, semMarksEntries, setSem
           {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><Upload size={14} /> Upload Semester Marks</>}
         </Button>
       </div>
+
+      {sectionMarks.length > 0 && (
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="px-5 py-4 border-b border-white/50"><h3 className="text-sm font-semibold text-slate-800">Recorded Marks</h3></div>
+          <div className="overflow-x-auto">
+            <table className="collego-table">
+              <thead><tr><th>Student</th><th style={{ textAlign: 'center' }}>Obtained</th><th style={{ textAlign: 'center' }}>Max</th><th style={{ textAlign: 'center' }}>Grade</th></tr></thead>
+              <tbody>
+                {sectionMarks.map(m => (
+                  <tr key={m.id} className="hover:bg-white/30 transition-colors">
+                    <td><p className="text-slate-800">{m.studentName}</p><code className="text-[10px] text-slate-400">{m.enrollmentNumber}</code></td>
+                    <td style={{ textAlign: 'center', color: '#2563eb', fontWeight: 600 }}>{m.obtainedMarks}</td>
+                    <td style={{ textAlign: 'center', color: '#64748b' }}>{m.maxMarks}</td>
+                    <td style={{ textAlign: 'center' }}><Badge variant="secondary">{m.grade || '—'}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Assignment Marks Tab ────────────────────────────────────────────────────
+function AssignmentMarksTab({
+  assignments, selectedAssignmentId, setSelectedAssignmentId, entries, setEntries,
+  onSubmit, sectionMarks, loading,
+}) {
+  const selectedAssignment = assignments.find(a => String(a.id) === String(selectedAssignmentId))
+
+  return (
+    <div className="space-y-6">
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2">
+          <ClipboardList size={14} className="text-amber-500" /> Upload Assignment Marks
+        </h3>
+
+        {assignments.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-white/40 px-5 py-10 text-center">
+            <p className="text-sm font-medium text-slate-700">No assignments yet</p>
+            <p className="text-xs text-slate-400 mt-1">Create an assignment in the Assignments tab, then come back here to record marks.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Assignment</label>
+                <select value={selectedAssignmentId} onChange={e => setSelectedAssignmentId(e.target.value)} className="collego-input">
+                  <option value="">Select assignment</option>
+                  {assignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+                </select>
+              </div>
+              <div className="flex items-end">
+                {selectedAssignment && (
+                  <Badge variant="secondary">Max Marks: {selectedAssignment.maxMarks ?? 10}</Badge>
+                )}
+              </div>
+            </div>
+
+            {selectedAssignmentId && (
+              <>
+                <div className="rounded-xl overflow-hidden border border-white/60 mb-5">
+                  <div className="overflow-x-auto">
+                    <table className="collego-table">
+                      <thead><tr><th>Enrollment</th><th>Student</th><th style={{ textAlign: 'center' }}>Marks / {selectedAssignment?.maxMarks ?? 10}</th></tr></thead>
+                      <tbody>
+                        {entries.map((entry, i) => (
+                          <tr key={entry.studentId} className="hover:bg-white/30 transition-colors">
+                            <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{entry.enrollmentNumber}</code></td>
+                            <td className="text-slate-800">{entry.studentName}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" value={entry.marks} min="0" max={selectedAssignment?.maxMarks ?? 10}
+                                onChange={e => setEntries(prev => prev.map((m, j) => j === i ? { ...m, marks: e.target.value } : m))}
+                                className="w-20 text-center collego-input py-1 text-sm" placeholder="—" />
+                            </td>
+                          </tr>
+                        ))}
+                        {entries.length === 0 && <tr><td colSpan={3} className="text-center text-slate-400 py-10">No students enrolled in this section.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                {entries.length > 0 && (
+                  <Button variant="gradient" onClick={onSubmit} disabled={loading} className="px-6">
+                    {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><Upload size={14} /> Save Assignment Marks</>}
+                  </Button>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {sectionMarks.length > 0 && (
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="px-5 py-4 border-b border-white/50"><h3 className="text-sm font-semibold text-slate-800">Recorded Marks</h3></div>
+          <div className="overflow-x-auto">
+            <table className="collego-table">
+              <thead><tr><th>Student</th><th>Assignment</th><th style={{ textAlign: 'center' }}>Obtained</th><th style={{ textAlign: 'center' }}>Max</th></tr></thead>
+              <tbody>
+                {sectionMarks.map(m => (
+                  <tr key={m.id} className="hover:bg-white/30 transition-colors">
+                    <td><p className="text-slate-800">{m.studentName}</p><code className="text-[10px] text-slate-400">{m.enrollmentNumber}</code></td>
+                    <td><Badge variant="secondary">{m.assignmentTitle}</Badge></td>
+                    <td style={{ textAlign: 'center', color: '#d97706', fontWeight: 600 }}>{m.marks}</td>
+                    <td style={{ textAlign: 'center', color: '#64748b' }}>{m.maxMarks}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -622,7 +738,9 @@ function SubmissionRow({ row, onGraded, onDownload, showMsg }) {
             {row.studentName} <span className="text-xs text-slate-400">({row.enrollmentNumber})</span>
           </p>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            {row.submittedAt ? `Submitted ${fmtDate(row.submittedAt)}` : 'Submitted'}
+            {row.hasFile
+              ? (row.submittedAt ? `Submitted ${fmtDate(row.submittedAt)}` : 'Submitted')
+              : (row.gradedAt ? `Marks recorded ${fmtDate(row.gradedAt)}` : 'No file submitted')}
             {row.late && <span className="ml-2 text-amber-600">Late</span>}
             {row.fileName && <span className="ml-2">· {row.fileName}</span>}
           </p>
@@ -1046,7 +1164,13 @@ export default function FacultyDashboard() {
   const [sectionMarks, setSectionMarks] = useState([])
   const [semMaxMarks, setSemMaxMarks] = useState(100)
   const [semMarksEntries, setSemMarksEntries] = useState([])
+  const [semesterMarks, setSemesterMarks] = useState([])
   const [studentPerformance, setStudentPerformance] = useState([])
+
+  // Assignment Marks
+  const [assignmentMarksAssignmentId, setAssignmentMarksAssignmentId] = useState('')
+  const [assignmentMarksEntries, setAssignmentMarksEntries] = useState([])
+  const [assignmentMarksRecorded, setAssignmentMarksRecorded] = useState([])
 
   // Assignments & Materials
   const [assignmentTitle, setAssignmentTitle] = useState('')
@@ -1118,6 +1242,13 @@ export default function FacultyDashboard() {
     }
   }, [activeTab, sections])
 
+  useEffect(() => {
+    if (selectedSection && activeTab === 'internalMarks') {
+      loadSectionMarks()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examName, selectedSection, activeTab])
+
   const handleGlobalNav = (tabId) => {
     setSelectedSection(null)
     setActiveTab(tabId)
@@ -1137,6 +1268,10 @@ export default function FacultyDashboard() {
     setActiveTab('attendance')
     setAnalytics(null)
     setSectionMarks([])
+    setSemesterMarks([])
+    setAssignmentMarksAssignmentId('')
+    setAssignmentMarksEntries([])
+    setAssignmentMarksRecorded([])
     setSectionAssignments([])
     setSectionMaterials([])
     setStudentPerformance([])
@@ -1159,7 +1294,8 @@ export default function FacultyDashboard() {
     if (tabId === 'assignments') loadAssignments()
     if (tabId === 'materials') loadMaterials()
     if (tabId === 'analytics') loadAnalytics()
-    if (tabId === 'internalMarks') loadSectionMarks()
+    if (tabId === 'semesterMarks') loadSemesterMarks()
+    if (tabId === 'assignmentMarks') loadAssignmentMarks()
     if (tabId === 'studentPerformance') loadStudentPerformance()
   }
 
@@ -1184,15 +1320,23 @@ export default function FacultyDashboard() {
     try {
       const res = await api.post('/api/faculty/marks/internal', { sectionId: selectedSection.sectionId, examName, maxMarks: parseFloat(maxMarks), entries })
       showMsg(`Marks saved: ${res.data.created} created, ${res.data.updated} updated`)
-      loadSectionMarks()
+      await loadSectionMarks()
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload marks', 'error') }
     finally { setLoading(false) }
   }
 
   const loadSectionMarks = async () => {
+    if (!selectedSection) return
     setTabLoading(true)
-    try { const res = await api.get(`/api/faculty/marks/internal/${selectedSection.sectionId}`); setSectionMarks(res.data) }
-    catch { /* ignore */ } finally { setTabLoading(false) }
+    try {
+      const res = await api.get(`/api/faculty/marks/internal/${selectedSection.sectionId}`)
+      const rows = Array.isArray(res.data) ? res.data : []
+      setSectionMarks(rows)
+      setMarksEntries(prev => prev.map(entry => {
+        const existing = rows.find(m => m.studentId === entry.studentId && m.examName === examName)
+        return { ...entry, obtainedMarks: existing ? existing.obtainedMarks : '' }
+      }))
+    } catch { /* ignore */ } finally { setTabLoading(false) }
   }
 
   const handleUploadSemesterMarks = async () => {
@@ -1202,7 +1346,86 @@ export default function FacultyDashboard() {
     try {
       const res = await api.post('/api/faculty/marks/semester', { sectionId: selectedSection.sectionId, maxMarks: parseFloat(semMaxMarks), entries })
       showMsg(`Semester marks saved: ${res.data.created} created, ${res.data.updated} updated`)
+      await loadSemesterMarks()
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload semester marks', 'error') }
+    finally { setLoading(false) }
+  }
+
+  const loadSemesterMarks = async () => {
+    if (!selectedSection) return
+    setTabLoading(true)
+    try {
+      const res = await api.get(`/api/faculty/marks/semester/${selectedSection.sectionId}`)
+      const rows = Array.isArray(res.data) ? res.data : []
+      setSemesterMarks(rows)
+      setSemMarksEntries(prev => prev.map(entry => {
+        const existing = rows.find(m => m.studentId === entry.studentId)
+        return existing ? { ...entry, obtainedMarks: existing.obtainedMarks } : entry
+      }))
+    } catch { /* ignore */ } finally { setTabLoading(false) }
+  }
+
+  const loadAssignmentMarks = async () => {
+    if (!selectedSection) return
+    setTabLoading(true)
+    try {
+      const [assignmentsRes, recordedRes] = await Promise.all([
+        api.get(`/api/faculty/assignments/${selectedSection.sectionId}`),
+        api.get(`/api/faculty/assignment-marks/${selectedSection.sectionId}`),
+      ])
+      const assignments = Array.isArray(assignmentsRes.data) ? assignmentsRes.data : []
+      const recorded = Array.isArray(recordedRes.data) ? recordedRes.data : []
+      setSectionAssignments(assignments)
+      setAssignmentMarksRecorded(recorded)
+
+      const currentExists = assignments.some(a => String(a.id) === String(assignmentMarksAssignmentId))
+      const nextId = currentExists ? assignmentMarksAssignmentId : assignments[0]?.id || ''
+      setAssignmentMarksAssignmentId(nextId ? String(nextId) : '')
+      if (nextId) {
+        await loadAssignmentMarksGrid(nextId)
+      } else {
+        setAssignmentMarksEntries([])
+      }
+    } catch { /* ignore */ } finally { setTabLoading(false) }
+  }
+
+  const loadAssignmentMarksGrid = async (assignmentId) => {
+    if (!selectedSection || !assignmentId) { setAssignmentMarksEntries([]); return }
+    try {
+      const res = await api.get(`/api/faculty/assignments/${assignmentId}/marks`)
+      const students = Array.isArray(res.data?.students) ? res.data.students : []
+      setAssignmentMarksEntries(students.map(s => ({
+        studentId: s.studentId,
+        studentName: s.studentName,
+        enrollmentNumber: s.enrollmentNumber,
+        marks: s.marks ?? '',
+      })))
+    } catch (err) {
+      setAssignmentMarksEntries([])
+      showMsg(err.response?.data?.message || 'Failed to load assignment marks', 'error')
+    }
+  }
+
+  const handleAssignmentMarksSelect = async (value) => {
+    setAssignmentMarksAssignmentId(value)
+    await loadAssignmentMarksGrid(value)
+  }
+
+  const handleUploadAssignmentMarks = async () => {
+    const entries = assignmentMarksEntries
+      .filter(e => e.marks !== '' && e.marks !== null)
+      .map(e => ({ studentId: e.studentId, marks: Number(e.marks) }))
+    if (!assignmentMarksAssignmentId) { showMsg('Select an assignment first', 'error'); return }
+    if (!entries.length) { showMsg('Enter marks for at least one student', 'error'); return }
+    setLoading(true)
+    try {
+      const res = await api.post(`/api/faculty/assignments/${assignmentMarksAssignmentId}/marks`, { entries })
+      showMsg(`Assignment marks saved: ${res.data.created} created, ${res.data.updated} updated`)
+      await Promise.all([
+        loadAssignmentMarksGrid(assignmentMarksAssignmentId),
+        api.get(`/api/faculty/assignment-marks/${selectedSection.sectionId}`).then(r => setAssignmentMarksRecorded(Array.isArray(r.data) ? r.data : [])),
+      ])
+    } catch (err) { showMsg(err.response?.data?.message || 'Failed to save assignment marks', 'error') }
     finally { setLoading(false) }
   }
 
@@ -1212,8 +1435,28 @@ export default function FacultyDashboard() {
     try {
       const [attRes, marksRes] = await Promise.all([api.get(`/api/faculty/attendance/${selectedSection.sectionId}`), api.get(`/api/faculty/marks/internal/${selectedSection.sectionId}`)])
       const attMap = {}; attRes.data.forEach(s => { attMap[s.studentId] = s })
-      const combined = marksRes.data.map(m => ({ ...m, attendance: attMap[m.studentId] || null }))
-      attRes.data.forEach(s => { if (!combined.find(c => c.studentId === s.studentId)) combined.push({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, attendance: s }) })
+      const marksByStudent = {}
+      marksRes.data.forEach(m => {
+        if (!marksByStudent[m.studentId]) {
+          marksByStudent[m.studentId] = {
+            studentId: m.studentId,
+            studentName: m.studentName,
+            enrollmentNumber: m.enrollmentNumber,
+          }
+        }
+        if (m.examName === 'IA-1') marksByStudent[m.studentId].ia1ObtainedMarks = m.obtainedMarks
+        if (m.examName === 'IA-2') marksByStudent[m.studentId].ia2ObtainedMarks = m.obtainedMarks
+      })
+      const combined = attRes.data.map(s => ({
+        ...s,
+        ...(marksByStudent[s.studentId] || {}),
+        attendance: attMap[s.studentId] || null,
+      }))
+      Object.values(marksByStudent).forEach(m => {
+        if (!combined.find(c => c.studentId === m.studentId)) {
+          combined.push({ ...m, attendance: attMap[m.studentId] || null })
+        }
+      })
       setStudentPerformance(combined)
     } catch { /* ignore */ } finally { setTabLoading(false) }
   }, [selectedSection])
@@ -1429,9 +1672,10 @@ export default function FacultyDashboard() {
     switch (activeTab) {
       case 'attendance': return <AttendanceTab attendanceDate={attendanceDate} setAttendanceDate={setAttendanceDate} attendanceRecords={attendanceRecords} toggleAttendance={toggleAttendance} onSubmit={handleMarkAttendance} loading={loading} />
       case 'internalMarks': return <InternalMarksTab examName={examName} setExamName={setExamName} maxMarks={maxMarks} setMaxMarks={setMaxMarks} marksEntries={marksEntries} setMarksEntries={setMarksEntries} onSubmit={handleUploadInternalMarks} sectionMarks={sectionMarks} loading={loading} />
-      case 'semesterMarks': return <SemesterMarksTab semMaxMarks={semMaxMarks} setSemMaxMarks={setSemMaxMarks} semMarksEntries={semMarksEntries} setSemMarksEntries={setSemMarksEntries} onSubmit={handleUploadSemesterMarks} loading={loading} />
+      case 'semesterMarks': return <SemesterMarksTab semMaxMarks={semMaxMarks} setSemMaxMarks={setSemMaxMarks} semMarksEntries={semMarksEntries} setSemMarksEntries={setSemMarksEntries} onSubmit={handleUploadSemesterMarks} sectionMarks={semesterMarks} loading={loading} />
       case 'studentPerformance': return <StudentPerformanceTab data={studentPerformance} loading={tabLoading} />
       case 'assignments': return <AssignmentsTab title={assignmentTitle} setTitle={setAssignmentTitle} desc={assignmentDesc} setDesc={setAssignmentDesc} dueDate={assignmentDueDate} setDueDate={setAssignmentDueDate} maxMarks={assignmentMaxMarks} setMaxMarks={setAssignmentMaxMarks} targetYear={assignmentTargetYear} setTargetYear={setAssignmentTargetYear} onSubmit={handleCreateAssignment} assignments={sectionAssignments} loading={loading} onDownload={handleDownload} showMsg={showMsg} />
+      case 'assignmentMarks': return <AssignmentMarksTab assignments={sectionAssignments} selectedAssignmentId={assignmentMarksAssignmentId} setSelectedAssignmentId={handleAssignmentMarksSelect} entries={assignmentMarksEntries} setEntries={setAssignmentMarksEntries} onSubmit={handleUploadAssignmentMarks} sectionMarks={assignmentMarksRecorded} loading={loading} />
       case 'materials': return <MaterialsTab title={materialTitle} setTitle={setMaterialTitle} desc={materialDesc} setDesc={setMaterialDesc} type={materialType} setType={setMaterialType} targetYear={materialTargetYear} setTargetYear={setMaterialTargetYear} onSubmit={handleCreateMaterial} materials={sectionMaterials} loading={loading} onDownload={handleDownload} />
       case 'analytics': return <AnalyticsTab analytics={analytics} loading={tabLoading} />
       default: return null

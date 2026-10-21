@@ -243,25 +243,29 @@ public class FacultyPortalService {
 
         List<Enrollment> enrollments = enrollmentRepository.findBySectionId(sectionId);
 
-        return enrollments.stream().map(enrollment -> {
+        // Return one flat row per recorded exam mark so the faculty UI can render
+        // the "Recorded Marks" table directly after an upload.
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Enrollment enrollment : enrollments) {
             StudentProfile student = enrollment.getStudent();
             User studentUser = student.getUser();
-            List<InternalMarks> marks = internalMarksRepository.findByStudentIdAndSectionId(student.getId(), sectionId);
+            String studentName = studentUser.getFirstName() + " " + studentUser.getLastName();
 
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("studentId", student.getId());
-            entry.put("enrollmentNumber", student.getEnrollmentNumber());
-            entry.put("studentName", studentUser.getFirstName() + " " + studentUser.getLastName());
-
-            for (InternalMarks mark : marks) {
-                Map<String, Object> markData = new LinkedHashMap<>();
-                markData.put("maxMarks", mark.getMaxMarks());
-                markData.put("obtainedMarks", mark.getObtainedMarks());
-                entry.put(mark.getExamName(), markData);
+            for (InternalMarks mark : internalMarksRepository.findByStudentIdAndSectionId(student.getId(), sectionId)) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("id", mark.getId());
+                entry.put("studentId", student.getId());
+                entry.put("enrollmentNumber", student.getEnrollmentNumber());
+                entry.put("studentName", studentName);
+                entry.put("examName", mark.getExamName());
+                entry.put("maxMarks", mark.getMaxMarks());
+                entry.put("obtainedMarks", mark.getObtainedMarks());
+                entry.put("createdAt", mark.getCreatedAt());
+                rows.add(entry);
             }
+        }
 
-            return entry;
-        }).collect(Collectors.toList());
+        return rows;
     }
 
     // ==================== Semester Marks ====================
@@ -325,6 +329,35 @@ public class FacultyPortalService {
         result.put("updated", updated);
         result.put("message", "Semester marks uploaded successfully");
         return result;
+    }
+
+    public List<Map<String, Object>> getSemesterMarksForSection(String email, Long sectionId) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        Section section = sectionRepository.findById(sectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + sectionId));
+        validateFacultyOwnsSection(faculty, section);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Enrollment enrollment : enrollmentRepository.findBySectionId(sectionId)) {
+            StudentProfile student = enrollment.getStudent();
+            User studentUser = student.getUser();
+
+            for (SemesterMarks mark : semesterMarksRepository.findByStudentIdAndSectionId(student.getId(), sectionId)) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("id", mark.getId());
+                entry.put("studentId", student.getId());
+                entry.put("enrollmentNumber", student.getEnrollmentNumber());
+                entry.put("studentName", studentUser.getFirstName() + " " + studentUser.getLastName());
+                entry.put("maxMarks", mark.getMaxMarks());
+                entry.put("obtainedMarks", mark.getObtainedMarks());
+                entry.put("grade", mark.getGrade());
+                entry.put("gradePoints", mark.getGradePoints());
+                entry.put("createdAt", mark.getCreatedAt());
+                rows.add(entry);
+            }
+        }
+
+        return rows;
     }
 
     // ==================== Assignments ====================
@@ -463,6 +496,155 @@ public class FacultyPortalService {
 
         log.info("Faculty {} graded submission {} with {} marks", email, submissionId, request.getMarks());
         return mapSubmissionToResponse(submission);
+    }
+
+    // ==================== Assignment Marks ====================
+
+    /**
+     * All recorded assignment marks for a section, across every assignment in
+     * that section. Used by the Assignment Marks "Recorded Marks" table.
+     */
+    public List<Map<String, Object>> getAssignmentMarksForSection(String email, Long sectionId) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        Section section = sectionRepository.findById(sectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + sectionId));
+        validateFacultyOwnsSection(faculty, section);
+
+        List<Assignment> assignments = assignmentRepository.findBySectionIdOrderByCreatedAtDesc(sectionId);
+        List<AssignmentSubmission> submissions = assignmentSubmissionRepository.findByAssignment_Section_Id(sectionId);
+        List<Map<String, Object>> rows = new ArrayList<>();
+
+        for (Assignment assignment : assignments) {
+            int maxMarks = assignment.getMaxMarks() != null ? assignment.getMaxMarks() : 10;
+            for (AssignmentSubmission submission : submissions) {
+                if (!assignment.getId().equals(submission.getAssignment().getId())
+                        || submission.getMarks() == null) {
+                    continue;
+                }
+                StudentProfile student = submission.getStudent();
+                User studentUser = student.getUser();
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("id", submission.getId());
+                entry.put("assignmentId", assignment.getId());
+                entry.put("assignmentTitle", assignment.getTitle());
+                entry.put("maxMarks", maxMarks);
+                entry.put("studentId", student.getId());
+                entry.put("studentName", studentUser.getFirstName() + " " + studentUser.getLastName());
+                entry.put("enrollmentNumber", student.getEnrollmentNumber());
+                entry.put("marks", submission.getMarks());
+                entry.put("status", submission.getStatus() != null ? submission.getStatus().name() : null);
+                entry.put("submittedAt", submission.getSubmittedAt());
+                entry.put("gradedAt", submission.getGradedAt());
+                rows.add(entry);
+            }
+        }
+
+        return rows;
+    }
+
+    /**
+     * Marks grid for one assignment. Every student enrolled in the assignment's
+     * section is returned, even when they have not submitted anything yet, so
+     * faculty can enter or update marks for the whole class.
+     */
+    public Map<String, Object> getAssignmentMarksGrid(String email, Long assignmentId) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
+        validateFacultyOwnsSection(faculty, assignment.getSection());
+
+        int maxMarks = assignment.getMaxMarks() != null ? assignment.getMaxMarks() : 10;
+        List<Map<String, Object>> students = new ArrayList<>();
+
+        for (Enrollment enrollment : enrollmentRepository.findBySectionId(assignment.getSection().getId())) {
+            StudentProfile student = enrollment.getStudent();
+            User studentUser = student.getUser();
+            Optional<AssignmentSubmission> submission = assignmentSubmissionRepository
+                    .findByAssignmentIdAndStudentId(assignmentId, student.getId());
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("studentId", student.getId());
+            row.put("studentName", studentUser.getFirstName() + " " + studentUser.getLastName());
+            row.put("enrollmentNumber", student.getEnrollmentNumber());
+            row.put("submissionId", submission.map(AssignmentSubmission::getId).orElse(null));
+            row.put("marks", submission.map(AssignmentSubmission::getMarks).orElse(null));
+            row.put("status", submission
+                    .map(s -> s.getStatus() != null ? s.getStatus().name() : null)
+                    .orElse("NOT_SUBMITTED"));
+            students.add(row);
+        }
+
+        students.sort(Comparator.comparing(row -> String.valueOf(row.get("enrollmentNumber"))));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("assignmentId", assignment.getId());
+        result.put("assignmentTitle", assignment.getTitle());
+        result.put("sectionId", assignment.getSection().getId());
+        result.put("maxMarks", maxMarks);
+        result.put("students", students);
+        return result;
+    }
+
+    /**
+     * Bulk create/update assignment marks for the students in an assignment's
+     * section. A placeholder submission is created when the student has not
+     * submitted a file, so marks can be recorded for everyone.
+     */
+    @Transactional
+    public Map<String, Object> uploadAssignmentMarks(String email, Long assignmentId,
+                                                     UploadAssignmentMarksRequest request) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
+        validateFacultyOwnsSection(faculty, assignment.getSection());
+
+        int maxMarks = assignment.getMaxMarks() != null ? assignment.getMaxMarks() : 10;
+        int created = 0;
+        int updated = 0;
+
+        for (UploadAssignmentMarksRequest.StudentAssignmentMarksEntry entry : request.getEntries()) {
+            StudentProfile student = studentProfileRepository.findById(entry.getStudentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + entry.getStudentId()));
+
+            if (!enrollmentRepository.existsByStudentIdAndSectionId(student.getId(), assignment.getSection().getId())) {
+                throw new BadRequestException("Student " + entry.getStudentId()
+                        + " is not enrolled in this assignment's section");
+            }
+            if (entry.getMarks().compareTo(BigDecimal.valueOf(maxMarks)) > 0) {
+                throw new BadRequestException("Marks cannot exceed the maximum of " + maxMarks
+                        + " for student " + entry.getStudentId());
+            }
+
+            Optional<AssignmentSubmission> existing = assignmentSubmissionRepository
+                    .findByAssignmentIdAndStudentId(assignmentId, student.getId());
+
+            AssignmentSubmission submission = existing.orElseGet(() -> AssignmentSubmission.builder()
+                    .assignment(assignment)
+                    .student(student)
+                    .build());
+
+            submission.setMarks(entry.getMarks());
+            submission.setStatus(SubmissionStatus.GRADED);
+            submission.setGradedAt(LocalDateTime.now());
+            submission.setGradedBy(faculty.getUser());
+            assignmentSubmissionRepository.save(submission);
+
+            if (existing.isPresent()) {
+                updated++;
+            } else {
+                created++;
+            }
+        }
+
+        log.info("Faculty {} recorded assignment marks for assignment {}: {} created, {} updated",
+                email, assignmentId, created, updated);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("assignmentId", assignmentId);
+        result.put("created", created);
+        result.put("updated", updated);
+        result.put("message", "Assignment marks saved successfully");
+        return result;
     }
 
     private AssignmentSubmissionResponse mapSubmissionToResponse(AssignmentSubmission s) {

@@ -10,6 +10,7 @@ import java.util.Optional;
 @Repository
 public interface AssignmentSubmissionRepository extends JpaRepository<AssignmentSubmission, Long> {
     List<AssignmentSubmission> findByAssignmentIdOrderBySubmittedAtDesc(Long assignmentId);
+    List<AssignmentSubmission> findByAssignment_Section_Id(Long sectionId);
     List<AssignmentSubmission> findByStudentId(Long studentId);
     Optional<AssignmentSubmission> findByAssignmentIdAndStudentId(Long assignmentId, Long studentId);
     long countByAssignmentId(Long assignmentId);

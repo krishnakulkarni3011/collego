@@ -107,6 +107,13 @@ public class FacultyController {
         return ResponseEntity.ok(facultyPortalService.uploadSemesterMarks(auth.getName(), request));
     }
 
+    @GetMapping("/marks/semester/{sectionId}")
+    public ResponseEntity<List<Map<String, Object>>> getSemesterMarksForSection(
+            Authentication auth,
+            @PathVariable Long sectionId) {
+        return ResponseEntity.ok(facultyPortalService.getSemesterMarksForSection(auth.getName(), sectionId));
+    }
+
     // ==================== Assignments ====================
 
     @PostMapping("/assignments")
@@ -172,6 +179,30 @@ public class FacultyController {
             @PathVariable Long submissionId,
             @Valid @RequestBody GradeSubmissionRequest request) {
         return ResponseEntity.ok(facultyPortalService.gradeSubmission(auth.getName(), submissionId, request));
+    }
+
+    // ==================== Assignment Marks ====================
+
+    @GetMapping("/assignment-marks/{sectionId}")
+    public ResponseEntity<List<Map<String, Object>>> getAssignmentMarksForSection(
+            Authentication auth,
+            @PathVariable Long sectionId) {
+        return ResponseEntity.ok(facultyPortalService.getAssignmentMarksForSection(auth.getName(), sectionId));
+    }
+
+    @GetMapping("/assignments/{assignmentId}/marks")
+    public ResponseEntity<Map<String, Object>> getAssignmentMarksGrid(
+            Authentication auth,
+            @PathVariable Long assignmentId) {
+        return ResponseEntity.ok(facultyPortalService.getAssignmentMarksGrid(auth.getName(), assignmentId));
+    }
+
+    @PostMapping("/assignments/{assignmentId}/marks")
+    public ResponseEntity<Map<String, Object>> uploadAssignmentMarks(
+            Authentication auth,
+            @PathVariable Long assignmentId,
+            @Valid @RequestBody UploadAssignmentMarksRequest request) {
+        return ResponseEntity.ok(facultyPortalService.uploadAssignmentMarks(auth.getName(), assignmentId, request));
     }
 
     // ==================== Course Materials ====================
