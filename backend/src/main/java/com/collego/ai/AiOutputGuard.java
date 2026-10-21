@@ -1,6 +1,7 @@
 package com.collego.ai;
 
 import com.collego.repository.FacultyProfileRepository;
+import com.collego.repository.StudentProfileRepository;
 import com.collego.service.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +11,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,6 +47,12 @@ public class AiOutputGuard {
     private static final Pattern TOKEN_LIKE = Pattern.compile("eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{4,}");
     private static final Pattern EMAIL = Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
 
+    /**
+     * Enrolment-number shape, e.g. 1CG24CS001. A student may only ever see their
+     * own enrolment number, so any other one in a reply is a cross-user identifier.
+     */
+    private static final Pattern ENROLMENT_NUMBER = Pattern.compile("\\b\\d{1,2}CG\\d{2}CS\\d{3}\\b");
+
     /** Credential-shaped keys that must never appear in an AI reply. */
     private static final List<String> FORBIDDEN_TOKENS = List.of(
             "passwordhash", "password_hash", "\"password\"", "hashedpassword",
@@ -53,7 +62,11 @@ public class AiOutputGuard {
     private static final long EMAIL_CACHE_MILLIS = 5 * 60 * 1000L;
 
     private final FacultyProfileRepository facultyProfileRepository;
+    private final StudentProfileRepository studentProfileRepository;
     private final AuditService auditService;
+
+    /** The caller's own enrolment number never changes, so it is cached. */
+    private final Map<Long, String> ownEnrolmentNumbers = new ConcurrentHashMap<>();
 
     private volatile Set<String> cachedShareableEmails = Set.of();
     private volatile long cacheExpiresAt = 0L;
@@ -61,7 +74,7 @@ public class AiOutputGuard {
     /** Returns a safe reply: either the original text or a neutral refusal. */
     public String enforce(AiScope scope, String text) {
         if (text == null || text.isBlank()) return SAFE_FALLBACK;
-        String violation = detect(scope, text, shareableEmails());
+        String violation = detect(scope, text, shareableEmails(), ownEnrolmentNumber(scope));
         if (violation != null) {
             log.warn("AI output blocked for {}: {}", scope != null ? scope.email() : "unknown", violation);
             try {
@@ -80,9 +93,17 @@ public class AiOutputGuard {
      * Pure detection logic — package-private and static so it can be unit tested
      * without a Spring context or a database.
      *
+     * @param ownEnrolmentNumber the caller's own enrolment number, or null when
+     *                           it is unknown (then any enrolment number is a
+     *                           violation)
      * @return a reason string when the text must be blocked, otherwise null
      */
     static String detect(AiScope scope, String text, Set<String> shareableEmails) {
+        return detect(scope, text, shareableEmails, null);
+    }
+
+    static String detect(AiScope scope, String text, Set<String> shareableEmails,
+                         String ownEnrolmentNumber) {
         if (text == null || text.isEmpty()) return null;
 
         if (BCRYPT.matcher(text).find()) {
@@ -115,6 +136,17 @@ public class AiOutputGuard {
                     return "cross-user email address in AI output";
                 }
             }
+
+            // A student may only ever see their own enrolment number. This also
+            // catches a model that answers a question about somebody else by
+            // relabelling the caller's own data with the name that was asked for.
+            Matcher enrolment = ENROLMENT_NUMBER.matcher(text);
+            while (enrolment.find()) {
+                if (ownEnrolmentNumber == null
+                        || !ownEnrolmentNumber.equalsIgnoreCase(enrolment.group())) {
+                    return "another student's enrolment number in AI output";
+                }
+            }
         }
         return null;
     }
@@ -137,5 +169,23 @@ public class AiOutputGuard {
         }
         cacheExpiresAt = now + EMAIL_CACHE_MILLIS;
         return cachedShareableEmails;
+    }
+
+    /**
+     * The caller's own enrolment number, or null when the caller has no student
+     * profile (in which case the guard treats any enrolment number as a leak).
+     */
+    private String ownEnrolmentNumber(AiScope scope) {
+        if (scope == null || scope.userId() == null) return null;
+        return ownEnrolmentNumbers.computeIfAbsent(scope.userId(), id -> {
+            try {
+                return studentProfileRepository.findByUserId(id)
+                        .map(profile -> profile.getEnrollmentNumber())
+                        .orElse(null);
+            } catch (Exception e) {
+                log.debug("Could not resolve own enrolment number: {}", e.getMessage());
+                return null;
+            }
+        });
     }
 }

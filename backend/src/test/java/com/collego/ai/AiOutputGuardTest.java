@@ -72,4 +72,31 @@ class AiOutputGuardTest {
         String text = "Your overall attendance is 82.5% (33/40 classes) and your CGPA is 8.4.";
         assertNull(AiOutputGuard.detect(student(), text, Set.of()));
     }
+
+    @Test
+    void blocksAnotherStudentsEnrolmentNumber() {
+        String text = "The student 1CG24CS101 (Dhruv Bhat) has 82.69% attendance.";
+        assertEquals("another student's enrolment number in AI output",
+                AiOutputGuard.detect(student(), text, Set.of(), "1CG24CS105"));
+    }
+
+    @Test
+    void allowsTheCallersOwnEnrolmentNumber() {
+        String text = "Your enrolment number is 1CG24CS105 and your attendance is 82.69%.";
+        assertNull(AiOutputGuard.detect(student(), text, Set.of(), "1CG24CS105"));
+    }
+
+    @Test
+    void blocksEveryEnrolmentNumberWhenTheCallersOwnIsUnknown() {
+        String text = "Your enrolment number is 1CG24CS105.";
+        assertNotNull(AiOutputGuard.detect(student(), text, Set.of(), null));
+    }
+
+    @Test
+    void facultyMayStillListStudentEnrolmentNumbers() {
+        AiScope faculty = AiScope.of(20L, "f1@collego.edu", Role.FACULTY, false,
+                Set.of(100L), Set.of(7L), Set.of(3L));
+        String text = "Section A roster: 1CG24CS001 Aarav Sharma, 1CG24CS002 Aditi Patel.";
+        assertNull(AiOutputGuard.detect(faculty, text, Set.of(), null));
+    }
 }
