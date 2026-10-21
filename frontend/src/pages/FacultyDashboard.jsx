@@ -130,7 +130,7 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.06 }}
                 onClick={() => onSectionSelect(sec)}
-                className="text-left rounded-2xl p-5 border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white hover:border-white/80 hover:shadow-xl hover:shadow-indigo-500/10 transition-all group"
+                className="text-left rounded-2xl p-5 border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white hover:border-indigo-300/70 hover:shadow-xl hover:shadow-indigo-500/10 transition-all group"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1 min-w-0">
@@ -173,7 +173,7 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
             const Icon = f.icon
             const a = ACCENTS[f.accent]
             return (
-              <div key={f.label} className="flex items-start gap-3 p-4 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white hover:border-white/80 transition-all group">
+              <div key={f.label} className="flex items-start gap-3 p-4 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white hover:border-indigo-300/70 transition-all group">
                 <span className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', a.softBg, a.shadow)}>
                   <Icon size={16} className={a.text} />
                 </span>

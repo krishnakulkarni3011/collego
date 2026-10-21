@@ -8,14 +8,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20 hover:bg-indigo-700 focus-visible:ring-indigo-300",
-        destructive: "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100",
-        outline: "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-        secondary: "bg-slate-100 text-slate-700 hover:bg-slate-200",
-        ghost: "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+        default: "border border-indigo-700/20 bg-indigo-600 text-white shadow-sm shadow-indigo-500/25 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 hover:shadow-md focus-visible:ring-indigo-300",
+        destructive: "border border-red-300 bg-red-50 text-red-600 hover:border-red-400 hover:bg-white hover:text-red-700",
+        outline: "border border-slate-300 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700",
+        secondary: "border border-slate-300 bg-slate-100 text-slate-700 hover:border-indigo-300 hover:bg-white hover:text-indigo-700",
+        ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
         link: "text-indigo-600 underline-offset-4 hover:underline",
-        gradient: "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-violet-500",
-        success: "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-teal-600",
+        gradient: "border border-indigo-700/20 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/20 hover:border-indigo-300 hover:from-indigo-50 hover:to-violet-50 hover:text-indigo-700 hover:shadow-md",
+        success: "border border-emerald-700/15 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20 hover:border-emerald-300 hover:from-emerald-50 hover:to-teal-50 hover:text-emerald-700 hover:shadow-md",
       },
       size: {
         default: "h-9 px-4 py-2",

@@ -14,6 +14,7 @@ export const ACCENTS = {
     grad: 'from-indigo-500 to-blue-600',
     shadow: 'shadow-indigo-500/30',
     text: 'text-indigo-600',
+    activeIcon: 'text-indigo-300',
     softBg: 'bg-indigo-50',
     softBorder: 'border-indigo-100',
     bar: '#4f46e5',
@@ -25,6 +26,7 @@ export const ACCENTS = {
     grad: 'from-emerald-500 to-teal-600',
     shadow: 'shadow-emerald-500/30',
     text: 'text-emerald-600',
+    activeIcon: 'text-emerald-300',
     softBg: 'bg-emerald-50',
     softBorder: 'border-emerald-100',
     bar: '#10b981',
@@ -36,6 +38,7 @@ export const ACCENTS = {
     grad: 'from-violet-500 to-fuchsia-600',
     shadow: 'shadow-violet-500/30',
     text: 'text-violet-600',
+    activeIcon: 'text-violet-300',
     softBg: 'bg-violet-50',
     softBorder: 'border-violet-100',
     bar: '#8b5cf6',
@@ -47,6 +50,7 @@ export const ACCENTS = {
     grad: 'from-blue-500 to-cyan-500',
     shadow: 'shadow-blue-500/30',
     text: 'text-blue-600',
+    activeIcon: 'text-sky-300',
     softBg: 'bg-blue-50',
     softBorder: 'border-blue-100',
     bar: '#3b82f6',
@@ -58,6 +62,7 @@ export const ACCENTS = {
     grad: 'from-amber-500 to-orange-500',
     shadow: 'shadow-amber-500/30',
     text: 'text-amber-600',
+    activeIcon: 'text-amber-300',
     softBg: 'bg-amber-50',
     softBorder: 'border-amber-100',
     bar: '#f59e0b',
@@ -338,9 +343,9 @@ export function PortalSidebar({
 }) {
   const a = ACCENTS[accent] || ACCENTS.indigo
   return (
-    <aside className={cn('sidebar', collapsed && 'collapsed')}>
+    <aside className={cn('sidebar', collapsed && 'collapsed')} style={{ '--nav-accent': a.bar }}>
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-[80px] border-b border-slate-100/60 shrink-0">
+      <div className="flex items-center gap-3 px-4 h-[80px] border-b border-white/10 shrink-0">
         <div className={cn('w-11 h-11 rounded-2xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-lg text-white', a.grad, a.shadow)}>
           <GraduationCap size={21} />
         </div>
@@ -353,7 +358,7 @@ export function PortalSidebar({
               transition={{ duration: 0.15 }}
               className="min-w-0"
             >
-              <p className="text-sm font-extrabold text-slate-900 leading-tight tracking-wide">{brand}</p>
+              <p className="text-sm font-extrabold text-white leading-tight tracking-wide">{brand}</p>
               <p className="text-[9px] text-slate-400 tracking-[0.18em] uppercase font-semibold">{portalLabel}</p>
             </motion.div>
           )}
@@ -379,15 +384,15 @@ export function PortalSidebar({
                   title={collapsed ? item.label : undefined}
                   className={cn(
                     'w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-2xl transition-all duration-300 relative group mb-1',
-                    isActive ? 'nav-item-active' : 'text-slate-500 hover:bg-slate-50/60 hover:text-slate-800'
+                    isActive ? 'nav-item-active' : 'text-slate-300 hover:bg-white/10 hover:text-white'
                   )}
                 >
-                  <Icon size={17} className={cn('shrink-0', isActive ? a.text : 'text-slate-400 group-hover:text-slate-600')} />
+                  <Icon size={17} className={cn('shrink-0', isActive ? a.activeIcon : 'text-slate-400 group-hover:text-slate-100')} />
                   {!collapsed && <span className="text-[13px] font-medium leading-none flex-1 min-w-0 truncate">{item.label}</span>}
                   {item.meta && !collapsed && (
                     <span className="text-[9px] text-slate-400 ml-auto shrink-0">{item.meta}</span>
                   )}
-                  {isActive && !collapsed && !item.meta && <ChevronRight size={12} className={cn('ml-auto', a.text)} />}
+                  {isActive && !collapsed && !item.meta && <ChevronRight size={12} className={cn('ml-auto', a.activeIcon)} />}
                   {collapsed && (
                     <div className="absolute left-full ml-3 px-2.5 py-1.5 rounded-xl bg-slate-800/90 text-white text-[10px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl">
                       {item.label}
@@ -402,14 +407,14 @@ export function PortalSidebar({
 
       {/* Summary note */}
       {!collapsed && note && (
-        <div className="mx-3 mb-3 p-3 rounded-2xl bg-slate-50 border border-slate-100 shrink-0">
-          <p className="text-[9px] text-slate-500 leading-relaxed">{note}</p>
+        <div className="mx-3 mb-3 p-3 rounded-2xl bg-white/5 border border-white/10 shrink-0">
+          <p className="text-[9px] text-slate-400 leading-relaxed">{note}</p>
         </div>
       )}
 
       {/* Campus card */}
       {!collapsed && (
-        <div className="mx-3 mb-4 rounded-2xl overflow-hidden relative h-28 shrink-0 border border-slate-100/50 shadow-sm">
+        <div className="mx-3 mb-4 rounded-2xl overflow-hidden relative h-28 shrink-0 border border-white/10 shadow-sm">
           <img src={heroImg} alt="Campus" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/30 to-transparent" />
           <div className="absolute inset-0 flex flex-col items-start justify-end p-3">
@@ -420,10 +425,10 @@ export function PortalSidebar({
       )}
 
       {/* Collapse */}
-      <div className="border-t border-slate-100/60 p-2 shrink-0">
+      <div className="border-t border-white/10 p-2 shrink-0">
         <button
           onClick={onToggle}
-          className="w-full flex items-center justify-center gap-2 py-2 text-slate-400 hover:text-slate-700 text-xs rounded-2xl hover:bg-slate-50/60 transition-colors"
+          className="w-full flex items-center justify-center gap-2 py-2 text-slate-400 hover:text-white text-xs rounded-2xl hover:bg-white/10 transition-colors"
         >
           {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
           {!collapsed && <span className="text-xs">Collapse</span>}

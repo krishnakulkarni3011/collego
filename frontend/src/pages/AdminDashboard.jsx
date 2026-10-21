@@ -199,7 +199,7 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
         </Panel>
 
         <Panel title="Upcoming Events" icon={CalendarDays} accent="amber" className="xl:col-span-4"
-          action={<button onClick={() => onTabChange('announcements')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 px-2 py-1 rounded-lg transition-colors">View All</button>}
+          action={<button onClick={() => onTabChange('announcements')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors">View All</button>}
         >
           {upcomingEvents.length === 0 ? (
             <EmptyState icon={CalendarDays} title="No upcoming events" description="New placement drives and activities will show up here." accent="amber" />
@@ -212,7 +212,7 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
                   <motion.div key={ev.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}
                     className="event-item relative overflow-hidden group">
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-current" style={{ opacity: 0.15, backgroundColor: color }} />
-                    <div className="flex items-center gap-3.5 p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-colors group-hover:border-white/80">
+                    <div className="flex items-center gap-3.5 p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-colors group-hover:border-indigo-300/70">
                       <div className="flex flex-col items-center justify-center w-10 h-10 rounded-xl shrink-0" style={{ background: `${color}14`, border: `1px solid ${color}30` }}>
                         <span className="text-[9px] font-bold uppercase" style={{ color }}>{date ? date.toLocaleDateString('en-IN', { month: 'short' }) : '—'}</span>
                         <span className="text-sm font-extrabold text-slate-800 leading-none">{date ? date.getDate() : '—'}</span>
@@ -238,7 +238,7 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
       {/* Notices / performers / quick actions */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         <Panel title="Recent Notices" icon={Megaphone} accent="amber" className="xl:col-span-4"
-          action={<button onClick={() => onTabChange('announcements')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 px-2 py-1 rounded-lg transition-colors">View All</button>}
+          action={<button onClick={() => onTabChange('announcements')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors">View All</button>}
         >
           {recentNotices.length === 0 ? (
             <EmptyState icon={Megaphone} title="No notices yet" description="Notices broadcast to students will appear here." accent="amber" />
@@ -400,11 +400,11 @@ function DirectoryTab({
                 `/api/admin/export/${fixedRole === 'FACULTY' ? 'faculty' : 'students'}`,
                 `${fixedRole === 'FACULTY' ? 'faculty' : 'students'}.csv`
               ).catch(() => {})}
-              className="flex items-center gap-2 bg-white border border-white/60 text-slate-500 text-xs font-semibold px-3 py-2 rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition-colors backdrop-blur-sm"
+              className="flex items-center gap-2 bg-white border border-white/60 text-slate-500 text-xs font-semibold px-3 py-2 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 transition-colors backdrop-blur-sm"
             >
               <Download size={14} /> Export CSV
             </button>
-            <label className="flex items-center gap-2 bg-white border border-white/60 text-slate-500 text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer hover:border-indigo-300 hover:text-indigo-600 transition-colors backdrop-blur-sm">
+            <label className="flex items-center gap-2 bg-white border border-white/60 text-slate-500 text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 transition-colors backdrop-blur-sm">
               <Upload size={14} />
               <span>Import CSV</span>
               <input type="file" accept=".csv" onChange={e => e.target.files?.[0] && onCsvImport(e.target.files[0])} className="hidden" />
@@ -494,7 +494,7 @@ function DirectoryTab({
               onClick={() => setRoleFilter(r)}
               className={cn(
                 'px-3 py-1.5 rounded-full text-xs font-semibold transition-all border',
-                roleFilter === r ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-500/20' : 'bg-white text-slate-500 border-white/60 hover:border-indigo-300 hover:text-slate-800'
+                roleFilter === r ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-500/20' : 'bg-white text-slate-500 border-white/60 hover:border-indigo-300 hover:bg-indigo-50 hover:text-slate-800'
               )}
             >
               {r === 'ALL' ? 'All' : r.charAt(0) + r.slice(1).toLowerCase()}
@@ -886,7 +886,7 @@ function AcademicsTab({
       <div className="flex flex-wrap gap-2">
         {YEAR_OPTIONS.map(y => (
           <button key={y.value} onClick={() => { setYear(y.value); setShowCreate(false); setEditing(null) }}
-            className={cn('px-4 py-2 rounded-xl text-xs font-semibold border transition-all', Number(year) === y.value ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-500/20' : 'bg-white text-slate-500 border-white/60 hover:border-emerald-300 hover:text-slate-800')}>
+            className={cn('px-4 py-2 rounded-xl text-xs font-semibold border transition-all', Number(year) === y.value ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-500/20' : 'bg-white text-slate-500 border-white/60 hover:border-emerald-300 hover:bg-emerald-50 hover:text-slate-800')}>
             {y.label}
           </button>
         ))}

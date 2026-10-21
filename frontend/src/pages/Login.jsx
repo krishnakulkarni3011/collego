@@ -163,7 +163,7 @@ export default function Login() {
   const progress = step === 'role' ? 50 : 100
 
   return (
-    <div className="min-h-screen flex flex-col portal-bg relative overflow-x-hidden">
+    <div className="min-h-screen flex flex-col portal-bg login-bg relative overflow-x-hidden">
       <div className="bg-mesh" />
       <Particles />
 
@@ -193,7 +193,7 @@ export default function Login() {
             initial={{ opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.5 }}
-            className="relative rounded-[2rem] overflow-hidden bg-white border border-white/60 shadow-2xl shadow-slate-900/5 backdrop-blur-md"
+            className="login-card relative rounded-[2rem] overflow-hidden bg-white border border-white/60 shadow-2xl shadow-slate-900/5 backdrop-blur-md"
           >
             <div className="h-1 bg-slate-100">
               <motion.div
@@ -234,7 +234,7 @@ export default function Login() {
                               'relative flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all duration-300 focus:outline-none group',
                               isActive
                                 ? `${cn(role.iconBg, role.badgeColor.replace('bg-', 'border-'))}`
-                                : 'border-white/60 hover:border-indigo-300 bg-white/50 hover:bg-white'
+                                : 'border-slate-300/80 hover:border-indigo-400 bg-white/70 hover:bg-indigo-50/70'
                             )}
                           >
                             {isActive && (
@@ -247,7 +247,7 @@ export default function Login() {
                                 <CheckCircle2 size={10} className="text-white" />
                               </motion.div>
                             )}
-                            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-all', isActive ? role.iconBg : 'bg-white border border-white/60 group-hover:border-indigo-300')}>
+                            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-all', isActive ? role.iconBg : 'bg-white border border-slate-300/80 group-hover:border-indigo-400')}>
                               <Icon size={20} className={isActive ? role.iconColor : 'text-slate-400 group-hover:text-slate-500'} />
                             </div>
                             <div className="text-center">
@@ -273,8 +273,7 @@ export default function Login() {
                     <button
                       id="btn-continue-role"
                       onClick={handleRoleContinue}
-                      className="w-full flex items-center justify-center gap-1.5 py-3.5 rounded-xl font-semibold text-white transition-all active:scale-[0.98] mb-6 hover:shadow-xl hover:shadow-indigo-500/25"
-                      style={{ background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)' }}
+                      className="login-primary w-full flex items-center justify-center gap-1.5 py-3.5 rounded-xl font-semibold text-white transition-all active:scale-[0.98] mb-6"
                     >
                       Continue
                       <ChevronRight size={16} />
@@ -289,7 +288,7 @@ export default function Login() {
                     <button
                       id="btn-google-signin"
                       onClick={handleGoogleSignIn}
-                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 border border-white/60 hover:border-slate-300 py-3.5 rounded-xl text-sm font-medium text-slate-600 hover:text-slate-800 transition-all active:scale-[0.98]"
+                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-indigo-50/70 border border-slate-300/80 hover:border-indigo-300 py-3.5 rounded-xl text-sm font-medium text-slate-600 hover:text-indigo-700 transition-all active:scale-[0.98]"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -416,13 +415,14 @@ export default function Login() {
                             id="btn-login-submit"
                             type="submit"
                             disabled={loading}
-                            className="w-auto shrink-0 whitespace-nowrap px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed hover:shadow-lg"
-                            style={{
-                              background: activeRole
-                                ? `linear-gradient(135deg, ${activeRole.id === 'STUDENT' ? '#10b981, #0d9488' : activeRole.id === 'FACULTY' ? '#8b5cf6, #d946ef' : '#4f46e5, #3b82f6'})`
-                                : 'linear-gradient(135deg, #4f46e5, #3b82f6)',
-                              boxShadow: `0 10px 28px ${activeRole?.id === 'STUDENT' ? 'rgba(16,185,129,0.3)' : activeRole?.id === 'FACULTY' ? 'rgba(139,92,246,0.3)' : 'rgba(99,102,241,0.3)'}`
-                            }}
+                            className={cn(
+                              'login-submit w-auto shrink-0 whitespace-nowrap px-5 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed',
+                              activeRole?.id === 'STUDENT'
+                                ? 'login-submit-emerald'
+                                : activeRole?.id === 'FACULTY'
+                                  ? 'login-submit-violet'
+                                  : 'login-submit-indigo'
+                            )}
                           >
                             {loading ? (
                               <span className="flex items-center justify-center gap-2">
@@ -549,7 +549,7 @@ export default function Login() {
                         <p className="text-sm text-slate-500 mb-4">{forgotStep === 'success' && resetToken ? 'Your password has been reset successfully.' : 'A reset link has been sent to your email.'}</p>
                         <button
                           onClick={() => { setStep('credentials'); setForgotStep('email'); setResetToken(''); setNewPassword(''); setConfirmPassword(''); setForgotEmail('') }}
-                          className="w-full py-3 rounded-xl text-xs text-indigo-600 font-medium hover:bg-indigo-50 transition-colors border border-indigo-100"
+                          className="w-full py-3 rounded-xl text-xs text-indigo-600 font-medium hover:bg-indigo-50 transition-colors border border-slate-300/80 hover:border-indigo-300"
                         >
                           Back to Sign In
                         </button>
@@ -565,7 +565,7 @@ export default function Login() {
                     <button
                       id="btn-google-signin-step2"
                       onClick={handleGoogleSignIn}
-                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 border border-white/60 hover:border-slate-300 py-3.5 rounded-xl text-sm font-medium text-slate-600 hover:text-slate-800 transition-all active:scale-[0.98]"
+                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-indigo-50/70 border border-slate-300/80 hover:border-indigo-300 py-3.5 rounded-xl text-sm font-medium text-slate-600 hover:text-indigo-700 transition-all active:scale-[0.98]"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

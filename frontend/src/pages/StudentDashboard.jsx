@@ -158,7 +158,7 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         <Panel title="Subject-wise Attendance" icon={ClipboardCheck} accent="emerald" className="xl:col-span-5"
-          action={<button onClick={() => onTabChange('attendance')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 px-2 py-1 rounded-lg transition-colors">Details</button>}>
+          action={<button onClick={() => onTabChange('attendance')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 px-2 py-1 rounded-lg transition-colors">Details</button>}>
           {subjects.length === 0 ? (
             <EmptyState icon={ClipboardCheck} title="No attendance data" accent="emerald" description="Your subject attendance will appear once classes are marked." />
           ) : (
@@ -214,7 +214,7 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
         </Panel>
 
         <Panel title="Today's Schedule" icon={Calendar} accent="blue" className="xl:col-span-3"
-          action={<button onClick={() => onTabChange('timetable')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 px-2 py-1 rounded-lg transition-colors">Full</button>}>
+          action={<button onClick={() => onTabChange('timetable')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors">Full</button>}>
           {todaySlots.length === 0 ? (
             <EmptyState icon={Calendar} title="No classes today" accent="blue" description="Enjoy your day off!" />
           ) : (
@@ -238,7 +238,7 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Panel title="Recent Notifications" icon={Bell} accent="blue"
-          action={<button onClick={() => onTabChange('notifications')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 px-2 py-1 rounded-lg transition-colors">View All</button>}>
+          action={<button onClick={() => onTabChange('notifications')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors">View All</button>}>
           {notifications.slice(0, 4).length === 0 ? (
             <EmptyState icon={Bell} title="No notifications" accent="blue" />
           ) : (
@@ -259,7 +259,7 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
         </Panel>
 
         <Panel title="Upcoming Placements" icon={Briefcase} accent="emerald"
-          action={<button onClick={() => onTabChange('placements')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 px-2 py-1 rounded-lg transition-colors">View All</button>}>
+          action={<button onClick={() => onTabChange('placements')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 px-2 py-1 rounded-lg transition-colors">View All</button>}>
           {upcomingPlacements.length === 0 ? (
             <EmptyState icon={Briefcase} title="No active drives" accent="emerald" description="New placement notices will appear here." />
           ) : (
@@ -542,7 +542,7 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
   }
 
   return (
-    <div className="glass-card p-5 border border-white/60 hover:border-white/80 transition-all">
+    <div className="glass-card p-5 border border-white/60 hover:border-indigo-300/70 transition-all">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -628,7 +628,7 @@ function MaterialsTab({ materials = [], loading, onDownload }) {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           {list.map((m, i) => (
             <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-              className="glass-card p-5 border border-white/60 hover:border-white/80 transition-all flex flex-col">
+              className="glass-card p-5 border border-white/60 hover:border-indigo-300/70 transition-all flex flex-col">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800">{m.title}</p>
@@ -708,7 +708,7 @@ function PlacementsTab({ notices, onDownload }) {
             const isExpired = notice.lastDate && new Date(notice.lastDate) < new Date()
             return (
               <motion.div key={notice.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                className={cn('glass-card p-5 border border-white/60 hover:border-white/80 hover:-translate-y-1 transition-all', isExpired ? 'opacity-70' : '')}>
+                className={cn('glass-card p-5 border border-white/60 hover:border-indigo-300/70 hover:-translate-y-1 transition-all', isExpired ? 'opacity-70' : '')}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
@@ -760,7 +760,7 @@ function NotificationsTab({ notifications, onMarkRead }) {
           const cfg = NOTIF_TYPES[n.type] || NOTIF_TYPES.GENERAL
           return (
             <motion.div key={n.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-              className={cn('glass-card p-4 flex items-start gap-4 border border-white/60 hover:border-white/80 transition-all', !n.read ? 'bg-indigo-50/50 border-indigo-100/50' : 'bg-white/60')}>
+              className={cn('glass-card p-4 flex items-start gap-4 border border-white/60 hover:border-indigo-300/70 transition-all', !n.read ? 'bg-indigo-50/50 border-indigo-100/50' : 'bg-white/60')}>
               <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/10">
                 <Bell size={16} className="text-indigo-600" />
               </div>
@@ -827,7 +827,7 @@ function DocumentsTab({ cgpa, showMessage }) {
         <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Semester Marksheets</h3>
         <div className="space-y-3">
           {sems.map(sem => (
-            <div key={sem.semesterId} className="glass-card p-5 flex items-center justify-between border border-white/60 hover:border-white/80 transition-all">
+            <div key={sem.semesterId} className="glass-card p-5 flex items-center justify-between border border-white/60 hover:border-indigo-300/70 transition-all">
               <div>
                 <p className="font-semibold text-slate-800">{sem.semesterName}</p>
                 <p className="text-xs text-slate-400 mt-0.5">{sem.academicYear} · {sem.subjects?.length} subjects · SGPA {fmtNum(sem.sgpa)}</p>
@@ -903,7 +903,7 @@ function AiAssistantTab({ overall, cgpa }) {
       </div>
       <div className="flex flex-wrap gap-2">
         {quickPrompts.map(p => (
-          <button key={p} onClick={() => setInput(p)} className="text-xs bg-white border border-white/60 hover:border-violet-200 hover:text-violet-600 text-slate-500 px-3 py-1.5 rounded-xl font-medium transition-all active:scale-95">{p}</button>
+          <button key={p} onClick={() => setInput(p)} className="text-xs bg-white border border-white/60 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600 text-slate-500 px-3 py-1.5 rounded-xl font-medium transition-all active:scale-95">{p}</button>
         ))}
       </div>
     </div>
