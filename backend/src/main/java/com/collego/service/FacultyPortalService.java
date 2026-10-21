@@ -821,6 +821,11 @@ public class FacultyPortalService {
         Semester semester = semesterRepository.findById(request.getSemesterId())
                 .orElseThrow(() -> new ResourceNotFoundException("Semester not found: " + request.getSemesterId()));
 
+        Integer year = AcademicYearUtils.fromSemester(semester.getNumber());
+        if (year == null) {
+            throw new BadRequestException("Semester number must be between 1 and 8");
+        }
+
         // Check if already assigned
         Optional<FacultySubjectAssignment> existing = facultySubjectAssignmentRepository
                 .findByFacultyIdAndCourseIdAndSemesterId(faculty.getId(), course.getId(), semester.getId());
@@ -842,11 +847,20 @@ public class FacultyPortalService {
 
         // Claim the sections that belong to this course + semester so the faculty
         // can immediately manage attendance, marks, assignments and materials.
-        claimSectionsForFaculty(faculty, course, semester);
+        List<Section> assignedSections = claimSectionsForFaculty(faculty, course, semester);
 
-        log.info("Faculty {} assigned to course {} for semester {}", email, course.getName(), semester.getName());
+        // Load every student from the academic year that owns this semester into
+        // the faculty's sections, including sections created on the fly.
+        int studentCount = loadYearStudentsIntoOwnedSections(faculty.getDepartment(), year, assignedSections);
 
-        return mapSubjectAssignmentToResponse(assignment);
+        log.info("Faculty {} assigned to course {} for semester {} ({}): {} students in {} section(s)",
+                email, course.getName(), semester.getName(), AcademicYearUtils.label(year),
+                studentCount, assignedSections.size());
+
+        FacultySubjectAssignmentResponse response = mapSubjectAssignmentToResponse(assignment);
+        response.setSectionCount(assignedSections.size());
+        response.setStudentCount(studentCount);
+        return response;
     }
 
     @Transactional
@@ -899,14 +913,8 @@ public class FacultyPortalService {
                 .collect(Collectors.toList());
     }
 
-    private void claimSectionsForFaculty(FacultyProfile faculty, Course course, Semester semester) {
+    private List<Section> claimSectionsForFaculty(FacultyProfile faculty, Course course, Semester semester) {
         List<Section> sections = sectionRepository.findByCourseIdAndSemesterId(course.getId(), semester.getId());
-
-        boolean alreadyOwns = sections.stream()
-                .anyMatch(s -> s.getFaculty() != null && s.getFaculty().getId().equals(faculty.getId()));
-        if (alreadyOwns) {
-            return;
-        }
 
         List<Section> unassigned = sections.stream()
                 .filter(s -> s.getFaculty() == null)
@@ -917,26 +925,80 @@ public class FacultyPortalService {
                 section.setFaculty(faculty);
                 sectionRepository.save(section);
             });
-            return;
+        } else if (sections.stream().noneMatch(s -> isOwnedBy(s, faculty))) {
+            // Every existing section is already taken by another faculty member —
+            // create a fresh pair of sections for this faculty.
+            int created = 0;
+            for (String name : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
+                if (created >= 2) break;
+                if (sectionRepository.existsByNameAndCourseIdAndSemesterId(name, course.getId(), semester.getId())) {
+                    continue;
+                }
+                sectionRepository.save(Section.builder()
+                        .name(name)
+                        .course(course)
+                        .semester(semester)
+                        .faculty(faculty)
+                        .maxCapacity(60)
+                        .build());
+                created++;
+            }
         }
 
-        // Every existing section is already taken by another faculty member —
-        // create a fresh pair of sections for this faculty.
-        int created = 0;
-        for (String name : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
-            if (created >= 2) break;
-            if (sectionRepository.existsByNameAndCourseIdAndSemesterId(name, course.getId(), semester.getId())) {
+        return sectionRepository.findByCourseIdAndSemesterId(course.getId(), semester.getId()).stream()
+                .filter(section -> isOwnedBy(section, faculty))
+                .collect(Collectors.toList());
+    }
+
+    private boolean isOwnedBy(Section section, FacultyProfile faculty) {
+        return section.getFaculty() != null && section.getFaculty().getId().equals(faculty.getId());
+    }
+
+    /**
+     * Ensures every student in the semester's academic year is enrolled in one of
+     * the faculty's sections. Existing enrollments are left untouched.
+     */
+    private int loadYearStudentsIntoOwnedSections(Department department, Integer year, List<Section> sections) {
+        if (sections.isEmpty()) {
+            return 0;
+        }
+
+        List<StudentProfile> yearStudents = studentProfileRepository.findByDepartmentId(department.getId()).stream()
+                .filter(student -> Objects.equals(AcademicYearUtils.fromSemester(student.getSemester()), year))
+                .collect(Collectors.toList());
+
+        Map<Long, Long> sectionCounts = new HashMap<>();
+        sections.forEach(section ->
+                sectionCounts.put(section.getId(), enrollmentRepository.countBySectionId(section.getId())));
+
+        for (StudentProfile student : yearStudents) {
+            boolean alreadyEnrolled = sections.stream()
+                    .anyMatch(section -> enrollmentRepository.existsByStudentIdAndSectionId(
+                            student.getId(), section.getId()));
+            if (alreadyEnrolled) {
                 continue;
             }
-            sectionRepository.save(Section.builder()
-                    .name(name)
-                    .course(course)
-                    .semester(semester)
-                    .faculty(faculty)
-                    .maxCapacity(60)
+
+            Section target = sections.stream()
+                    .filter(section -> student.getSection() != null
+                            && student.getSection().equalsIgnoreCase(section.getName()))
+                    .findFirst()
+                    .orElseGet(() -> sections.stream()
+                            .min(Comparator.comparingLong(
+                                    section -> sectionCounts.getOrDefault(section.getId(), 0L)))
+                            .orElse(sections.get(0)));
+
+            enrollmentRepository.save(Enrollment.builder()
+                    .student(student)
+                    .section(target)
+                    .status(EnrollmentStatus.ACTIVE)
                     .build());
-            created++;
+            sectionCounts.merge(target.getId(), 1L, Long::sum);
         }
+
+        return sections.stream()
+                .mapToInt(section -> (int) enrollmentRepository.countBySectionId(section.getId()))
+                .sum();
     }
 
     private String generateCourseCode(Department department, String courseName) {
@@ -1177,6 +1239,8 @@ public class FacultyPortalService {
                 .semesterId(a.getSemester().getId())
                 .semesterName(a.getSemester().getName())
                 .semesterNumber(a.getSemester().getNumber())
+                .year(AcademicYearUtils.fromSemester(a.getSemester().getNumber()))
+                .yearLabel(AcademicYearUtils.label(AcademicYearUtils.fromSemester(a.getSemester().getNumber())))
                 .isActive(a.isActive())
                 .createdAt(a.getCreatedAt().toString())
                 .build();

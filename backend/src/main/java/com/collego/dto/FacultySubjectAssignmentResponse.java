@@ -15,6 +15,10 @@ public class FacultySubjectAssignmentResponse {
     private Long semesterId;
     private String semesterName;
     private Integer semesterNumber;
+    private Integer year;
+    private String yearLabel;
+    private Integer sectionCount;
+    private Integer studentCount;
     private Boolean isActive;
     private String createdAt;
 }

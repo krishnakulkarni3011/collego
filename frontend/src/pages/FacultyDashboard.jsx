@@ -38,6 +38,16 @@ const TARGET_YEAR_OPTIONS = [
   { value: '4', label: 'Final Year' },
 ]
 const targetYearLabel = (value) => TARGET_YEAR_OPTIONS.find(y => y.value === String(value))?.label || 'All Years'
+const semesterYear = (semesterNumber) => {
+  const number = Number(semesterNumber)
+  return number >= 1 && number <= 8 ? Math.ceil(number / 2) : null
+}
+const SEMESTER_YEAR_MAP = [
+  { semesters: 'Sem 1 & 2', year: 1 },
+  { semesters: 'Sem 3 & 4', year: 2 },
+  { semesters: 'Sem 5 & 6', year: 3 },
+  { semesters: 'Sem 7 & 8', year: 4 },
+]
 
 function TargetYearField({ value, onChange }) {
   return (
@@ -107,7 +117,7 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
 
       <Panel title="My Teaching Sections" icon={BookOpen} accent="violet" bodyClassName="!flex-none" hover>
         {sections.length === 0 ? (
-          <EmptyState icon={BookOpen} title="No sections assigned" accent="violet" description="Sections will appear once the admin assigns you courses." />
+          <EmptyState icon={BookOpen} title="No sections assigned" accent="violet" description="Assign yourself a subject from My Subject Assignments to load your sections and students." />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {sections.map((sec, i) => (
@@ -914,15 +924,18 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, targe
 
 // ─── Subject Assignments Tab ─────────────────────────────────────────────────────
 function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove, selectedSemesterId, setSelectedSemesterId, courseName, setCourseName }) {
+  const selectedSemester = semesters.find(s => String(s.id) === String(selectedSemesterId))
+  const selectedYear = semesterYear(selectedSemester?.number)
+
   return (
     <div className="space-y-6">
-      <PageTitle icon={BookUser} title="My Subject Assignments" subtitle="Assign yourself to courses for specific semesters. You can type any course name and select the semester." accent="violet"
+      <PageTitle icon={BookUser} title="My Subject Assignments" subtitle="Assign yourself to a subject and semester. Students from the matching academic year are loaded automatically into the sections you manage." accent="violet"
         image={uiImages.campus} imageAlt="College campus"
         actions={<Badge variant="purple">Full Independence</Badge>} />
 
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={14} className="text-violet-500" /> Assign New Subject</h3>
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Name (type any course)</label>
             <input
@@ -934,14 +947,43 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Semester</label>
-            <select value={selectedSemesterId} onChange={e => setSelectedSemesterId(e.target.value)} className="collego-input !w-48">
+            <select value={selectedSemesterId} onChange={e => setSelectedSemesterId(e.target.value)} className="collego-input">
               <option value="">Select semester</option>
-              {semesters.map(s => <option key={s.id} value={s.id}>{s.name} ({s.academicYear})</option>)}
+              {semesters.map(s => {
+                const year = semesterYear(s.number)
+                return <option key={s.id} value={s.id}>{s.name} · {targetYearLabel(year)} ({s.academicYear})</option>
+              })}
             </select>
+            {selectedSemester && (
+              <div className="mt-2 flex items-start gap-2 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2">
+                <GraduationCap size={14} className="text-violet-500 mt-0.5 shrink-0" />
+                <p className="text-[11px] text-violet-700 leading-relaxed">
+                  <span className="font-semibold">{targetYearLabel(selectedYear)} students</span> from your department will be loaded into the sections for this subject, ready for attendance, marks and resources.
+                </p>
+              </div>
+            )}
           </div>
         </div>
+
+        <div className="mt-5 rounded-xl border border-white/60 bg-white/50 p-3">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Semester → Academic Year</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {SEMESTER_YEAR_MAP.map(item => (
+              <div key={item.year} className={cn(
+                'rounded-lg border px-2.5 py-2 text-center transition-colors',
+                selectedYear === item.year
+                  ? 'border-violet-200 bg-violet-50'
+                  : 'border-white/70 bg-white/60'
+              )}>
+                <p className="text-[10px] text-slate-400">{item.semesters}</p>
+                <p className={cn('text-xs font-semibold mt-0.5', selectedYear === item.year ? 'text-violet-700' : 'text-slate-700')}>{targetYearLabel(item.year)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onAssign} disabled={loading || !courseName.trim() || !selectedSemesterId}>
-          {loading ? <><RefreshCw size={14} className="animate-spin" /> Assigning...</> : <><Plus size={13} /> Assign Subject</>}
+          {loading ? <><RefreshCw size={14} className="animate-spin" /> Assigning...</> : <><Plus size={13} /> Assign Subject &amp; Load Students</>}
         </Button>
       </div>
 
@@ -956,6 +998,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
                   <p className="text-xs text-slate-400 mt-1">{a.courseCode}</p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
+                  <Badge variant="secondary">{a.yearLabel || targetYearLabel(a.year || semesterYear(a.semesterNumber))}</Badge>
                   <Badge variant="info">{a.semesterName}</Badge>
                   <Button variant="destructive" size="sm" onClick={() => onRemove(a.id)} className="px-3 py-1.5">
                     <X size={12} /> Remove
@@ -1317,12 +1360,16 @@ export default function FacultyDashboard() {
     if (!newCourseName.trim() || !selectedSemesterId) return
     setSubjectAssignmentsLoading(true)
     try {
-      await api.post('/api/faculty/subject-assignments', { courseName: newCourseName.trim(), semesterId: parseInt(selectedSemesterId) })
-      showMsg('Subject assigned successfully')
+      const res = await api.post('/api/faculty/subject-assignments', { courseName: newCourseName.trim(), semesterId: parseInt(selectedSemesterId) })
+      const studentCount = res.data?.studentCount ?? 0
+      const yearLabel = res.data?.yearLabel || targetYearLabel(res.data?.year)
+      const sectionCount = res.data?.sectionCount ?? 0
       setNewCourseName('')
       setSelectedSemesterId('')
-      loadMySubjectAssignments()
-      fetchSections()
+      await Promise.all([loadMySubjectAssignments(), fetchSections()])
+      showMsg(studentCount > 0
+        ? `Subject assigned — ${studentCount} ${yearLabel} students loaded into ${sectionCount} section${sectionCount === 1 ? '' : 's'}. Open the subject under My Sections to manage them.`
+        : `Subject assigned, but no ${yearLabel} students were found in your department yet.`)
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to assign subject', 'error') }
     finally { setSubjectAssignmentsLoading(false) }
   }
@@ -1350,7 +1397,7 @@ export default function FacultyDashboard() {
     { items: GLOBAL_NAV },
     {
       title: 'My Sections',
-      items: sections.map(sec => ({ id: `section-${sec.sectionId}`, label: sec.courseName, icon: Layers, meta: `Sec ${sec.sectionName}` })),
+      items: sections.map(sec => ({ id: `section-${sec.sectionId}`, label: sec.courseName, icon: Layers, meta: `Sec ${sec.sectionName} · ${targetYearLabel(sec.year)}` })),
     },
   ]
   const sidebarActive = selectedSection ? `section-${selectedSection.sectionId}` : activeTab
