@@ -31,6 +31,7 @@ import {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtNum = (n, dp = 1) => (n == null ? '—' : Number(n).toFixed(dp))
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 const timeAgo = (ts) => {
   if (!ts) return ''
   const diff = Date.now() - new Date(ts).getTime()

@@ -475,6 +475,169 @@ function TimetableTab({ timetable, loading }) {
   )
 }
 
+// ─── Assignments ─────────────────────────────────────────────────────────────
+function AssignmentsTab({ assignments = [], loading, onSubmit, onDownload }) {
+  const list = Array.isArray(assignments) ? assignments : []
+  const pending = list.filter(a => !a.submissionStatus).length
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={BookOpen} title="Assignments" subtitle="Submit your work and track marks and feedback." accent="amber"
+        actions={list.length > 0 ? <Badge variant={pending ? 'warning' : 'success'}>{pending ? `${pending} pending` : 'All submitted'}</Badge> : undefined} />
+      {loading ? (
+        <div className="flex items-center justify-center py-16"><Spinner color="amber" /></div>
+      ) : list.length === 0 ? (
+        <div className="glass-card p-12 border border-white/60">
+          <EmptyState icon={BookOpen} title="No assignments yet" accent="amber" description="Assignments posted by your faculty will appear here." />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {list.map(a => <StudentAssignmentCard key={a.id} assignment={a} onSubmit={onSubmit} onDownload={onDownload} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
+  const [showSubmit, setShowSubmit] = useState(false)
+  const [file, setFile] = useState(null)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef(null)
+
+  const submitted = Boolean(a.submissionStatus)
+  const graded = a.submissionStatus === 'GRADED'
+  const overdue = !submitted && a.dueDate && new Date(a.dueDate).getTime() < Date.now()
+
+  const submit = async () => {
+    if (!file) return
+    setBusy(true)
+    try {
+      await onSubmit(a.id, file, note)
+      setShowSubmit(false)
+      setFile(null)
+      setNote('')
+      if (fileRef.current) fileRef.current.value = ''
+    } catch { /* toast is shown by the parent */ } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="glass-card p-5 border border-white/60 hover:border-white/80 transition-all">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <h3 className="text-sm font-semibold text-slate-800">{a.title}</h3>
+            <Badge variant={graded ? 'success' : submitted ? 'info' : overdue ? 'destructive' : 'warning'}>
+              {graded ? 'Graded' : submitted ? 'Submitted' : overdue ? 'Overdue' : 'Pending'}
+            </Badge>
+          </div>
+          <p className="text-[11px] text-slate-400">{a.courseName} · {a.courseCode}</p>
+          {a.description && <p className="text-sm text-slate-500 mt-2.5 leading-relaxed">{a.description}</p>}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-[11px] text-slate-500">
+            {a.dueDate && <span className={cn('flex items-center gap-1', overdue && 'text-red-500 font-medium')}><Clock size={12} /> Due {fmtDate(a.dueDate)}</span>}
+            {a.maxMarks != null && <span>{a.maxMarks} marks</span>}
+            {a.submittedAt && <span>Submitted {fmtDate(a.submittedAt)}</span>}
+            {a.late && <span className="text-amber-600 font-medium">Late submission</span>}
+          </div>
+          {graded && (
+            <div className="mt-3 p-3 rounded-xl bg-emerald-50/70 border border-emerald-100">
+              <p className="text-xs font-semibold text-emerald-700">
+                Score: {a.marks ?? '—'} / {a.maxMarks ?? '—'}
+              </p>
+              {a.feedback && <p className="text-xs text-emerald-600 mt-1">{a.feedback}</p>}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {a.hasFile && (
+            <Button variant="outline" size="sm" onClick={() => onDownload(`/api/student/assignments/${a.id}/file`, a.fileName || `assignment-${a.id}`)}>
+              <Download size={12} /> Attachment
+            </Button>
+          )}
+          {a.submissionId && (
+            <Button variant="outline" size="sm" onClick={() => onDownload(`/api/student/submissions/${a.submissionId}/file`, `assignment-${a.id}-submission`)}>
+              <FileText size={12} /> My submission
+            </Button>
+          )}
+          {!submitted && (
+            <Button variant="gradient" size="sm" onClick={() => setShowSubmit(v => !v)}>
+              <Upload size={12} /> {showSubmit ? 'Cancel' : 'Submit'}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {showSubmit && !submitted && (
+        <div className="mt-4 pt-4 border-t border-white/60 space-y-3">
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Your file</label>
+            <input ref={fileRef} type="file" onChange={e => setFile(e.target.files?.[0] || null)}
+              className="collego-input file:mr-3 file:rounded-lg file:border-0 file:bg-amber-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-amber-600" />
+            {file && <p className="text-[10px] text-slate-400 mt-1 truncate">{file.name}</p>}
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Note (optional)</label>
+            <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Add a note for your faculty..."
+              className="collego-input resize-none" />
+          </div>
+          <div className="flex justify-end">
+            <Button variant="success" size="sm" onClick={submit} disabled={!file || busy}>
+              {busy ? <><RefreshCw size={12} className="animate-spin" /> Submitting...</> : <><Upload size={12} /> Submit Assignment</>}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Study Materials ─────────────────────────────────────────────────────────
+function MaterialsTab({ materials = [], loading, onDownload }) {
+  const list = Array.isArray(materials) ? materials : []
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={FolderOpen} title="Study Materials" subtitle="Notes, slides and references shared by your faculty." accent="blue" />
+      {loading ? (
+        <div className="flex items-center justify-center py-16"><Spinner color="blue" /></div>
+      ) : list.length === 0 ? (
+        <div className="glass-card p-12 border border-white/60">
+          <EmptyState icon={FolderOpen} title="No study materials yet" accent="blue" description="Materials uploaded by your faculty will appear here." />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          {list.map((m, i) => (
+            <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+              className="glass-card p-5 border border-white/60 hover:border-white/80 transition-all flex flex-col">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">{m.title}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{m.courseName} · {m.courseCode}</p>
+                </div>
+                <Badge variant="info">{m.materialType || 'MATERIAL'}</Badge>
+              </div>
+              {m.description && <p className="text-sm text-slate-500 mt-3 leading-relaxed line-clamp-3">{m.description}</p>}
+              <div className="flex items-center justify-between gap-3 mt-auto pt-4 border-t border-white/60">
+                <p className="text-[11px] text-slate-400 truncate flex items-center gap-1.5">
+                  <Paperclip size={12} /> {m.fileName || 'No attachment'}
+                </p>
+                {m.hasFile && (
+                  <Button variant="outline" size="sm" onClick={() => onDownload(`/api/student/materials/${m.id}/file`, m.fileName || `material-${m.id}`)}>
+                    <Download size={12} /> Download
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Placements ──────────────────────────────────────────────────────────────
 function QuestionPapersTab({ papers, onDownload }) {
   return (
