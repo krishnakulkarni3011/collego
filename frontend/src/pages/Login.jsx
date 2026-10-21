@@ -179,9 +179,9 @@ export default function Login() {
           </div>
         </div>
         <h1 className="mt-5 text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
-          The future of{' '}
+          The Future of{' '}
           <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-500 bg-clip-text text-transparent">
-            college management
+            College Management
           </span>
         </h1>
       </header>
