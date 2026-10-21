@@ -82,16 +82,6 @@ collego:
   ai-service:
     url: ${AI_SERVICE_URL:http://collego-ai-service:8000}
 
-  # Phase 10: AI isolation, rate limiting and caching
-  ai:
-    max-tool-rounds: ${AI_MAX_TOOL_ROUNDS:4}
-    rate-limit:
-      max: ${AI_RATE_LIMIT_MAX:30}
-      window-seconds: ${AI_RATE_LIMIT_WINDOW_SECONDS:300}
-    cache:
-      ttl-seconds: ${AI_CACHE_TTL_SECONDS:90}
-      max-entries: ${AI_CACHE_MAX_ENTRIES:500}
-
 logging:
   level:
     com.collego: DEBUG

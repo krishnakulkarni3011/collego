@@ -50,57 +50,6 @@ public class AiService {
         return post("/chat", payload);
     }
 
-    /**
-     * Phase 10: grounded chat call. Sends the server-built conversation, the
-     * role-filtered tool descriptors, and the accumulated tool results. The
-     * ai-service answers with either a final {@code reply} or {@code toolCalls}.
-     */
-    public Map<String, Object> chatWithTools(String message,
-                                             List<Map<String, Object>> history,
-                                             Map<String, Object> context,
-                                             List<Map<String, Object>> tools,
-                                             List<Map<String, Object>> toolTrace,
-                                             boolean finalRound,
-                                             Map<String, Object> scopeInfo) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("message", message);
-        payload.put("history", history != null ? history : List.of());
-        payload.put("toolTrace", toolTrace != null ? toolTrace : List.of());
-        payload.put("finalRound", finalRound);
-        if (context != null) payload.put("context", context);
-        if (tools != null && !tools.isEmpty()) payload.put("tools", tools);
-        if (scopeInfo != null) payload.put("scope", scopeInfo);
-        return post("/chat", payload);
-    }
-
-    /**
-     * Phase 10: local embeddings (Ollama) for scoped RAG. Returns an empty list
-     * when the embedding model is unavailable so callers can degrade gracefully.
-     */
-    public List<List<Double>> embed(List<String> texts) {
-        if (texts == null || texts.isEmpty()) return List.of();
-        try {
-            Map<String, Object> response = post("/embed", Map.of("texts", texts));
-            Object raw = response.get("embeddings");
-            if (!(raw instanceof List<?> vectors)) return List.of();
-
-            List<List<Double>> out = new ArrayList<>();
-            for (Object item : vectors) {
-                List<Double> vector = new ArrayList<>();
-                if (item instanceof List<?> values) {
-                    for (Object value : values) {
-                        vector.add(value instanceof Number number ? number.doubleValue() : 0.0);
-                    }
-                }
-                out.add(vector);
-            }
-            return out;
-        } catch (Exception e) {
-            log.debug("Embedding request failed: {}", e.getMessage());
-            return List.of();
-        }
-    }
-
     // ── Feature 2: Smart Search ───────────────────────────────────────────────
 
     public Map<String, Object> smartSearch(String query) {
