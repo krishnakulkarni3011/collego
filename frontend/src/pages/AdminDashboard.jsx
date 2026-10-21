@@ -26,8 +26,9 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import {
   PortalSidebar, PortalTopbar, Toast, StatCard, Panel, PageTitle,
-  WelcomeBanner, ChartTooltip, EmptyState, AnimatedNumber, ACCENTS,
+  WelcomeBanner, ChartTooltip, EmptyState, AnimatedNumber, ACCENTS, ImageStrip,
 } from '../components/dashboard/PortalUI'
+import { uiImages } from '../assets/uiImages'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtNum = (n, dp = 1) => (n == null ? '—' : Number(n).toFixed(dp))
@@ -315,6 +316,17 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
           </div>
         </Panel>
       </div>
+
+      <ImageStrip
+        title="Campus at a Glance"
+        subtitle="The people, places and moments that keep Collego moving."
+        items={[
+          { src: uiImages.campus, label: 'Our campus' },
+          { src: uiImages.studentServices, label: 'Student services' },
+          { src: uiImages.placementsFair, label: 'Placements' },
+          { src: uiImages.placementTalk, label: 'Career talks' },
+        ]}
+      />
     </div>
   )
 }
@@ -690,7 +702,7 @@ function AcademicsTab({
 
   const renderDepartmentHome = () => (
     <>
-      <PageTitle icon={BookOpen} title="Academics" subtitle="Choose a department to manage its students and faculty." />
+      <PageTitle icon={BookOpen} title="Academics" subtitle="Choose a department to manage its students and faculty." image={uiImages.classroom} imageAlt="Classroom lecture" />
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {stats.map((s, i) => <StatCard key={s.label} index={i} label={s.label} value={s.value} icon={s.icon} accent={s.accent} glow />)}
       </div>
@@ -732,7 +744,7 @@ function AcademicsTab({
 
   const renderChoice = () => (
     <>
-      <PageTitle icon={Building2} title={selectedDept.departmentName} subtitle="Select what you want to manage in this department." />
+      <PageTitle icon={Building2} title={selectedDept.departmentName} subtitle="Select what you want to manage in this department." image={uiImages.studentServices} imageAlt="Student services desk" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <button onClick={() => { setMode('students'); setYear(1) }}
           className="glass-card p-8 border border-white/60 text-left hover:-translate-y-1 hover:border-emerald-200 transition-all group">
@@ -816,6 +828,7 @@ function AcademicsTab({
   const renderFaculty = () => (
     <>
       <PageTitle icon={Users} title={`${selectedDept.departmentName} Faculty`} subtitle="Add, edit or remove faculty and manage resume documents."
+        image={uiImages.classroom} imageAlt="Classroom lecture"
         actions={<Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Faculty'}</Button>} />
       {showCreate && renderCreateForm()}
       {editing && renderEditForm()}
@@ -868,6 +881,7 @@ function AcademicsTab({
   const renderStudents = () => (
     <>
       <PageTitle icon={GraduationCap} title={`${selectedDept.departmentName} Students`} subtitle="Choose a year and manage the students enrolled in it."
+        image={uiImages.studentServices} imageAlt="Student services desk"
         actions={<Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Student'}</Button>} />
       <div className="flex flex-wrap gap-2">
         {YEAR_OPTIONS.map(y => (
@@ -943,7 +957,7 @@ function AttendanceTab({ attendanceSummary, overview }) {
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={ClipboardCheck} title="Attendance Management" subtitle="Department-wise attendance health and at-risk students." />
+      <PageTitle icon={ClipboardCheck} title="Attendance Management" subtitle="Department-wise attendance health and at-risk students." image={uiImages.classroom} imageAlt="Classroom lecture" />
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard index={0} label="Average Attendance" value={overview?.overallAverageAttendance ?? 0} decimals={1} suffix="%" icon={Percent} accent="emerald" glow />
         <StatCard index={1} label="Above 75%" value={totals.above75} icon={CheckCircle2} accent="blue" glow />
@@ -1018,6 +1032,7 @@ function PlacementsTab({ placementStats, notices = [], departments = [], onCreat
   return (
     <div className="space-y-6">
       <PageTitle icon={Briefcase} title="Placement Management" subtitle="Create upcoming drives, share attachments and monitor placements."
+        image={uiImages.placementsFair} imageAlt="Campus placement fair"
         actions={<Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Upcoming Placement'}</Button>} />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
@@ -1143,6 +1158,7 @@ function ReportsTab({ deptReports, subjectReports }) {
         icon={BarChart3}
         title="Reports & Analytics"
         subtitle="Department performance, pass percentages and subject-level outcomes."
+        image={uiImages.graduation} imageAlt="Graduation celebration"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => downloadFile('/api/admin/export/students', 'students.csv').catch(() => {})}>
@@ -1212,7 +1228,7 @@ function NoticesTab({ insights }) {
   const events = insights?.upcomingEvents || []
   return (
     <div className="space-y-6">
-      <PageTitle icon={Megaphone} title="Notices & Events" subtitle="Latest broadcasts and the campus activity calendar." />
+      <PageTitle icon={Megaphone} title="Notices & Events" subtitle="Latest broadcasts and the campus activity calendar." image={uiImages.placementTalk} imageAlt="Placement talk" />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Panel title="Recent Notices" icon={Megaphone} accent="amber">
           <div className="space-y-3">

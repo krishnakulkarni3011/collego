@@ -23,8 +23,9 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import {
   PortalSidebar, PortalTopbar, Toast, StatCard, Panel, PageTitle,
-  WelcomeBanner, ChartTooltip, EmptyState, Spinner, ACCENTS,
+  WelcomeBanner, ChartTooltip, EmptyState, Spinner, ACCENTS, FadedImage, ImageStrip,
 } from '../components/dashboard/PortalUI'
+import { uiImages } from '../assets/uiImages'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
@@ -152,12 +153,32 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
           })}
         </div>
       </Panel>
+
+      <ImageStrip
+        title="Teaching Moments"
+        subtitle="Your classroom, your students, their progress."
+        items={[
+          { src: uiImages.classroom, label: 'In the classroom' },
+          { src: uiImages.groupStudy, label: 'Collaborative learning' },
+          { src: uiImages.graduation, label: 'The finish line' },
+        ]}
+      />
     </div>
   )
 }
 
 // ─── Section Header ──────────────────────────────────────────────────────────
 function SectionHeader({ section, activeTab, onTabChange, onBack }) {
+  const headerImage = {
+    attendance: uiImages.classroom,
+    internalMarks: uiImages.graduation,
+    semesterMarks: uiImages.graduation,
+    studentPerformance: uiImages.groupStudy,
+    assignments: uiImages.groupStudy,
+    materials: uiImages.library,
+    analytics: uiImages.onlineLearning,
+  }[activeTab]
+
   return (
     <div className="mb-6">
       <div className="flex items-center gap-3 mb-4">
@@ -167,6 +188,11 @@ function SectionHeader({ section, activeTab, onTabChange, onBack }) {
         <h2 className="text-lg font-bold text-slate-900">{section.courseName}</h2>
         <Badge variant="purple" className="text-[10px] px-2.5 py-0.5">{section.courseCode}</Badge>
         <p className="text-xs text-slate-400 ml-3 hidden sm:block">{section.sectionName} · {section.semesterName} · {section.enrolledStudents} students</p>
+        {headerImage && (
+          <div className="hidden md:block ml-auto h-12 w-44 shrink-0 opacity-75 pointer-events-none" aria-hidden="true">
+            <FadedImage src={headerImage} alt="" className="h-full w-full" fade={24} />
+          </div>
+        )}
       </div>
       <div className="flex gap-1 bg-white border border-white/60 rounded-2xl p-1 backdrop-blur-sm overflow-x-auto scrollbar-hide">
         {SECTION_TABS.map(tab => {
@@ -374,7 +400,7 @@ function SemesterMarksTab({ semMaxMarks, setSemMaxMarks, semMarksEntries, setSem
 function StudentPerformanceTab({ data, loading }) {
   return (
     <div className="space-y-6">
-      <PageTitle icon={Users} title="Student Performance" subtitle="Attendance and internal marks per student." accent="emerald" />
+      <PageTitle icon={Users} title="Student Performance" subtitle="Attendance and internal marks per student." accent="emerald" image={uiImages.groupStudy} imageAlt="Students collaborating" />
       {loading ? (
         <div className="flex justify-center py-16"><Spinner color="violet" /></div>
       ) : (
@@ -737,7 +763,7 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={FileText} title="Question Papers" subtitle="Upload question papers. They are published instantly to students in your department." accent="violet" />
+      <PageTitle icon={FileText} title="Question Papers" subtitle="Upload question papers. They are published instantly to students in your department." accent="violet" image={uiImages.classroom} imageAlt="Classroom lecture" />
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Upload size={14} className="text-blue-500" /> Upload Question Paper</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -809,7 +835,7 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, deptI
   const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'EXAM']
   return (
     <div className="space-y-6">
-      <PageTitle icon={Megaphone} title="Notices" subtitle="Broadcast announcements to students across departments." accent="amber" />
+      <PageTitle icon={Megaphone} title="Notices" subtitle="Broadcast announcements to students across departments." accent="amber" image={uiImages.placementTalk} imageAlt="Placement talk" />
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Megaphone size={14} className="text-amber-500" /> Broadcast Notice</h3>
         <div className="space-y-3">
@@ -865,6 +891,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
   return (
     <div className="space-y-6">
       <PageTitle icon={BookUser} title="My Subject Assignments" subtitle="Assign yourself to courses for specific semesters. You can type any course name and select the semester." accent="violet"
+        image={uiImages.campus} imageAlt="College campus"
         actions={<Badge variant="purple">Full Independence</Badge>} />
 
       <div className="glass-card p-6 border border-white/60">

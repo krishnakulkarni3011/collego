@@ -8,6 +8,7 @@ import api from '../../services/api'
 import { PageTitle, Panel, StatCard, EmptyState, Spinner } from './PortalUI'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
+import { uiImages } from '../../assets/uiImages'
 
 const EXAM_TYPES = [
   { value: 'MID_TERM', label: 'Mid-term' },
@@ -260,6 +261,7 @@ export function ExamsAdminTab({ showMsg }) {
         title="Examinations"
         subtitle="Exam periods, paper schedules, seating, invigilation, revaluation and promotion."
         accent="indigo"
+        image={uiImages.classroom} imageAlt="Classroom lecture"
         actions={
           <Button variant="gradient" size="sm" onClick={() => setShowExamForm(v => !v)}>
             <span className="flex gap-1"><Plus size={14} /> {showExamForm ? 'Cancel' : 'New exam'}</span>

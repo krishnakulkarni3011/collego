@@ -4,6 +4,7 @@ import api from '../../services/api'
 import { PageTitle, Panel, EmptyState, Spinner } from './PortalUI'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
+import { uiImages } from '../../assets/uiImages'
 
 function fmtDate(value) {
   if (!value) return '—'
@@ -89,6 +90,7 @@ export function ExamsStudentTab({ showMsg, onDownload }) {
         title="Examinations"
         subtitle="Published exams, hall tickets and revaluation requests."
         accent="blue"
+        image={uiImages.library} imageAlt="Students studying in the library"
       />
 
       {exams.length === 0 ? (

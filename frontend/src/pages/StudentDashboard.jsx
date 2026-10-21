@@ -25,8 +25,9 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import {
   PortalSidebar, PortalTopbar, Toast, StatCard, Panel, PageTitle,
-  WelcomeBanner, ChartTooltip, EmptyState, Spinner,
+  WelcomeBanner, ChartTooltip, EmptyState, Spinner, ImageStrip,
 } from '../components/dashboard/PortalUI'
+import { uiImages } from '../assets/uiImages'
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 const fmtNum = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
@@ -283,6 +284,16 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
           )}
         </Panel>
       </div>
+
+      <ImageStrip
+        title="Campus Moments"
+        subtitle="A little inspiration for your day."
+        items={[
+          { src: uiImages.library, label: 'Study spaces' },
+          { src: uiImages.onlineLearning, label: 'Learn anywhere' },
+          { src: uiImages.campusReading, label: 'Campus life' },
+        ]}
+      />
     </div>
   )
 }
@@ -294,6 +305,7 @@ function AttendanceTab({ overall, subjects, semesters, onSemesterChange, loading
   return (
     <div className="space-y-6">
       <PageTitle icon={ClipboardCheck} title="Attendance" subtitle="Your attendance across enrolled subjects." accent="emerald"
+        image={uiImages.classroom} imageAlt="Classroom lecture"
         actions={
           <select onChange={e => onSemesterChange(e.target.value || null)} className="collego-input !w-auto text-xs py-2 pr-8">
             <option value="">All Semesters</option>
@@ -357,6 +369,7 @@ function MarksTab({ internalMarks, cgpa }) {
   return (
     <div className="space-y-6">
       <PageTitle icon={BookMarked} title="Marks & Results" subtitle="Semester grades, CGPA and internal assessment marks." accent="violet"
+        image={uiImages.graduation} imageAlt="Graduation celebration"
         actions={
           <div className="flex bg-white border border-white/60 rounded-2xl p-1 backdrop-blur-sm">
             {[['cgpa', 'CGPA / SGPA'], ['internal', 'Internal Marks']].map(([id, label]) => (
@@ -431,7 +444,7 @@ function TimetableTab({ timetable, loading }) {
   const days = timetable?.weeklySchedule ? DAY_ORDER.filter(d => timetable.weeklySchedule[d]?.length > 0) : []
   return (
     <div className="space-y-6">
-      <PageTitle icon={Calendar} title="Timetable" subtitle="Your weekly class schedule." accent="blue" />
+      <PageTitle icon={Calendar} title="Timetable" subtitle="Your weekly class schedule." accent="blue" image={uiImages.classroom} imageAlt="Classroom lecture" />
       {loading ? (
         <div className="flex items-center justify-center py-16"><Spinner color="blue" /></div>
       ) : days.length === 0 ? (
@@ -483,6 +496,7 @@ function AssignmentsTab({ assignments = [], loading, onSubmit, onDownload }) {
   return (
     <div className="space-y-6">
       <PageTitle icon={BookOpen} title="Assignments" subtitle="Submit your work and track marks and feedback." accent="amber"
+        image={uiImages.groupStudy} imageAlt="Students collaborating"
         actions={list.length > 0 ? <Badge variant={pending ? 'warning' : 'success'}>{pending ? `${pending} pending` : 'All submitted'}</Badge> : undefined} />
       {loading ? (
         <div className="flex items-center justify-center py-16"><Spinner color="amber" /></div>
@@ -600,7 +614,7 @@ function MaterialsTab({ materials = [], loading, onDownload }) {
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={FolderOpen} title="Study Materials" subtitle="Notes, slides and references shared by your faculty." accent="blue" />
+      <PageTitle icon={FolderOpen} title="Study Materials" subtitle="Notes, slides and references shared by your faculty." accent="blue" image={uiImages.library} imageAlt="Students studying in the library" />
       {loading ? (
         <div className="flex items-center justify-center py-16"><Spinner color="blue" /></div>
       ) : list.length === 0 ? (
@@ -642,7 +656,7 @@ function MaterialsTab({ materials = [], loading, onDownload }) {
 function QuestionPapersTab({ papers, onDownload }) {
   return (
     <div className="space-y-6">
-      <PageTitle icon={FileText} title="Question Papers" subtitle="Previous and current question papers published by your department faculty." accent="violet" />
+      <PageTitle icon={FileText} title="Question Papers" subtitle="Previous and current question papers published by your department faculty." accent="violet" image={uiImages.classroom} imageAlt="Classroom lecture" />
       {(!papers || papers.length === 0) ? (
         <div className="glass-card p-12 border border-white/60">
           <EmptyState icon={FileText} title="No question papers yet" accent="violet" description="Papers uploaded by your department faculty will appear here." />
@@ -682,7 +696,7 @@ function QuestionPapersTab({ papers, onDownload }) {
 function PlacementsTab({ notices, onDownload }) {
   return (
     <div className="space-y-6">
-      <PageTitle icon={Briefcase} title="Placement Notices" subtitle="Active campus drives and internship opportunities." accent="emerald" />
+      <PageTitle icon={Briefcase} title="Placement Notices" subtitle="Active campus drives and internship opportunities." accent="emerald" image={uiImages.placementsFair} imageAlt="Campus placement fair" />
       {(!notices || notices.length === 0) ? (
         <div className="glass-card p-12 border border-white/60"><EmptyState icon={Briefcase} title="No placement notices" accent="emerald" description="New drives will be announced here." /></div>
       ) : (
@@ -737,7 +751,7 @@ const NOTIF_TYPES = { ACADEMIC: { v: 'info', label: 'Academic' }, PLACEMENT: { v
 function NotificationsTab({ notifications, onMarkRead }) {
   return (
     <div className="space-y-6">
-      <PageTitle icon={Bell} title="Notifications" subtitle="Announcements and updates from your college." accent="blue" />
+      <PageTitle icon={Bell} title="Notifications" subtitle="Announcements and updates from your college." accent="blue" image={uiImages.campusReading} imageAlt="Student reading on campus" />
       <div className="space-y-3">
         {(notifications || []).map(n => {
           const cfg = NOTIF_TYPES[n.type] || NOTIF_TYPES.GENERAL
@@ -791,7 +805,7 @@ function DocumentsTab({ cgpa, showMessage }) {
   const sems = cgpa?.semesters || []
   return (
     <div className="space-y-6">
-      <PageTitle icon={FileText} title="Academic Documents" subtitle="Download your marksheets and official transcript." accent="violet" />
+      <PageTitle icon={FileText} title="Academic Documents" subtitle="Download your marksheets and official transcript." accent="violet" image={uiImages.studentServices} imageAlt="Student services desk" />
       <div className="glass-card p-6 flex flex-wrap items-center justify-between gap-5 border border-white/60">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/25">
@@ -852,6 +866,7 @@ function AiAssistantTab({ overall, cgpa }) {
   return (
     <div className="space-y-4 flex flex-col h-[calc(100vh-160px)]">
       <PageTitle icon={Sparkles} title="AI College Assistant" subtitle="Your 24/7 academic companion." accent="violet"
+        image={uiImages.onlineLearning} imageAlt="Student learning online"
         actions={<Badge variant="purple">AI Powered</Badge>} />
       <div className="flex-1 glass-card overflow-hidden flex flex-col min-h-[400px] border border-white/60">
         <div className="flex-1 overflow-y-auto p-5 space-y-3.5 pr-3">

@@ -149,11 +149,74 @@ export function EmptyState({ icon: Icon, title, description, accent = 'indigo', 
   )
 }
 
+// ─── Static image with softly faded edges and corners ─────────────────────────
+export function FadedImage({ src, alt = '', className, imgClassName, fade = 18 }) {
+  const horizontal = `linear-gradient(to right, transparent 0%, #000 ${fade}%, #000 ${100 - fade}%, transparent 100%)`
+  const vertical = `linear-gradient(to bottom, transparent 0%, #000 ${fade}%, #000 ${100 - fade}%, transparent 100%)`
+  return (
+    <div
+      className={cn('overflow-hidden', className)}
+      style={{
+        WebkitMaskImage: horizontal,
+        maskImage: horizontal,
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+      }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        draggable={false}
+        loading="lazy"
+        className={cn('h-full w-full object-cover', imgClassName)}
+        style={{
+          WebkitMaskImage: vertical,
+          maskImage: vertical,
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+        }}
+      />
+    </div>
+  )
+}
+
+// ─── Faded image strip (dashboard moments) ────────────────────────────────────
+export function ImageStrip({ items = [], title, subtitle, className }) {
+  if (!items.length) return null
+  return (
+    <section className={cn('glass-card p-5 md:p-6', className)}>
+      {(title || subtitle) && (
+        <div className="mb-4">
+          {title && <h3 className="text-sm font-semibold text-slate-800">{title}</h3>}
+          {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+        </div>
+      )}
+      <div className={cn('grid gap-4', items.length >= 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3')}>
+        {items.map((item, index) => (
+          <figure key={`${item.src}-${index}`} className="relative h-36 md:h-40 m-0">
+            <FadedImage
+              src={item.src}
+              alt={item.alt || item.label || ''}
+              className="absolute inset-0"
+              fade={16}
+            />
+            <figcaption className="absolute inset-x-3 bottom-3">
+              <span className="inline-flex rounded-full bg-slate-900/45 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+                {item.label}
+              </span>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 // ─── Page title (premium) ──────────────────────────────────────────────────────
-export function PageTitle({ icon: Icon, title, subtitle, accent = 'indigo', actions }) {
+export function PageTitle({ icon: Icon, title, subtitle, accent = 'indigo', actions, image, imageAlt = '' }) {
   const a = ACCENTS[accent] || ACCENTS.indigo
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+    <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
       <div className="flex items-start gap-3.5">
         {Icon && (
           <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center shrink-0', a.softBg, a.shadow)}>
@@ -165,6 +228,11 @@ export function PageTitle({ icon: Icon, title, subtitle, accent = 'indigo', acti
           {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
         </div>
       </div>
+      {image && (
+        <div className="hidden lg:block flex-1 min-w-[120px] max-w-[320px] h-20 pointer-events-none opacity-80" aria-hidden="true">
+          <FadedImage src={image} alt={imageAlt} className="h-full w-full" fade={22} />
+        </div>
+      )}
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
   )
