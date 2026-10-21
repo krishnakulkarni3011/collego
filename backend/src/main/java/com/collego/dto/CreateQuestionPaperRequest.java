@@ -13,7 +13,7 @@ public class CreateQuestionPaperRequest {
     @NotNull(message = "Course ID is required")
     private Long courseId;
 
-    @NotNull(message = "Department ID is required")
+    /** Kept for API compatibility. The faculty's own department is always used. */
     private Long departmentId;
 
     @NotBlank(message = "Exam type is required")

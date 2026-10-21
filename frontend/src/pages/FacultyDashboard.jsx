@@ -831,30 +831,24 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
 }
 
 // ─── Notices Tab ─────────────────────────────────────────────────────────────
-function NoticesTab({ title, setTitle, message, setMessage, type, setType, deptId, setDeptId, departments, onSubmit, sentNotices, loading }) {
+function NoticesTab({ title, setTitle, message, setMessage, type, setType, departmentName, onSubmit, sentNotices, loading }) {
   const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'EXAM']
   return (
     <div className="space-y-6">
-      <PageTitle icon={Megaphone} title="Notices" subtitle="Broadcast announcements to students across departments." accent="amber" image={uiImages.placementTalk} imageAlt="Placement talk" />
+      <PageTitle icon={Megaphone} title="Notices" subtitle="Send announcements to every student in your department." accent="amber" image={uiImages.placementTalk} imageAlt="Placement talk" />
       <div className="glass-card p-6 border border-white/60">
-        <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Megaphone size={14} className="text-amber-500" /> Broadcast Notice</h3>
+        <h3 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2"><Megaphone size={14} className="text-amber-500" /> Department Notice</h3>
+        <p className="text-xs text-slate-500 mb-5">
+          This notice will appear in the portal of every student in <span className="font-semibold text-slate-700">{departmentName}</span>.
+        </p>
         <div className="space-y-3">
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Notice title" className="collego-input" /></div>
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Message</label><textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} placeholder="Notice message..." className="collego-input resize-none" /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Type</label>
-              <select value={type} onChange={e => setType(e.target.value)} className="collego-input">
-                {TYPE_OPTIONS.map(t => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Department (optional)</label>
-              <select value={deptId} onChange={e => setDeptId(e.target.value)} className="collego-input">
-                <option value="">All departments</option>
-                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
+          <div className="max-w-xs">
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Type</label>
+            <select value={type} onChange={e => setType(e.target.value)} className="collego-input">
+              {TYPE_OPTIONS.map(t => <option key={t}>{t}</option>)}
+            </select>
           </div>
         </div>
         <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim() || !message.trim()}>
@@ -996,8 +990,6 @@ export default function FacultyDashboard() {
   const [noticeTitle, setNoticeTitle] = useState('')
   const [noticeMessage, setNoticeMessage] = useState('')
   const [noticeType, setNoticeType] = useState('GENERAL')
-  const [noticeDeptId, setNoticeDeptId] = useState('')
-  const [departments, setDepartments] = useState([])
   const [sentNotices, setSentNotices] = useState([])
 
   // Question Papers
@@ -1020,6 +1012,7 @@ export default function FacultyDashboard() {
   const [subjectAssignmentsLoading, setSubjectAssignmentsLoading] = useState(false)
 
   const sidebarWidth = collapsed ? 76 : 248
+  const facultyDepartmentName = sections.find(s => s.departmentName)?.departmentName || 'your department'
   const showMsg = useCallback((text, type = 'success') => setMessage({ text, type }), [])
 
   const fetchSections = useCallback(async () => {
@@ -1031,14 +1024,9 @@ export default function FacultyDashboard() {
     finally { setLoading(false) }
   }, [showMsg])
 
-  const fetchDepartments = useCallback(async () => {
-    try { const res = await api.get('/api/departments'); setDepartments(res.data) } catch { /* ignore */ }
-  }, [])
-
   useEffect(() => {
     fetchSections()
-    fetchDepartments()
-  }, [fetchSections, fetchDepartments])
+  }, [fetchSections])
 
   useEffect(() => {
     if (activeTab === 'overview' && sections.length > 0) {
@@ -1229,7 +1217,7 @@ export default function FacultyDashboard() {
     try {
       const params = {
         courseId: sec.courseId,
-        departmentId: sec.course?.departmentId || departments[0]?.id || 1,
+        departmentId: sec.departmentId,
         examType: qpExamType,
         year: parseInt(qpYear),
         semesterNumber: sec.semesterNumber,
@@ -1257,7 +1245,7 @@ export default function FacultyDashboard() {
   const handleDraftNotice = async () => {
     setLoading(true)
     try {
-      const res = await api.post('/api/faculty/notices', { title: noticeTitle, message: noticeMessage, type: noticeType, departmentId: noticeDeptId ? parseInt(noticeDeptId) : null })
+      const res = await api.post('/api/faculty/notices', { title: noticeTitle, message: noticeMessage, type: noticeType })
       showMsg(`Notice sent to ${res.data.recipientCount} students`)
       setSentNotices(prev => [{ title: noticeTitle, message: noticeMessage, type: noticeType, recipientCount: res.data.recipientCount, sentAt: new Date().toISOString() }, ...prev])
       setNoticeTitle(''); setNoticeMessage('')
@@ -1343,7 +1331,7 @@ export default function FacultyDashboard() {
         case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} />
         case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
         case 'facultyDirectory': return <FacultyDirectoryTab faculty={facultyDirectory} onDownload={handleDownload} accent="violet" />
-        case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} deptId={noticeDeptId} setDeptId={setNoticeDeptId} departments={departments} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
+        case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} departmentName={facultyDepartmentName} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
         case 'settings': return <SettingsTab showMsg={showMsg} accent="violet" />
         case 'help': return <HelpTab accent="violet" />
         case 'invigilations': return <InvigilationsTab showMsg={showMsg} />

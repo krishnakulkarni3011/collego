@@ -491,18 +491,18 @@ function TimetableTab({ timetable, loading }) {
 // ─── Assignments ─────────────────────────────────────────────────────────────
 function AssignmentsTab({ assignments = [], loading, onSubmit, onDownload }) {
   const list = Array.isArray(assignments) ? assignments : []
-  const pending = list.filter(a => !a.submissionStatus).length
+  const pending = list.filter(a => a.canSubmit !== false && !a.submissionStatus).length
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={BookOpen} title="Assignments" subtitle="Submit your work and track marks and feedback." accent="amber"
+      <PageTitle icon={BookOpen} title="Assignments" subtitle="Assignments shared with your department. Submit work for your enrolled subjects." accent="amber"
         image={uiImages.groupStudy} imageAlt="Students collaborating"
-        actions={list.length > 0 ? <Badge variant={pending ? 'warning' : 'success'}>{pending ? `${pending} pending` : 'All submitted'}</Badge> : undefined} />
+        actions={list.length > 0 ? <Badge variant={pending ? 'warning' : 'success'}>{pending ? `${pending} pending` : 'No pending work'}</Badge> : undefined} />
       {loading ? (
         <div className="flex items-center justify-center py-16"><Spinner color="amber" /></div>
       ) : list.length === 0 ? (
         <div className="glass-card p-12 border border-white/60">
-          <EmptyState icon={BookOpen} title="No assignments yet" accent="amber" description="Assignments posted by your faculty will appear here." />
+          <EmptyState icon={BookOpen} title="No assignments yet" accent="amber" description="Assignments shared by your department faculty will appear here." />
         </div>
       ) : (
         <div className="space-y-4">
@@ -522,7 +522,8 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
 
   const submitted = Boolean(a.submissionStatus)
   const graded = a.submissionStatus === 'GRADED'
-  const overdue = !submitted && a.dueDate && new Date(a.dueDate).getTime() < Date.now()
+  const canSubmit = a.canSubmit !== false
+  const overdue = canSubmit && !submitted && a.dueDate && new Date(a.dueDate).getTime() < Date.now()
 
   const submit = async () => {
     if (!file) return
@@ -544,8 +545,8 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <h3 className="text-sm font-semibold text-slate-800">{a.title}</h3>
-            <Badge variant={graded ? 'success' : submitted ? 'info' : overdue ? 'destructive' : 'warning'}>
-              {graded ? 'Graded' : submitted ? 'Submitted' : overdue ? 'Overdue' : 'Pending'}
+            <Badge variant={!canSubmit ? 'secondary' : graded ? 'success' : submitted ? 'info' : overdue ? 'destructive' : 'warning'}>
+              {!canSubmit ? 'View only' : graded ? 'Graded' : submitted ? 'Submitted' : overdue ? 'Overdue' : 'Pending'}
             </Badge>
           </div>
           <p className="text-[11px] text-slate-400">{a.courseName} · {a.courseCode}</p>
@@ -576,7 +577,7 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
               <FileText size={12} /> My submission
             </Button>
           )}
-          {!submitted && (
+          {canSubmit && !submitted && (
             <Button variant="gradient" size="sm" onClick={() => setShowSubmit(v => !v)}>
               <Upload size={12} /> {showSubmit ? 'Cancel' : 'Submit'}
             </Button>
@@ -614,12 +615,12 @@ function MaterialsTab({ materials = [], loading, onDownload }) {
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={FolderOpen} title="Study Materials" subtitle="Notes, slides and references shared by your faculty." accent="blue" image={uiImages.library} imageAlt="Students studying in the library" />
+      <PageTitle icon={FolderOpen} title="Study Materials" subtitle="Notes, slides and references shared with everyone in your department." accent="blue" image={uiImages.library} imageAlt="Students studying in the library" />
       {loading ? (
         <div className="flex items-center justify-center py-16"><Spinner color="blue" /></div>
       ) : list.length === 0 ? (
         <div className="glass-card p-12 border border-white/60">
-          <EmptyState icon={FolderOpen} title="No study materials yet" accent="blue" description="Materials uploaded by your faculty will appear here." />
+          <EmptyState icon={FolderOpen} title="No study materials yet" accent="blue" description="Materials shared by your department faculty will appear here." />
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">

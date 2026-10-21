@@ -38,7 +38,6 @@ public class FacultyPortalService {
     private final QuestionPaperRepository questionPaperRepository;
     private final NotificationRepository notificationRepository;
     private final CourseRepository courseRepository;
-    private final DepartmentRepository departmentRepository;
     private final SemesterRepository semesterRepository;
     private final FacultySubjectAssignmentRepository facultySubjectAssignmentRepository;
     private final QuestionPaperService questionPaperService;
@@ -68,6 +67,10 @@ public class FacultyPortalService {
                     .courseId(section.getCourse().getId())
                     .courseName(section.getCourse().getName())
                     .courseCode(section.getCourse().getCode())
+                    .departmentId(section.getCourse().getDepartment() != null
+                            ? section.getCourse().getDepartment().getId() : null)
+                    .departmentName(section.getCourse().getDepartment() != null
+                            ? section.getCourse().getDepartment().getName() : null)
                     .credits(section.getCourse().getCredits())
                     .semesterId(section.getSemester().getId())
                     .semesterName(section.getSemester().getName())
@@ -576,13 +579,13 @@ public class FacultyPortalService {
 
     @Transactional
     public QuestionPaperResponse uploadQuestionPaper(String email, CreateQuestionPaperRequest request) {
-        User facultyUser = getUserByEmail(email);
+        FacultyProfile faculty = getFacultyByEmail(email);
+        User facultyUser = faculty.getUser();
+        Department department = requireFacultyDepartment(faculty);
 
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found: " + request.getCourseId()));
-
-        Department department = departmentRepository.findById(request.getDepartmentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Department not found: " + request.getDepartmentId()));
+        validateCourseBelongsToDepartment(course, department);
 
         QuestionPaper qp = QuestionPaper.builder()
                 .course(course)
@@ -624,17 +627,12 @@ public class FacultyPortalService {
             type = NotificationType.GENERAL;
         }
 
-        // If department-specific, send to students in that department
-        // Otherwise, broadcast to all students
-        List<User> recipients;
-        if (request.getDepartmentId() != null) {
-            Department dept = departmentRepository.findById(request.getDepartmentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Department not found: " + request.getDepartmentId()));
-            List<StudentProfile> students = studentProfileRepository.findByDepartmentId(dept.getId());
-            recipients = students.stream().map(StudentProfile::getUser).collect(Collectors.toList());
-        } else {
-            recipients = userRepository.findByRole(Role.STUDENT);
-        }
+        // A faculty notice is always scoped to the faculty's own department.
+        FacultyProfile faculty = getFacultyByEmail(email);
+        Department dept = requireFacultyDepartment(faculty);
+        List<User> recipients = studentProfileRepository.findByDepartmentId(dept.getId()).stream()
+                .map(StudentProfile::getUser)
+                .collect(Collectors.toList());
 
         int sent = 0;
         for (User recipient : recipients) {
@@ -648,13 +646,15 @@ public class FacultyPortalService {
             sent++;
         }
 
-        log.info("Faculty {} drafted notice '{}' to {} students", email, request.getTitle(), sent);
+        log.info("Faculty {} sent notice '{}' to {} students in department {}",
+                email, request.getTitle(), sent, dept.getCode());
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("title", request.getTitle());
         result.put("recipientCount", sent);
-        result.put("departmentId", request.getDepartmentId());
-        result.put("message", "Notice sent successfully to " + sent + " students");
+        result.put("departmentId", dept.getId());
+        result.put("departmentName", dept.getName());
+        result.put("message", "Notice sent successfully to " + sent + " students in " + dept.getName());
         return result;
     }
 
@@ -963,13 +963,13 @@ public class FacultyPortalService {
 
     @Transactional
     public QuestionPaperResponse uploadQuestionPaperWithFile(String email, CreateQuestionPaperRequest request, MultipartFile file) throws IOException {
-        User facultyUser = getUserByEmail(email);
+        FacultyProfile faculty = getFacultyByEmail(email);
+        User facultyUser = faculty.getUser();
+        Department department = requireFacultyDepartment(faculty);
 
         Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found: " + request.getCourseId()));
-
-        Department department = departmentRepository.findById(request.getDepartmentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Department not found: " + request.getDepartmentId()));
+        validateCourseBelongsToDepartment(course, department);
 
         QuestionPaper qp = QuestionPaper.builder()
                 .course(course)
@@ -1079,6 +1079,20 @@ public class FacultyPortalService {
         if (section.getFaculty() == null || !section.getFaculty().getId().equals(faculty.getId())) {
             throw new BadRequestException("You are not assigned to section: " + section.getName()
                     + " (" + section.getCourse().getName() + ")");
+        }
+    }
+
+    private Department requireFacultyDepartment(FacultyProfile faculty) {
+        if (faculty.getDepartment() == null) {
+            throw new BadRequestException("Your faculty account is not assigned to a department.");
+        }
+        return faculty.getDepartment();
+    }
+
+    private void validateCourseBelongsToDepartment(Course course, Department department) {
+        if (course.getDepartment() == null
+                || !Objects.equals(course.getDepartment().getId(), department.getId())) {
+            throw new BadRequestException("You can only upload resources for courses in your department.");
         }
     }
 

@@ -422,46 +422,48 @@ public class StudentPortalService {
     // ==================== Assignments (Phase 4 + 8) ====================
 
     /**
-     * Returns all assignments for sections the student is actively enrolled in.
-     * The hasFile flag indicates whether a downloadable file exists in S3.
+     * Returns all assignments shared with the student's department, across every
+     * section. Students may download attachments for any department assignment,
+     * but can only submit work for sections they are actively enrolled in.
      */
     public List<AssignmentResponse> getAssignmentsForStudent(String email) {
         StudentProfile student = getStudentByEmail(email);
-        List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatus(
-                student.getId(), EnrollmentStatus.ACTIVE);
+        if (student.getDepartment() == null) return List.of();
+
+        Set<Long> enrolledSectionIds = enrollmentRepository.findByStudentIdAndStatus(
+                        student.getId(), EnrollmentStatus.ACTIVE).stream()
+                .map(enrollment -> enrollment.getSection().getId())
+                .collect(Collectors.toSet());
 
         Map<Long, AssignmentSubmission> mySubmissions = assignmentSubmissionRepository
                 .findByStudentId(student.getId()).stream()
                 .collect(Collectors.toMap(s -> s.getAssignment().getId(), s -> s, (a, b) -> a));
 
-        List<AssignmentResponse> results = new ArrayList<>();
-        for (Enrollment enrollment : enrollments) {
-            List<Assignment> assignments = assignmentRepository
-                    .findBySectionIdOrderByCreatedAtDesc(enrollment.getSection().getId());
-            for (Assignment a : assignments) {
-                AssignmentSubmission sub = mySubmissions.get(a.getId());
-                results.add(AssignmentResponse.builder()
-                        .id(a.getId())
-                        .sectionId(a.getSection().getId())
-                        .courseName(a.getSection().getCourse().getName())
-                        .courseCode(a.getSection().getCourse().getCode())
-                        .title(a.getTitle())
-                        .description(a.getDescription())
-                        .dueDate(a.getDueDate())
-                        .fileName(a.getFileName())
-                        .hasFile(a.getFilePath() != null && !a.getFilePath().isBlank())
-                        .createdAt(a.getCreatedAt())
-                        .maxMarks(a.getMaxMarks() != null ? a.getMaxMarks() : 10)
-                        .submissionId(sub != null ? sub.getId() : null)
-                        .submissionStatus(sub != null && sub.getStatus() != null ? sub.getStatus().name() : null)
-                        .marks(sub != null ? sub.getMarks() : null)
-                        .feedback(sub != null ? sub.getFeedback() : null)
-                        .submittedAt(sub != null ? sub.getSubmittedAt() : null)
-                        .late(sub != null ? sub.isLate() : null)
-                        .build());
-            }
-        }
-        return results;
+        return assignmentRepository.findByDepartmentId(student.getDepartment().getId()).stream()
+                .map(a -> {
+                    AssignmentSubmission sub = mySubmissions.get(a.getId());
+                    return AssignmentResponse.builder()
+                            .id(a.getId())
+                            .sectionId(a.getSection().getId())
+                            .courseName(a.getSection().getCourse().getName())
+                            .courseCode(a.getSection().getCourse().getCode())
+                            .title(a.getTitle())
+                            .description(a.getDescription())
+                            .dueDate(a.getDueDate())
+                            .fileName(a.getFileName())
+                            .hasFile(a.getFilePath() != null && !a.getFilePath().isBlank())
+                            .createdAt(a.getCreatedAt())
+                            .maxMarks(a.getMaxMarks() != null ? a.getMaxMarks() : 10)
+                            .submissionId(sub != null ? sub.getId() : null)
+                            .submissionStatus(sub != null && sub.getStatus() != null ? sub.getStatus().name() : null)
+                            .marks(sub != null ? sub.getMarks() : null)
+                            .feedback(sub != null ? sub.getFeedback() : null)
+                            .submittedAt(sub != null ? sub.getSubmittedAt() : null)
+                            .late(sub != null ? sub.isLate() : null)
+                            .canSubmit(enrolledSectionIds.contains(a.getSection().getId()))
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 
     /**
@@ -590,18 +592,15 @@ public class StudentPortalService {
 
     /**
      * Download the file for an assignment from S3.
-     * Student must be enrolled in the assignment's section.
+     * The assignment must belong to the student's department.
      */
     public byte[] downloadAssignmentFile(String email, Long assignmentId) throws IOException {
         StudentProfile student = getStudentByEmail(email);
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
 
-        // Verify enrollment
-        boolean enrolled = enrollmentRepository.existsByStudentIdAndSectionId(
-                student.getId(), assignment.getSection().getId());
-        if (!enrolled) {
-            throw new BadRequestException("You are not enrolled in this assignment's course.");
+        if (!isInStudentDepartment(student, assignment.getSection())) {
+            throw new BadRequestException("This assignment is not available in your department.");
         }
 
         if (assignment.getFilePath() == null || assignment.getFilePath().isBlank()) {
@@ -613,19 +612,15 @@ public class StudentPortalService {
     // ==================== Course Materials (Phase 4 + 8) ====================
 
     /**
-     * Returns all course materials for sections the student is actively enrolled in.
+     * Returns all course materials shared with the student's department, across
+     * every section and semester.
      */
     public List<CourseMaterialResponse> getMaterialsForStudent(String email) {
         StudentProfile student = getStudentByEmail(email);
-        List<Enrollment> enrollments = enrollmentRepository.findByStudentIdAndStatus(
-                student.getId(), EnrollmentStatus.ACTIVE);
+        if (student.getDepartment() == null) return List.of();
 
-        List<CourseMaterialResponse> results = new ArrayList<>();
-        for (Enrollment enrollment : enrollments) {
-            List<CourseMaterial> materials = courseMaterialRepository
-                    .findBySectionIdOrderByCreatedAtDesc(enrollment.getSection().getId());
-            for (CourseMaterial m : materials) {
-                results.add(CourseMaterialResponse.builder()
+        return courseMaterialRepository.findByDepartmentId(student.getDepartment().getId()).stream()
+                .map(m -> CourseMaterialResponse.builder()
                         .id(m.getId())
                         .sectionId(m.getSection().getId())
                         .courseName(m.getSection().getCourse().getName())
@@ -636,31 +631,37 @@ public class StudentPortalService {
                         .fileName(m.getFileName())
                         .hasFile(m.getFilePath() != null && !m.getFilePath().isBlank())
                         .createdAt(m.getCreatedAt())
-                        .build());
-            }
-        }
-        return results;
+                        .build())
+                .collect(Collectors.toList());
     }
 
     /**
      * Download a course material file from S3.
-     * Student must be enrolled in the material's section.
+     * The material must belong to the student's department.
      */
     public byte[] downloadMaterialFile(String email, Long materialId) throws IOException {
         StudentProfile student = getStudentByEmail(email);
         CourseMaterial material = courseMaterialRepository.findById(materialId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course material not found: " + materialId));
 
-        boolean enrolled = enrollmentRepository.existsByStudentIdAndSectionId(
-                student.getId(), material.getSection().getId());
-        if (!enrolled) {
-            throw new BadRequestException("You are not enrolled in this material's course.");
+        if (!isInStudentDepartment(student, material.getSection())) {
+            throw new BadRequestException("This course material is not available in your department.");
         }
 
         if (material.getFilePath() == null || material.getFilePath().isBlank()) {
             throw new BadRequestException("No file attached to this course material.");
         }
         return s3StorageService.download(materialBucket, material.getFilePath());
+    }
+
+    /** True when the section's course belongs to the student's department. */
+    private boolean isInStudentDepartment(StudentProfile student, Section section) {
+        if (student.getDepartment() == null || section == null || section.getCourse() == null
+                || section.getCourse().getDepartment() == null) {
+            return false;
+        }
+        return Objects.equals(student.getDepartment().getId(),
+                section.getCourse().getDepartment().getId());
     }
 
     // ==================== Helpers ====================

@@ -17,6 +17,7 @@ public class CreateNoticeRequest {
 
     private String type; // ACADEMIC, GENERAL, etc. — defaults to GENERAL
 
-    private Long departmentId; // null = all departments
+    /** Kept for API compatibility. Notices are always sent to the faculty's department. */
+    private Long departmentId;
 
 }

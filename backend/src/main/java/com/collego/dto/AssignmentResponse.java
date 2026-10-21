@@ -32,4 +32,7 @@ public class AssignmentResponse {
     private String feedback;
     private LocalDateTime submittedAt;
     private Boolean late;
+
+    /** True when the requesting student is enrolled in the assignment's section and can submit. */
+    private Boolean canSubmit;
 }

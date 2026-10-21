@@ -12,6 +12,8 @@ public class FacultySectionResponse {
     private Long courseId;
     private String courseName;
     private String courseCode;
+    private Long departmentId;
+    private String departmentName;
     private Integer credits;
     private Long semesterId;
     private String semesterName;

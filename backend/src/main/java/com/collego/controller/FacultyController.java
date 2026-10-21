@@ -248,7 +248,7 @@ public class FacultyController {
     public ResponseEntity<QuestionPaperResponse> uploadQuestionPaperWithFile(
             Authentication auth,
             @RequestParam("courseId") Long courseId,
-            @RequestParam("departmentId") Long departmentId,
+            @RequestParam(value = "departmentId", required = false) Long departmentId,
             @RequestParam("examType") String examType,
             @RequestParam("year") Integer year,
             @RequestParam("semesterNumber") Integer semesterNumber,
