@@ -82,10 +82,17 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
-      # Phase 9: LLM API key for AI features (leave blank to use stub mode)
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      # Phase 9: LLM model to use (default: openai/gpt-4o-mini, cost-effective)
-      AI_MODEL: ${AI_MODEL:-openai/gpt-4o-mini}
+      # Phase 10: LOCAL Ollama inference — free forever, no API key, no quota, and
+      # student data never leaves your infrastructure.
+      # Point LLM_BASE_URL at wherever Ollama actually runs (the optional `ollama`
+      # service below, a lab machine, or a GPU host). If it is unreachable the AI
+      # features degrade to the deterministic Phase 9 stubs instead of failing.
+      AI_ENABLED: ${AI_ENABLED:-true}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434}
+      AI_MODEL: ${AI_MODEL:-qwen2.5:7b-instruct}
+      AI_EMBED_MODEL: ${AI_EMBED_MODEL:-nomic-embed-text}
+      AI_NUM_CTX: ${AI_NUM_CTX:-4096}
     expose:
       - "8000"
     networks:
@@ -101,6 +108,42 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # Phase 10: optional local Ollama for AI inference. Off by default — enable on a
+  # host with >= 16 GB RAM (GPU strongly preferred for the 7B model):
+  #   LLM_BASE_URL=http://ollama:11434 docker compose -f docker-compose.prod.yml --profile ollama up -d
+  # Then pull the model once:
+  #   docker exec -it collego-ollama ollama pull qwen2.5:7b-instruct
+  #   docker exec -it collego-ollama ollama pull nomic-embed-text
+  # Uncomment the deploy block for NVIDIA GPU passthrough (needs
+  # nvidia-container-toolkit on the host).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: collego-ollama
+    restart: always
+    profiles: ["ollama"]
+    environment:
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_CONTEXT_LENGTH: ${AI_NUM_CTX:-4096}
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - collego-net
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /collego/ollama
+        awslogs-region: ${AWS_REGION}
+        awslogs-stream: ollama
 
   nginx:
     image: nginx:alpine
@@ -126,6 +169,9 @@ services:
         awslogs-group: /collego/nginx
         awslogs-region: ${AWS_REGION}
         awslogs-stream: nginx
+
+volumes:
+  ollama_models:
 
 networks:
   collego-net:
