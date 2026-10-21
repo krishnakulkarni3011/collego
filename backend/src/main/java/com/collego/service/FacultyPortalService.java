@@ -863,6 +863,40 @@ public class FacultyPortalService {
         return response;
     }
 
+    /**
+     * Repairs older subject assignments that were created before year-based
+     * enrollment was introduced. Called once after startup; safe to repeat.
+     */
+    @Transactional
+    public void backfillStudentEnrollmentsForActiveAssignments() {
+        List<FacultySubjectAssignment> assignments = facultySubjectAssignmentRepository.findAll().stream()
+                .filter(FacultySubjectAssignment::isActive)
+                .collect(Collectors.toList());
+
+        int synchronizedAssignments = 0;
+        for (FacultySubjectAssignment assignment : assignments) {
+            FacultyProfile faculty = assignment.getFaculty();
+            Integer year = AcademicYearUtils.fromSemester(assignment.getSemester().getNumber());
+            if (faculty.getDepartment() == null || year == null) {
+                continue;
+            }
+
+            List<Section> ownedSections = claimSectionsForFaculty(
+                    faculty, assignment.getCourse(), assignment.getSemester());
+            if (ownedSections.isEmpty()) {
+                continue;
+            }
+
+            loadYearStudentsIntoOwnedSections(faculty.getDepartment(), year, ownedSections);
+            synchronizedAssignments++;
+        }
+
+        if (synchronizedAssignments > 0) {
+            log.info("Synchronized year students for {} active faculty subject assignment(s)",
+                    synchronizedAssignments);
+        }
+    }
+
     @Transactional
     public void removeSubjectAssignment(String email, Long assignmentId) {
         FacultyProfile faculty = getFacultyByEmail(email);
