@@ -322,7 +322,11 @@ async def chat(req: ChatRequest):
             json_mode=False,
         )
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=502, detail=f"AI backend error: {e.response.status_code}")
+        # Model missing (404) or backend error: degrade to the deterministic stub
+        # instead of failing the whole chat.
+        print(f"[ai-service] LLM backend error {e.response.status_code}; using stub")
+        lower = message.lower()
+        return ChatResponse(reply=_stub_chat_response(lower, req.context), intent=_detect_intent(lower))
     except httpx.RequestError:
         # Local model down: degrade to the deterministic stub instead of failing.
         lower = message.lower()
