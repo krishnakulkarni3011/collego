@@ -66,17 +66,14 @@ public class AcademicDataSeeder implements CommandLineRunner {
      * removed on startup so student/admin portals only show notices that were
      * actually sent through the application.
      */
-    private static final String SEEDED_NOTIFICATIONS_SQL =
-            "DELETE FROM notifications WHERE "
-                    + "(title = ? AND message = ?) OR "
-                    + "(title = ? AND message = ?) OR "
-                    + "(title = ? AND message = ?) OR "
-                    + "(title = ? AND message = ?)";
-
     private static final String[][] SEEDED_NOTIFICATIONS = {
             {"Welcome to New Semester!", "Your semester classes have started. Check your timetable for schedule details."},
+            {"Welcome to Semester 3!", "Your Semester 3 classes have started. Check your timetable for schedule details."},
             {"IA-1 Marks Published", "Internal Assessment 1 marks have been published. Check your marks section."},
             {"New Placement Drive", "A new placement drive has been announced. Check placement notices for details."},
+            {"New Placement Drive", "Google is visiting campus soon. Check placement notices for details."},
+            {"Fee Payment Reminder", "Your semester fee payment is due. Please clear your dues before the deadline."},
+            {"Fee Payment Reminder", "Your Semester 3 fee payment is due. Please clear your dues before the deadline."},
             {"Library Book Due", "You have library books due for return. Please return them to avoid fines."}
     };
 
@@ -252,12 +249,14 @@ public class AcademicDataSeeder implements CommandLineRunner {
 
     private void cleanupSeededNotifications() {
         try {
+            String sql = "DELETE FROM notifications WHERE " + String.join(" OR ",
+                    Collections.nCopies(SEEDED_NOTIFICATIONS.length, "(title = ? AND message = ?)"));
             Object[] args = new Object[SEEDED_NOTIFICATIONS.length * 2];
             for (int i = 0; i < SEEDED_NOTIFICATIONS.length; i++) {
                 args[i * 2] = SEEDED_NOTIFICATIONS[i][0];
                 args[i * 2 + 1] = SEEDED_NOTIFICATIONS[i][1];
             }
-            int removed = jdbcTemplate.update(SEEDED_NOTIFICATIONS_SQL, args);
+            int removed = jdbcTemplate.update(sql, args);
             if (removed > 0) {
                 log.info("Removed {} seeded notification(s).", removed);
             }
