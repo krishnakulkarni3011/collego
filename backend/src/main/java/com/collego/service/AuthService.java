@@ -37,18 +37,14 @@ public class AuthService {
         String cleanUsername = request.getUsername() != null ? request.getUsername().trim() : "";
         String cleanPassword = request.getPassword() != null ? request.getPassword().trim() : "";
 
-        User user = null;
-        String loginIdentifier = cleanUsername;
-
         // Try to find user by email first
-        user = userRepository.findByEmailIgnoreCase(cleanUsername).orElse(null);
+        User user = userRepository.findByEmailIgnoreCase(cleanUsername).orElse(null);
 
         // If not found by email, try USN (enrollmentNumber) for students
         if (user == null && cleanUsername.matches("1CG\\d{2}CS\\d{3}")) {
             StudentProfile student = studentProfileRepository.findByEnrollmentNumber(cleanUsername).orElse(null);
             if (student != null) {
                 user = student.getUser();
-                loginIdentifier = user.getEmail(); // Use email for authentication
             }
         }
 
@@ -57,7 +53,6 @@ public class AuthService {
             FacultyProfile faculty = facultyProfileRepository.findByEmployeeId(cleanUsername).orElse(null);
             if (faculty != null) {
                 user = faculty.getUser();
-                loginIdentifier = user.getEmail(); // Use email for authentication
             }
         }
 

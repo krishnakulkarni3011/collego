@@ -211,10 +211,10 @@ public class AcademicDataSeeder implements CommandLineRunner {
         Map<Integer, List<Course>> coursesBySemester = seedAllCSECourses(cseDept);
 
         // 4. Create 7 authentic faculty members
-        List<FacultyProfile> facultyList = seedAuthenticFaculty(cseDept);
+        seedAuthenticFaculty(cseDept);
 
         // 5. Create sections and assign faculty (faculty will self-assign later via portal)
-        Map<String, List<Section>> semSections = seedSectionsForAllSemesters(coursesBySemester, semesters, facultyList);
+        Map<String, List<Section>> semSections = seedSectionsForAllSemesters(coursesBySemester, semesters);
 
         // 6. Create 30 students per year × 4 years = 120 students
         Map<Integer, List<StudentProfile>> studentsByYear = seedStudentsPerYear(cseDept);
@@ -447,8 +447,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
 
     private Map<String, List<Section>> seedSectionsForAllSemesters(
             Map<Integer, List<Course>> coursesBySemester,
-            List<Semester> semesters,
-            List<FacultyProfile> facultyList) {
+            List<Semester> semesters) {
 
         Map<String, List<Section>> semSections = new HashMap<>();
 

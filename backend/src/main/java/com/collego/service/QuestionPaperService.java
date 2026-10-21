@@ -5,7 +5,6 @@ import com.collego.entity.QuestionPaper;
 import com.collego.exception.BadRequestException;
 import com.collego.exception.ResourceNotFoundException;
 import com.collego.repository.QuestionPaperRepository;
-import com.collego.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +35,6 @@ public class QuestionPaperService {
 
     private final QuestionPaperRepository questionPaperRepository;
     private final S3StorageService s3StorageService;
-    private final UserRepository userRepository;
 
     @Value("${collego.aws.s3-bucket-question-papers:collego-question-papers-prod}")
     private String qpBucket;

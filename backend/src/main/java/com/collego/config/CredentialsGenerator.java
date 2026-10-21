@@ -18,7 +18,6 @@ import java.util.List;
 @SuppressWarnings("null")
 public class CredentialsGenerator implements CommandLineRunner {
 
-    private final UserRepository userRepository;
     private final StudentProfileRepository studentProfileRepository;
     private final FacultyProfileRepository facultyProfileRepository;
 

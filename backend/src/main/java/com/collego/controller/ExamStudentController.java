@@ -18,6 +18,7 @@ import java.util.List;
 @RequestMapping("/api/student/exams")
 @PreAuthorize("hasRole('STUDENT')")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class ExamStudentController {
 
     private final ExamService examService;

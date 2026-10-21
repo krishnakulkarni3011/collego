@@ -3,8 +3,6 @@ package com.collego.service;
 import com.collego.dto.ChangePasswordRequest;
 import com.collego.dto.UpdateProfileRequest;
 import com.collego.dto.UserProfileResponse;
-import com.collego.entity.FacultyProfile;
-import com.collego.entity.StudentProfile;
 import com.collego.entity.User;
 import com.collego.exception.BadRequestException;
 import com.collego.exception.ResourceNotFoundException;

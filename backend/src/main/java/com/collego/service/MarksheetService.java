@@ -66,7 +66,7 @@ public class MarksheetService {
             document.open();
 
             // Header
-            addHeader(document, student, semester);
+            addHeader(document, semester);
 
             // Student Info
             addStudentInfo(document, student, user, semester);
@@ -167,7 +167,7 @@ public class MarksheetService {
 
     // ==================== PDF Building Helpers ====================
 
-    private void addHeader(Document document, StudentProfile student, Semester semester) throws DocumentException {
+    private void addHeader(Document document, Semester semester) throws DocumentException {
         Paragraph collegeName = new Paragraph("COLLEGO INSTITUTE OF TECHNOLOGY", TITLE_FONT);
         collegeName.setAlignment(Element.ALIGN_CENTER);
         document.add(collegeName);

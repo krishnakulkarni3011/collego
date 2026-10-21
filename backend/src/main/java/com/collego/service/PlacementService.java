@@ -377,7 +377,7 @@ public class PlacementService {
         }
 
         // Resolve resume
-        Resume resume = null;
+        Resume resume;
         if (request.getResumeId() != null) {
             resume = resumeRepository.findById(request.getResumeId())
                     .orElseThrow(() -> new ResourceNotFoundException("Resume not found: " + request.getResumeId()));
