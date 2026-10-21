@@ -191,6 +191,7 @@ public class FacultyController {
             @RequestParam("description") String description,
             @RequestParam("materialType") String materialType,
             @RequestParam("sectionId") Long sectionId,
+            @RequestParam("targetYear") Integer targetYear,
             @RequestParam(value = "file", required = false) MultipartFile file) throws IOException {
 
         CreateCourseMaterialRequest request = CreateCourseMaterialRequest.builder()
@@ -198,6 +199,7 @@ public class FacultyController {
                 .description(description)
                 .materialType(materialType)
                 .sectionId(sectionId)
+                .targetYear(targetYear)
                 .fileName(file != null ? file.getOriginalFilename() : null)
                 .build();
 
@@ -252,6 +254,7 @@ public class FacultyController {
             @RequestParam("examType") String examType,
             @RequestParam("year") Integer year,
             @RequestParam("semesterNumber") Integer semesterNumber,
+            @RequestParam("targetYear") Integer targetYear,
             @RequestParam(value = "fileName", required = false) String fileName,
             @RequestParam(value = "file", required = false) MultipartFile file) throws IOException {
 
@@ -261,6 +264,7 @@ public class FacultyController {
                 .examType(examType)
                 .year(year)
                 .semesterNumber(semesterNumber)
+                .targetYear(targetYear)
                 .fileName(fileName != null ? fileName : (file != null ? file.getOriginalFilename() : null))
                 .build();
 

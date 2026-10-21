@@ -21,5 +21,8 @@ public class CreateAssignmentRequest {
 
     private Long sectionId;
 
+    /** 1 = I Year, 2 = II Year, 3 = III Year, 4 = Final Year. */
+    private Integer targetYear;
+
     private String fileName;
 }

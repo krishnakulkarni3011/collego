@@ -20,6 +20,7 @@ public class AssignmentResponse {
     private Boolean hasFile; // true if a file is uploaded to S3 and downloadable
     private LocalDateTime createdAt;
     private Integer maxMarks;
+    private Integer targetYear;
 
     // Faculty view
     private Long submissionCount;

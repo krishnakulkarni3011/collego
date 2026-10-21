@@ -21,5 +21,8 @@ public class CreateCourseMaterialRequest {
     @NotBlank(message = "Material type is required")
     private String materialType; // SYLLABUS, NOTES, REFERENCE, OTHER
 
+    /** 1 = I Year, 2 = II Year, 3 = III Year, 4 = Final Year. */
+    private Integer targetYear;
+
     private String fileName;
 }

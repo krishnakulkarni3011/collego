@@ -17,5 +17,6 @@ public class CourseMaterialResponse {
     private String materialType;
     private String fileName;
     private Boolean hasFile; // true if a file is uploaded to S3 and downloadable
+    private Integer targetYear;
     private LocalDateTime createdAt;
 }

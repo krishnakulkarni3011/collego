@@ -5,6 +5,7 @@ import com.collego.entity.*;
 import com.collego.exception.BadRequestException;
 import com.collego.exception.ResourceNotFoundException;
 import com.collego.repository.*;
+import com.collego.util.AcademicYearUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -343,6 +344,7 @@ public class FacultyPortalService {
                 .description(request.getDescription())
                 .dueDate(request.getDueDate())
                 .maxMarks(request.getMaxMarks() != null && request.getMaxMarks() > 0 ? request.getMaxMarks() : 10)
+                .targetYear(validateTargetYear(request.getTargetYear()))
                 .fileName(request.getFileName())
                 .uploadedBy(facultyUser)
                 .build();
@@ -506,6 +508,7 @@ public class FacultyPortalService {
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .materialType(request.getMaterialType().toUpperCase())
+                .targetYear(validateTargetYear(request.getTargetYear()))
                 .fileName(request.getFileName())
                 .uploadedBy(facultyUser)
                 .build();
@@ -593,6 +596,7 @@ public class FacultyPortalService {
                 .examType(request.getExamType().toUpperCase())
                 .year(request.getYear())
                 .semesterNumber(request.getSemesterNumber())
+                .targetYear(validateTargetYear(request.getTargetYear()))
                 .fileName(request.getFileName())
                 .status("APPROVED")
                 .uploadedBy(facultyUser)
@@ -630,14 +634,21 @@ public class FacultyPortalService {
         // A faculty notice is always scoped to the faculty's own department.
         FacultyProfile faculty = getFacultyByEmail(email);
         Department dept = requireFacultyDepartment(faculty);
-        List<User> recipients = studentProfileRepository.findByDepartmentId(dept.getId()).stream()
-                .map(StudentProfile::getUser)
+        Integer targetYear = validateTargetYear(request.getTargetYear());
+
+        List<StudentProfile> targetStudents = studentProfileRepository.findByDepartmentId(dept.getId()).stream()
+                .filter(s -> Objects.equals(AcademicYearUtils.fromSemester(s.getSemester()), targetYear))
                 .collect(Collectors.toList());
 
+        if (targetStudents.isEmpty()) {
+            throw new BadRequestException("No students are enrolled in " + AcademicYearUtils.label(targetYear)
+                    + " for your department.");
+        }
+
         int sent = 0;
-        for (User recipient : recipients) {
+        for (StudentProfile student : targetStudents) {
             Notification notification = Notification.builder()
-                    .user(recipient)
+                    .user(student.getUser())
                     .title(request.getTitle())
                     .message(request.getMessage())
                     .type(type)
@@ -646,16 +657,28 @@ public class FacultyPortalService {
             sent++;
         }
 
-        log.info("Faculty {} sent notice '{}' to {} students in department {}",
-                email, request.getTitle(), sent, dept.getCode());
+        log.info("Faculty {} sent notice '{}' to {} {} students in department {}",
+                email, request.getTitle(), sent, AcademicYearUtils.label(targetYear), dept.getCode());
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("title", request.getTitle());
         result.put("recipientCount", sent);
         result.put("departmentId", dept.getId());
         result.put("departmentName", dept.getName());
-        result.put("message", "Notice sent successfully to " + sent + " students in " + dept.getName());
+        result.put("targetYear", targetYear);
+        result.put("message", "Notice sent successfully to " + sent + " students in "
+                + AcademicYearUtils.label(targetYear) + " of " + dept.getName());
         return result;
+    }
+
+    private Integer validateTargetYear(Integer targetYear) {
+        if (targetYear == null) {
+            throw new BadRequestException("Please select a target year.");
+        }
+        if (targetYear < 1 || targetYear > 4) {
+            throw new BadRequestException("Target year must be between I Year and Final Year.");
+        }
+        return targetYear;
     }
 
     // ==================== Analytics ====================
@@ -977,6 +1000,7 @@ public class FacultyPortalService {
                 .examType(request.getExamType().toUpperCase())
                 .year(request.getYear())
                 .semesterNumber(request.getSemesterNumber())
+                .targetYear(validateTargetYear(request.getTargetYear()))
                 .fileName(request.getFileName())
                 .status("APPROVED")
                 .uploadedBy(facultyUser)
@@ -1033,6 +1057,7 @@ public class FacultyPortalService {
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .materialType(request.getMaterialType().toUpperCase())
+                .targetYear(validateTargetYear(request.getTargetYear()))
                 .fileName(request.getFileName())
                 .uploadedBy(facultyUser)
                 .build();
@@ -1114,6 +1139,7 @@ public class FacultyPortalService {
                 .hasFile(a.getFilePath() != null && !a.getFilePath().isBlank())
                 .createdAt(a.getCreatedAt())
                 .maxMarks(a.getMaxMarks() != null ? a.getMaxMarks() : 10)
+                .targetYear(a.getTargetYear())
                 .submissionCount(assignmentSubmissionRepository.countByAssignmentId(a.getId()))
                 .gradedCount(assignmentSubmissionRepository.countByAssignmentIdAndStatus(
                         a.getId(), SubmissionStatus.GRADED))
@@ -1131,6 +1157,7 @@ public class FacultyPortalService {
                 .materialType(m.getMaterialType())
                 .fileName(m.getFileName())
                 .hasFile(m.getFilePath() != null && !m.getFilePath().isBlank())
+                .targetYear(m.getTargetYear())
                 .createdAt(m.getCreatedAt())
                 .build();
     }

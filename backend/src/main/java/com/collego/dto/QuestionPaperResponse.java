@@ -15,6 +15,7 @@ public class QuestionPaperResponse {
     private String examType;
     private Integer year;
     private Integer semesterNumber;
+    private Integer targetYear;
     private String fileName;
     private String filePath;
     private String status;

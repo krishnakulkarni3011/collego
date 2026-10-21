@@ -34,6 +34,10 @@ public class QuestionPaper {
     @Column(nullable = false)
     private Integer semesterNumber;
 
+    /** 1 = I Year, 2 = II Year, 3 = III Year, 4 = Final Year. Null = legacy/all years. */
+    @Column(name = "target_year")
+    private Integer targetYear;
+
     @Column(name = "file_path")
     private String filePath;
 

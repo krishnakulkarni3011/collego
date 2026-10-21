@@ -204,6 +204,7 @@ public class QuestionPaperService {
                 .examType(qp.getExamType())
                 .year(qp.getYear())
                 .semesterNumber(qp.getSemesterNumber())
+                .targetYear(qp.getTargetYear())
                 .fileName(qp.getFileName())
                 .filePath(qp.getFilePath())
                 .status(qp.getStatus())

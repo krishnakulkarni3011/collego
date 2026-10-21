@@ -31,6 +31,26 @@ import { uiImages } from '../assets/uiImages'
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 const fmtNum = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
 const PIE_COLORS = ['#4f46e5', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+const TARGET_YEAR_OPTIONS = [
+  { value: '1', label: 'I Year' },
+  { value: '2', label: 'II Year' },
+  { value: '3', label: 'III Year' },
+  { value: '4', label: 'Final Year' },
+]
+const targetYearLabel = (value) => TARGET_YEAR_OPTIONS.find(y => y.value === String(value))?.label || 'All Years'
+
+function TargetYearField({ value, onChange }) {
+  return (
+    <div>
+      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Target Year</label>
+      <select value={value} onChange={e => onChange(e.target.value)} className="collego-input">
+        <option value="">Select year</option>
+        {TARGET_YEAR_OPTIONS.map(y => <option key={y.value} value={y.value}>{y.label}</option>)}
+      </select>
+      <p className="text-[10px] text-slate-400 mt-1">Only students in this year will see it.</p>
+    </div>
+  )
+}
 
 function AttBadge({ pct }) {
   if (pct >= 75) return <Badge variant="success">{pct}%</Badge>
@@ -432,7 +452,7 @@ function StudentPerformanceTab({ data, loading }) {
 }
 
 // ─── Assignments Tab ─────────────────────────────────────────────────────────
-function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, maxMarks, setMaxMarks, onSubmit, assignments, loading, onDownload, showMsg }) {
+function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, maxMarks, setMaxMarks, targetYear, setTargetYear, onSubmit, assignments, loading, onDownload, showMsg }) {
   const fileRef = useRef(null)
   const [pendingFile, setPendingFile] = useState(null)
 
@@ -451,9 +471,10 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, m
         <div className="space-y-3">
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Assignment title" className="collego-input" /></div>
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="Assignment description..." className="collego-input resize-none" /></div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Due Date (optional)</label><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="collego-input" /></div>
             <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Maximum Marks</label><input type="number" min="1" value={maxMarks} onChange={e => setMaxMarks(e.target.value)} className="collego-input" /></div>
+            <TargetYearField value={targetYear} onChange={setTargetYear} />
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Attachment (optional)</label>
@@ -466,7 +487,7 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, m
             {pendingFile && <p className="text-[10px] text-slate-400 mt-1">Selected: {pendingFile.name}</p>}
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={handleCreate} disabled={loading || !title.trim()}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={handleCreate} disabled={loading || !title.trim() || !targetYear}>
           {loading ? (
             <span className="flex gap-1"><RefreshCw size={13} className="animate-spin" /> Creating...</span>
           ) : (
@@ -485,6 +506,7 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, m
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold text-slate-800">{a.title}</p>
                       <Badge variant="secondary">{a.maxMarks ?? 10} marks</Badge>
+                      <Badge variant="info">{targetYearLabel(a.targetYear)}</Badge>
                     </div>
                     <p className="text-xs text-slate-500 mt-1">{a.description}</p>
                   </div>
@@ -625,7 +647,7 @@ function SubmissionRow({ row, onGraded, onDownload, showMsg }) {
 }
 
 // ─── Materials Tab ───────────────────────────────────────────────────────────
-function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit, materials, loading, onDownload }) {
+function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, targetYear, setTargetYear, onSubmit, materials, loading, onDownload }) {
   const MATERIAL_TYPES = ['NOTES', 'SLIDES', 'REFERENCE', 'VIDEO', 'ASSIGNMENT', 'OTHER']
   const fileRef = useRef(null)
   const [pendingFile, setPendingFile] = useState(null)
@@ -645,11 +667,14 @@ function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit,
         <div className="space-y-3">
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Material title" className="collego-input" /></div>
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} placeholder="Description..." className="collego-input resize-none" /></div>
-          <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Type</label>
-            <select value={type} onChange={e => setType(e.target.value)} className="collego-input !w-48">
-              {MATERIAL_TYPES.map(t => <option key={t}>{t}</option>)}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Type</label>
+              <select value={type} onChange={e => setType(e.target.value)} className="collego-input">
+                {MATERIAL_TYPES.map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <TargetYearField value={targetYear} onChange={setTargetYear} />
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Attachment (optional)</label>
@@ -662,7 +687,7 @@ function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit,
             {pendingFile && <p className="text-[10px] text-slate-400 mt-1">Selected: {pendingFile.name}</p>}
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={handleCreate} disabled={loading || !title.trim()}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={handleCreate} disabled={loading || !title.trim() || !targetYear}>
           {loading ? (
             <span className="flex gap-1"><RefreshCw size={13} className="animate-spin" /> Adding...</span>
           ) : (
@@ -674,12 +699,13 @@ function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, onSubmit,
         <div className="glass-card overflow-hidden border border-white/60">
           <div className="overflow-x-auto">
             <table className="collego-table">
-              <thead><tr><th>Title</th><th>Type</th><th>Description</th><th style={{ textAlign: 'center' }}>File</th></tr></thead>
+              <thead><tr><th>Title</th><th>Type</th><th>Target Year</th><th>Description</th><th style={{ textAlign: 'center' }}>File</th></tr></thead>
               <tbody>
                 {materials.map(m => (
                   <tr key={m.id} className="hover:bg-white/30 transition-colors">
                     <td className="text-slate-800 font-medium">{m.title}</td>
                     <td><Badge variant="info">{m.materialType}</Badge></td>
+                    <td><Badge variant="secondary">{targetYearLabel(m.targetYear)}</Badge></td>
                     <td className="text-slate-500 text-xs max-w-xs truncate">{m.description || '—'}</td>
                     <td style={{ textAlign: 'center' }}>
                       {m.hasFile && (
@@ -749,7 +775,7 @@ function AnalyticsTab({ analytics, loading }) {
 }
 
 // ─── Question Papers Tab ─────────────────────────────────────────────────────
-function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fileName, setFileName, selectedSectionId, setSelectedSectionId, onSubmit, papers, loading, uploadFileLoading }) {
+function QuestionPapersTab({ sections, examType, setExamType, year, setYear, targetYear, setTargetYear, fileName, setFileName, selectedSectionId, setSelectedSectionId, onSubmit, papers, loading, uploadFileLoading }) {
   const [pendingFile, setPendingFile] = useState(null)
   const fileRef = useRef(null)
 
@@ -763,7 +789,7 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={FileText} title="Question Papers" subtitle="Upload question papers. They are published instantly to students in your department." accent="violet" image={uiImages.classroom} imageAlt="Classroom lecture" />
+      <PageTitle icon={FileText} title="Question Papers" subtitle="Upload question papers. They are published instantly to students in the selected year of your department." accent="violet" image={uiImages.classroom} imageAlt="Classroom lecture" />
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Upload size={14} className="text-blue-500" /> Upload Question Paper</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -780,8 +806,9 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
               {['END_TERM', 'MID_TERM', 'INTERNAL', 'QUIZ'].map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
+          <TargetYearField value={targetYear} onChange={setTargetYear} />
           <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Year</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Exam Year</label>
             <input type="number" value={year} onChange={e => setYear(e.target.value)} className="collego-input" min="2000" max="2100" />
           </div>
           <div>
@@ -800,7 +827,7 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
           />
           {pendingFile && <p className="text-[10px] text-slate-400 mt-1">Selected: {pendingFile.name}</p>}
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={handleSubmit} disabled={loading || uploadFileLoading || !selectedSectionId}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={handleSubmit} disabled={loading || uploadFileLoading || !selectedSectionId || !targetYear}>
           {loading || uploadFileLoading ? <><RefreshCw size={13} className="animate-spin" /> Uploading...</> : <><Upload size={13} /> Publish Question Paper</>}
         </Button>
       </div>
@@ -809,13 +836,14 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
           <div className="px-5 py-4 border-b border-white/50"><h3 className="text-sm font-semibold text-slate-800">My Uploaded Papers</h3></div>
           <div className="overflow-x-auto">
             <table className="collego-table">
-              <thead><tr><th>Course</th><th>Exam Type</th><th>Year</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
+              <thead><tr><th>Course</th><th>Exam Type</th><th>Exam Year</th><th>Target Year</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
               <tbody>
                 {papers.map(p => (
                   <tr key={p.id} className="hover:bg-white/30 transition-colors">
                     <td className="text-slate-800">{p.courseName}</td>
                     <td><Badge variant="info">{p.examType}</Badge></td>
                     <td className="text-slate-500">{p.year}</td>
+                    <td><Badge variant="secondary">{targetYearLabel(p.targetYear)}</Badge></td>
                     <td style={{ textAlign: 'center' }}>
                       <Badge variant={p.status === 'APPROVED' ? 'success' : p.status === 'REJECTED' ? 'destructive' : 'warning'}>{p.status || 'PENDING'}</Badge>
                     </td>
@@ -831,27 +859,30 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, fil
 }
 
 // ─── Notices Tab ─────────────────────────────────────────────────────────────
-function NoticesTab({ title, setTitle, message, setMessage, type, setType, departmentName, onSubmit, sentNotices, loading }) {
+function NoticesTab({ title, setTitle, message, setMessage, type, setType, targetYear, setTargetYear, departmentName, onSubmit, sentNotices, loading }) {
   const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'EXAM']
   return (
     <div className="space-y-6">
-      <PageTitle icon={Megaphone} title="Notices" subtitle="Send announcements to every student in your department." accent="amber" image={uiImages.placementTalk} imageAlt="Placement talk" />
+      <PageTitle icon={Megaphone} title="Notices" subtitle="Send announcements to students in a selected year of your department." accent="amber" image={uiImages.placementTalk} imageAlt="Placement talk" />
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2"><Megaphone size={14} className="text-amber-500" /> Department Notice</h3>
         <p className="text-xs text-slate-500 mb-5">
-          This notice will appear in the portal of every student in <span className="font-semibold text-slate-700">{departmentName}</span>.
+          This notice will appear only in the portal of students in the selected year of <span className="font-semibold text-slate-700">{departmentName}</span>.
         </p>
         <div className="space-y-3">
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Title</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Notice title" className="collego-input" /></div>
           <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Message</label><textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} placeholder="Notice message..." className="collego-input resize-none" /></div>
-          <div className="max-w-xs">
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Type</label>
-            <select value={type} onChange={e => setType(e.target.value)} className="collego-input">
-              {TYPE_OPTIONS.map(t => <option key={t}>{t}</option>)}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+            <div>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Type</label>
+              <select value={type} onChange={e => setType(e.target.value)} className="collego-input">
+                {TYPE_OPTIONS.map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <TargetYearField value={targetYear} onChange={setTargetYear} />
           </div>
         </div>
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim() || !message.trim()}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onSubmit} disabled={loading || !title.trim() || !message.trim() || !targetYear}>
           {loading ? <><RefreshCw size={13} className="animate-spin" /> Sending...</> : <><Send size={13} /> Send Notice</>}
         </Button>
       </div>
@@ -868,6 +899,7 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, depar
                   </div>
                   <div className="text-right shrink-0">
                     <Badge variant="info">{n.type}</Badge>
+                    <div className="mt-1"><Badge variant="secondary">{targetYearLabel(n.targetYear)}</Badge></div>
                     <p className="text-[10px] text-slate-400 mt-1">{n.recipientCount} recipients</p>
                   </div>
                 </div>
@@ -978,10 +1010,12 @@ export default function FacultyDashboard() {
   const [assignmentDesc, setAssignmentDesc] = useState('')
   const [assignmentDueDate, setAssignmentDueDate] = useState('')
   const [assignmentMaxMarks, setAssignmentMaxMarks] = useState(10)
+  const [assignmentTargetYear, setAssignmentTargetYear] = useState('')
   const [sectionAssignments, setSectionAssignments] = useState([])
   const [materialTitle, setMaterialTitle] = useState('')
   const [materialDesc, setMaterialDesc] = useState('')
   const [materialType, setMaterialType] = useState('NOTES')
+  const [materialTargetYear, setMaterialTargetYear] = useState('')
   const [sectionMaterials, setSectionMaterials] = useState([])
   const [uploadFileLoading, setUploadFileLoading] = useState(false)
   const [uploadFileType, setUploadFileType] = useState(null) // 'assignment' | 'material' | 'qp'
@@ -990,11 +1024,13 @@ export default function FacultyDashboard() {
   const [noticeTitle, setNoticeTitle] = useState('')
   const [noticeMessage, setNoticeMessage] = useState('')
   const [noticeType, setNoticeType] = useState('GENERAL')
+  const [noticeTargetYear, setNoticeTargetYear] = useState('')
   const [sentNotices, setSentNotices] = useState([])
 
   // Question Papers
   const [qpExamType, setQpExamType] = useState('END_TERM')
   const [qpYear, setQpYear] = useState(new Date().getFullYear())
+  const [qpTargetYear, setQpTargetYear] = useState('')
   const [qpFileName, setQpFileName] = useState('')
   const [qpSelectedSectionId, setQpSelectedSectionId] = useState('')
   const [myQuestionPapers, setMyQuestionPapers] = useState([])
@@ -1148,6 +1184,7 @@ export default function FacultyDashboard() {
         description: assignmentDesc,
         dueDate: assignmentDueDate || null,
         maxMarks: Number(assignmentMaxMarks) || 10,
+        targetYear: Number(assignmentTargetYear),
         fileName: null,
       })
       if (file) {
@@ -1178,6 +1215,7 @@ export default function FacultyDashboard() {
         title: materialTitle,
         description: materialDesc,
         materialType,
+        targetYear: Number(materialTargetYear),
         fileName: null,
       })
       if (file) {
@@ -1221,6 +1259,7 @@ export default function FacultyDashboard() {
         examType: qpExamType,
         year: parseInt(qpYear),
         semesterNumber: sec.semesterNumber,
+        targetYear: Number(qpTargetYear),
         fileName: qpFileName || `${sec.courseCode}_${qpExamType}_${qpYear}.pdf`,
       }
       if (file) {
@@ -1246,9 +1285,9 @@ export default function FacultyDashboard() {
   const handleDraftNotice = async () => {
     setLoading(true)
     try {
-      const res = await api.post('/api/faculty/notices', { title: noticeTitle, message: noticeMessage, type: noticeType })
-      showMsg(`Notice sent to ${res.data.recipientCount} students`)
-      setSentNotices(prev => [{ title: noticeTitle, message: noticeMessage, type: noticeType, recipientCount: res.data.recipientCount, sentAt: new Date().toISOString() }, ...prev])
+      const res = await api.post('/api/faculty/notices', { title: noticeTitle, message: noticeMessage, type: noticeType, targetYear: Number(noticeTargetYear) })
+      showMsg(`Notice sent to ${res.data.recipientCount} students in ${targetYearLabel(res.data.targetYear)}`)
+      setSentNotices(prev => [{ title: noticeTitle, message: noticeMessage, type: noticeType, targetYear: res.data.targetYear, recipientCount: res.data.recipientCount, sentAt: new Date().toISOString() }, ...prev])
       setNoticeTitle(''); setNoticeMessage('')
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to send notice', 'error') }
     finally { setLoading(false) }
@@ -1330,9 +1369,9 @@ export default function FacultyDashboard() {
       switch (activeTab) {
         case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
         case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} />
-        case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
+        case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} targetYear={qpTargetYear} setTargetYear={setQpTargetYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
         case 'facultyDirectory': return <FacultyDirectoryTab faculty={facultyDirectory} onDownload={handleDownload} accent="violet" />
-        case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} departmentName={facultyDepartmentName} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
+        case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} targetYear={noticeTargetYear} setTargetYear={setNoticeTargetYear} departmentName={facultyDepartmentName} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
         case 'settings': return <SettingsTab showMsg={showMsg} accent="violet" />
         case 'help': return <HelpTab accent="violet" />
         case 'invigilations': return <InvigilationsTab showMsg={showMsg} />
@@ -1345,8 +1384,8 @@ export default function FacultyDashboard() {
       case 'internalMarks': return <InternalMarksTab examName={examName} setExamName={setExamName} maxMarks={maxMarks} setMaxMarks={setMaxMarks} marksEntries={marksEntries} setMarksEntries={setMarksEntries} onSubmit={handleUploadInternalMarks} sectionMarks={sectionMarks} loading={loading} />
       case 'semesterMarks': return <SemesterMarksTab semMaxMarks={semMaxMarks} setSemMaxMarks={setSemMaxMarks} semMarksEntries={semMarksEntries} setSemMarksEntries={setSemMarksEntries} onSubmit={handleUploadSemesterMarks} loading={loading} />
       case 'studentPerformance': return <StudentPerformanceTab data={studentPerformance} loading={tabLoading} />
-      case 'assignments': return <AssignmentsTab title={assignmentTitle} setTitle={setAssignmentTitle} desc={assignmentDesc} setDesc={setAssignmentDesc} dueDate={assignmentDueDate} setDueDate={setAssignmentDueDate} maxMarks={assignmentMaxMarks} setMaxMarks={setAssignmentMaxMarks} onSubmit={handleCreateAssignment} assignments={sectionAssignments} loading={loading} onDownload={handleDownload} showMsg={showMsg} />
-      case 'materials': return <MaterialsTab title={materialTitle} setTitle={setMaterialTitle} desc={materialDesc} setDesc={setMaterialDesc} type={materialType} setType={setMaterialType} onSubmit={handleCreateMaterial} materials={sectionMaterials} loading={loading} onDownload={handleDownload} />
+      case 'assignments': return <AssignmentsTab title={assignmentTitle} setTitle={setAssignmentTitle} desc={assignmentDesc} setDesc={setAssignmentDesc} dueDate={assignmentDueDate} setDueDate={setAssignmentDueDate} maxMarks={assignmentMaxMarks} setMaxMarks={setAssignmentMaxMarks} targetYear={assignmentTargetYear} setTargetYear={setAssignmentTargetYear} onSubmit={handleCreateAssignment} assignments={sectionAssignments} loading={loading} onDownload={handleDownload} showMsg={showMsg} />
+      case 'materials': return <MaterialsTab title={materialTitle} setTitle={setMaterialTitle} desc={materialDesc} setDesc={setMaterialDesc} type={materialType} setType={setMaterialType} targetYear={materialTargetYear} setTargetYear={setMaterialTargetYear} onSubmit={handleCreateMaterial} materials={sectionMaterials} loading={loading} onDownload={handleDownload} />
       case 'analytics': return <AnalyticsTab analytics={analytics} loading={tabLoading} />
       default: return null
     }

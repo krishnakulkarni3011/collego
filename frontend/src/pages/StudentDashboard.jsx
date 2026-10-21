@@ -495,7 +495,7 @@ function AssignmentsTab({ assignments = [], loading, onSubmit, onDownload }) {
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={BookOpen} title="Assignments" subtitle="Assignments shared with your department. Submit work for your enrolled subjects." accent="amber"
+      <PageTitle icon={BookOpen} title="Assignments" subtitle="Assignments shared with your department and academic year. Submit work for your enrolled subjects." accent="amber"
         image={uiImages.groupStudy} imageAlt="Students collaborating"
         actions={list.length > 0 ? <Badge variant={pending ? 'warning' : 'success'}>{pending ? `${pending} pending` : 'No pending work'}</Badge> : undefined} />
       {loading ? (
@@ -615,7 +615,7 @@ function MaterialsTab({ materials = [], loading, onDownload }) {
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={FolderOpen} title="Study Materials" subtitle="Notes, slides and references shared with everyone in your department." accent="blue" image={uiImages.library} imageAlt="Students studying in the library" />
+      <PageTitle icon={FolderOpen} title="Study Materials" subtitle="Notes, slides and references shared with your department and academic year." accent="blue" image={uiImages.library} imageAlt="Students studying in the library" />
       {loading ? (
         <div className="flex items-center justify-center py-16"><Spinner color="blue" /></div>
       ) : list.length === 0 ? (
@@ -657,7 +657,7 @@ function MaterialsTab({ materials = [], loading, onDownload }) {
 function QuestionPapersTab({ papers, onDownload }) {
   return (
     <div className="space-y-6">
-      <PageTitle icon={FileText} title="Question Papers" subtitle="Previous and current question papers published by your department faculty." accent="violet" image={uiImages.classroom} imageAlt="Classroom lecture" />
+      <PageTitle icon={FileText} title="Question Papers" subtitle="Previous and current question papers published for your department and academic year." accent="violet" image={uiImages.classroom} imageAlt="Classroom lecture" />
       {(!papers || papers.length === 0) ? (
         <div className="glass-card p-12 border border-white/60">
           <EmptyState icon={FileText} title="No question papers yet" accent="violet" description="Papers uploaded by your department faculty will appear here." />

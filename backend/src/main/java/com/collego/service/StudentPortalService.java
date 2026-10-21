@@ -5,6 +5,7 @@ import com.collego.entity.*;
 import com.collego.exception.BadRequestException;
 import com.collego.exception.ResourceNotFoundException;
 import com.collego.repository.*;
+import com.collego.util.AcademicYearUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -324,11 +325,14 @@ public class StudentPortalService {
 
     // ==================== Question Papers ====================
 
-    /** Approved question papers uploaded by faculty in the student's department. */
+    /** Approved question papers uploaded by faculty in the student's department and year. */
     public List<QuestionPaperResponse> getQuestionPapers(String email) {
         StudentProfile student = getStudentByEmail(email);
         if (student.getDepartment() == null) return List.of();
-        return questionPaperService.search(null, student.getDepartment().getId(), null, null, null);
+        return questionPaperService.search(null, student.getDepartment().getId(), null, null, null)
+                .stream()
+                .filter(qp -> isTargetedToStudent(student, qp.getTargetYear()))
+                .collect(Collectors.toList());
     }
 
     public byte[] downloadQuestionPaper(String email, Long questionPaperId) throws IOException {
@@ -339,7 +343,8 @@ public class StudentPortalService {
         boolean visible = questionPaperService
                 .search(null, student.getDepartment().getId(), null, null, null)
                 .stream()
-                .anyMatch(qp -> qp.getId().equals(questionPaperId));
+                .anyMatch(qp -> qp.getId().equals(questionPaperId)
+                        && isTargetedToStudent(student, qp.getTargetYear()));
         if (!visible) {
             throw new ResourceNotFoundException("Question paper not found: " + questionPaperId);
         }
@@ -439,7 +444,9 @@ public class StudentPortalService {
                 .findByStudentId(student.getId()).stream()
                 .collect(Collectors.toMap(s -> s.getAssignment().getId(), s -> s, (a, b) -> a));
 
-        return assignmentRepository.findByDepartmentId(student.getDepartment().getId()).stream()
+        Integer studentYear = getStudentYear(student);
+        return assignmentRepository.findByDepartmentIdAndTargetYear(
+                        student.getDepartment().getId(), studentYear != null ? studentYear : -1).stream()
                 .map(a -> {
                     AssignmentSubmission sub = mySubmissions.get(a.getId());
                     return AssignmentResponse.builder()
@@ -454,6 +461,7 @@ public class StudentPortalService {
                             .hasFile(a.getFilePath() != null && !a.getFilePath().isBlank())
                             .createdAt(a.getCreatedAt())
                             .maxMarks(a.getMaxMarks() != null ? a.getMaxMarks() : 10)
+                            .targetYear(a.getTargetYear())
                             .submissionId(sub != null ? sub.getId() : null)
                             .submissionStatus(sub != null && sub.getStatus() != null ? sub.getStatus().name() : null)
                             .marks(sub != null ? sub.getMarks() : null)
@@ -476,6 +484,10 @@ public class StudentPortalService {
         StudentProfile student = getStudentByEmail(email);
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
+
+        if (!isTargetedToStudent(student, assignment.getTargetYear())) {
+            throw new BadRequestException("This assignment is not available for your academic year.");
+        }
 
         boolean enrolled = enrollmentRepository.existsByStudentIdAndSectionId(
                 student.getId(), assignment.getSection().getId());
@@ -599,8 +611,9 @@ public class StudentPortalService {
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
 
-        if (!isInStudentDepartment(student, assignment.getSection())) {
-            throw new BadRequestException("This assignment is not available in your department.");
+        if (!isInStudentDepartment(student, assignment.getSection())
+                || !isTargetedToStudent(student, assignment.getTargetYear())) {
+            throw new BadRequestException("This assignment is not available in your department or academic year.");
         }
 
         if (assignment.getFilePath() == null || assignment.getFilePath().isBlank()) {
@@ -619,7 +632,9 @@ public class StudentPortalService {
         StudentProfile student = getStudentByEmail(email);
         if (student.getDepartment() == null) return List.of();
 
-        return courseMaterialRepository.findByDepartmentId(student.getDepartment().getId()).stream()
+        Integer studentYear = getStudentYear(student);
+        return courseMaterialRepository.findByDepartmentIdAndTargetYear(
+                        student.getDepartment().getId(), studentYear != null ? studentYear : -1).stream()
                 .map(m -> CourseMaterialResponse.builder()
                         .id(m.getId())
                         .sectionId(m.getSection().getId())
@@ -630,6 +645,7 @@ public class StudentPortalService {
                         .materialType(m.getMaterialType())
                         .fileName(m.getFileName())
                         .hasFile(m.getFilePath() != null && !m.getFilePath().isBlank())
+                        .targetYear(m.getTargetYear())
                         .createdAt(m.getCreatedAt())
                         .build())
                 .collect(Collectors.toList());
@@ -644,8 +660,9 @@ public class StudentPortalService {
         CourseMaterial material = courseMaterialRepository.findById(materialId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course material not found: " + materialId));
 
-        if (!isInStudentDepartment(student, material.getSection())) {
-            throw new BadRequestException("This course material is not available in your department.");
+        if (!isInStudentDepartment(student, material.getSection())
+                || !isTargetedToStudent(student, material.getTargetYear())) {
+            throw new BadRequestException("This course material is not available in your department or academic year.");
         }
 
         if (material.getFilePath() == null || material.getFilePath().isBlank()) {
@@ -662,6 +679,15 @@ public class StudentPortalService {
         }
         return Objects.equals(student.getDepartment().getId(),
                 section.getCourse().getDepartment().getId());
+    }
+
+    /** True when a resource is either legacy (all years) or targeted at the student's year. */
+    private boolean isTargetedToStudent(StudentProfile student, Integer targetYear) {
+        return targetYear == null || Objects.equals(targetYear, getStudentYear(student));
+    }
+
+    private Integer getStudentYear(StudentProfile student) {
+        return AcademicYearUtils.fromSemester(student.getSemester());
     }
 
     // ==================== Helpers ====================

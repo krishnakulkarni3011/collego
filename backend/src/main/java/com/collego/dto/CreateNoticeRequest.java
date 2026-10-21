@@ -20,4 +20,7 @@ public class CreateNoticeRequest {
     /** Kept for API compatibility. Notices are always sent to the faculty's department. */
     private Long departmentId;
 
+    /** 1 = I Year, 2 = II Year, 3 = III Year, 4 = Final Year. */
+    private Integer targetYear;
+
 }
