@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import heroImg from '../../assets/hero.png'
+import welcomeCampus from '../../assets/ui/welcome-campus.webp'
 
 // ─── Premium accent token sets (per portal) ────────────────────────────────────
 export const ACCENTS = {
@@ -585,7 +586,7 @@ export function WelcomeBanner({ greeting, name, subtitle, quote, accent = 'indig
       style={{ background: a.banner }}
     >
       <div className="relative z-10 flex items-center justify-between gap-4 p-7 md:p-8">
-        <div className="max-w-xl">
+        <div className="max-w-full sm:max-w-[60%] xl:max-w-xl">
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight">
             {greeting}, {name} <span className="text-slate-400">👋</span>
           </h1>
@@ -597,9 +598,9 @@ export function WelcomeBanner({ greeting, name, subtitle, quote, accent = 'indig
             {quote && <p className="text-xs text-slate-500 italic">“{quote}”</p>}
           </div>
         </div>
-        <div className="absolute right-0 top-0 h-full w-64 md:w-80 pointer-events-none">
-          <div className={cn('absolute -right-10 -top-10 w-56 h-56 rounded-full blur-3xl opacity-40 bg-gradient-to-br', a.grad)} />
-          <img src={heroImg} alt="Campus" className="absolute right-4 md:right-8 bottom-0 h-[88%] object-contain drop-shadow-2xl opacity-90" />
+        <div className="pointer-events-none absolute right-0 top-0 hidden h-full w-[38%] max-w-[560px] sm:block lg:w-[42%]">
+          <div className={cn('absolute -right-10 -top-10 w-56 h-56 rounded-full blur-3xl opacity-30 bg-gradient-to-br', a.grad)} />
+          <FadedImage src={welcomeCampus} alt="College campus" className="absolute inset-0 h-full w-full opacity-95" fade={16} />
         </div>
       </div>
     </motion.div>
