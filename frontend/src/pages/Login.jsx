@@ -3,13 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, ChevronRight, ChevronLeft, Eye, EyeOff,
-  Mail, Lock, AlertCircle, CheckCircle2, Sparkles,
-  Shield, BookOpen, BarChart3, Zap, RefreshCw,
-  User, IdCard, HelpCircle
+  Mail, Lock, AlertCircle, CheckCircle2,
+  Shield, BookOpen, RefreshCw,
+  IdCard, HelpCircle
 } from 'lucide-react'
 import { authService } from '../services/authService'
 import { cn } from '../lib/utils'
-import hero from '../assets/hero.png'
 import { Button } from '../components/ui/button'
 
 const ROLES = [
@@ -164,99 +163,32 @@ export default function Login() {
   const progress = step === 'role' ? 50 : 100
 
   return (
-    <div className="min-h-screen flex portal-bg relative overflow-hidden">
+    <div className="min-h-screen flex flex-col portal-bg relative overflow-x-hidden">
       <div className="bg-mesh" />
       <Particles />
 
-      {/* Left Panel (feature showcase) */}
-      <div className="hidden lg:flex lg:w-[47%] xl:w-1/2 flex-col relative overflow-hidden z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-violet-50 to-cyan-50" />
-        <div className="absolute top-0 left-0 w-72 h-72 bg-indigo-200/50 rounded-full blur-[100px] -translate-x-1/3 -translate-y-1/3" />
-        <div className="absolute bottom-0 right-0 w-80 h-80 bg-violet-200/50 rounded-full blur-[100px] translate-x-1/4 translate-y-1/4" />
-
-        <div className="relative flex flex-col h-full p-12 lg:p-16">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/25">
-              <GraduationCap size={24} className="text-white" />
-            </div>
-            <div>
-              <p className="text-lg xl:text-xl font-extrabold text-slate-900 tracking-wide">COLLEGO</p>
-              <p className="text-[10px] text-slate-400 tracking-[0.2em] uppercase font-semibold">AI College ERP</p>
-            </div>
+      {/* Brand header */}
+      <header className="relative z-10 flex flex-col items-center text-center px-6 pt-10 pb-8 lg:pt-14">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/25">
+            <GraduationCap size={24} className="text-white" />
           </div>
-
-          <div className="flex-1 flex flex-col justify-center max-w-xl">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.7 }}
-            >
-              <h1 className="text-4xl xl:text-5xl font-extrabold text-slate-900 leading-[1.1] mb-5">
-                The future of{' '}
-                <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-500 bg-clip-text text-transparent">
-                  college management
-                </span>
-              </h1>
-              <p className="text-slate-500 text-base leading-relaxed mb-8 max-w-md">
-                AI-powered ERP system for modern educational institutions. From attendance to placement — everything in one unified, intelligent platform.
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.25, duration: 0.7 }}
-              className="hidden xl:block mb-10 rounded-[2rem] overflow-hidden border border-white shadow-2xl shadow-indigo-500/10"
-            >
-              <img src={hero} alt="Campus" className="w-full h-44 xl:h-52 object-cover" />
-            </motion.div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { icon: Sparkles, title: 'AI Insights', desc: 'Prediction & risk detection', color: 'text-violet-600', bg: 'bg-violet-100' },
-                { icon: BarChart3, title: 'Real-time Analytics', desc: 'Attendance, marks, placements', color: 'text-indigo-600', bg: 'bg-indigo-100' },
-                { icon: Zap, title: 'Instant Operations', desc: 'Bulk uploads & PDF generation', color: 'text-amber-600', bg: 'bg-amber-100' },
-                { icon: Shield, title: 'Secure RBAC', desc: 'Role-based access control', color: 'text-emerald-600', bg: 'bg-emerald-100' },
-              ].map((f, i) => {
-                const Icon = f.icon
-                return (
-                  <motion.div
-                    key={f.title}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.35 + i * 0.08, duration: 0.5 }}
-                    className="flex items-start gap-3 p-4 rounded-[1.2rem] border border-white/80 bg-white/70 backdrop-blur-md shadow-sm group hover:shadow-md transition-shadow"
-                  >
-                    <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center shrink-0', f.bg)}>
-                      <Icon size={15} className={f.color} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-slate-800">{f.title}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">{f.desc}</p>
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="mt-8">
-            <p className="text-xs text-slate-400">© {new Date().getFullYear()} Collego · AI-Powered College ERP</p>
+          <div className="text-left">
+            <p className="text-xl lg:text-2xl font-extrabold text-slate-900 tracking-wide">COLLEGO</p>
+            <p className="text-[10px] text-slate-400 tracking-[0.2em] uppercase font-semibold">AI College ERP</p>
           </div>
         </div>
-      </div>
+        <h1 className="mt-5 text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
+          The future of{' '}
+          <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-500 bg-clip-text text-transparent">
+            college management
+          </span>
+        </h1>
+      </header>
 
-      {/* Right Panel (login form) */}
-      <div className="flex-1 flex items-center justify-center p-6 relative z-10">
+      {/* Centered sign-in */}
+      <main className="relative z-10 flex-1 flex items-center justify-center px-6 pb-10">
         <div className="w-full max-w-[440px]">
-
-          <div className="flex lg:hidden items-center gap-3 justify-center mb-10">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/25">
-              <GraduationCap size={24} className="text-white" />
-            </div>
-            <p className="text-xl font-extrabold text-slate-900">COLLEGO</p>
-          </div>
-
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -651,7 +583,7 @@ export default function Login() {
             © {new Date().getFullYear()} Collego · AI-Powered College ERP
           </p>
         </div>
-      </div>
+      </main>
     </div>
   )
 }
