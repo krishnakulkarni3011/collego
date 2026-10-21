@@ -1233,7 +1233,8 @@ export default function FacultyDashboard() {
       showMsg('Question paper published to your department')
       setQpFileName(''); loadMyQPs()
     } catch (err) {
-      showMsg(err.response?.data?.message || 'Failed to upload question paper', 'error')
+      const message = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to upload question paper'
+      showMsg(message, 'error')
       throw err
     } finally { setLoading(false) }
   }

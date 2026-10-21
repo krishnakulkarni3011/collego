@@ -1410,7 +1410,7 @@ export default function AdminDashboard() {
     const fd = new FormData()
     fd.append('file', file)
     try {
-      await api.post(`/api/admin/faculty/${facultyProfileId}/resume`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      await api.post(`/api/admin/faculty/${facultyProfileId}/resume`, fd)
       showMsg('Faculty resume uploaded')
       await loadUsers()
       await loadAll()
@@ -1428,7 +1428,7 @@ export default function AdminDashboard() {
     })
     if (file) fd.append('file', file)
     try {
-      await api.post('/api/placement/notices', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      await api.post('/api/placement/notices', fd)
       showMsg('Upcoming placement created')
       await loadAll()
       return true
@@ -1452,7 +1452,7 @@ export default function AdminDashboard() {
     const fd = new FormData(); fd.append('file', file)
     setLoading(true)
     try {
-      const res = await api.post('/api/admin/users/import', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const res = await api.post('/api/admin/users/import', fd)
       setImportResult(res.data)
       loadUsers()
       loadAll()

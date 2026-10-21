@@ -2,11 +2,11 @@ import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
+// Do not set a global Content-Type here. Axios automatically sends
+// application/json for objects and multipart/form-data with the correct
+// boundary for FormData uploads (question papers, materials, resumes, etc.).
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 // Request interceptor - attach JWT token
