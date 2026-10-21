@@ -69,6 +69,8 @@ public class AiChatOrchestrator {
         scopeInfo.put("role", scope.role() == null ? "UNKNOWN" : scope.role().name());
         scopeInfo.put("scope", scope.describe());
 
+        boolean serviceUnavailable = false;
+
         for (int round = 0; round <= Math.max(0, maxToolRounds); round++) {
             boolean finalRound = round >= maxToolRounds;
             Map<String, Object> response = aiService.chatWithTools(
@@ -81,6 +83,8 @@ public class AiChatOrchestrator {
                     scopeInfo);
 
             if (response == null || response.containsKey("error")) {
+                // The ai-service is unreachable — do not call it again below.
+                serviceUnavailable = true;
                 break;
             }
 
@@ -105,6 +109,11 @@ public class AiChatOrchestrator {
         }
 
         // Deterministic fallback: model unreachable, timed out, or gave nothing usable.
+        if (serviceUnavailable) {
+            audit.chat(scope, false);
+            return reply("The AI assistant is temporarily unavailable. Please try again in a moment.", null);
+        }
+
         Map<String, Object> fallback = aiService.chat(safeMessage, history, context);
         audit.chat(scope, false);
         Object fallbackReply = fallback.get("reply");
