@@ -26,6 +26,7 @@ import {
   WelcomeBanner, ChartTooltip, EmptyState, Spinner, ACCENTS, FadedImage, ImageStrip,
 } from '../components/dashboard/PortalUI'
 import { uiImages } from '../assets/uiImages'
+import welcomeFaculty from '../assets/ui/welcome-faculty.webp'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
@@ -105,6 +106,7 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
         subtitle="Here's a summary of your teaching assignments and recent activity."
         quote="Teaching is the profession that creates all other professions"
         accent="violet"
+        image={welcomeFaculty}
       />
 
       {overviewData && (

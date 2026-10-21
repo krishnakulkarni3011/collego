@@ -28,6 +28,7 @@ import {
   WelcomeBanner, ChartTooltip, EmptyState, Spinner, ImageStrip,
 } from '../components/dashboard/PortalUI'
 import { uiImages } from '../assets/uiImages'
+import welcomeStudent from '../assets/ui/welcome-student.webp'
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 const fmtNum = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
@@ -148,6 +149,7 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
         subtitle={`${profile?.enrollmentNumber || ''} · ${profile?.departmentName || ''} · Semester ${profile?.currentSemester || ''} · Section ${profile?.section || ''}`}
         quote="Every class attended is a step closer to your goal"
         accent="emerald"
+        image={welcomeStudent}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">

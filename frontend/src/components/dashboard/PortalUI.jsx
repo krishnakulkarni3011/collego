@@ -575,7 +575,7 @@ export function PortalTopbar({
 }
 
 // ─── Welcome banner (premium) ──────────────────────────────────────────────────
-export function WelcomeBanner({ greeting, name, subtitle, quote, accent = 'indigo' }) {
+export function WelcomeBanner({ greeting, name, subtitle, quote, accent = 'indigo', image = welcomeCampus }) {
   const a = ACCENTS[accent] || ACCENTS.indigo
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   return (
@@ -600,7 +600,7 @@ export function WelcomeBanner({ greeting, name, subtitle, quote, accent = 'indig
         </div>
         <div className="pointer-events-none absolute right-0 top-0 hidden h-full w-[38%] max-w-[560px] sm:block lg:w-[42%]">
           <div className={cn('absolute -right-10 -top-10 w-56 h-56 rounded-full blur-3xl opacity-30 bg-gradient-to-br', a.grad)} />
-          <FadedImage src={welcomeCampus} alt="College campus" className="absolute inset-0 h-full w-full opacity-95" fade={16} />
+          <FadedImage src={image} alt="College campus" className="absolute inset-0 h-full w-full opacity-95" fade={16} />
         </div>
       </div>
     </motion.div>
