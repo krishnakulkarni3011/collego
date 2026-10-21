@@ -39,7 +39,6 @@ public class AcademicDataSeeder implements CommandLineRunner {
     private final AttendanceRepository attendanceRepository;
     private final InternalMarksRepository internalMarksRepository;
     private final SemesterMarksRepository semesterMarksRepository;
-    private final NotificationRepository notificationRepository;
     private final AdminProfileRepository adminProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
@@ -61,6 +60,25 @@ public class AcademicDataSeeder implements CommandLineRunner {
     private static final String LEGACY_SEEDED_PLACEMENTS_SQL =
             "DELETE FROM placement_notices WHERE drive_date IS NULL AND attachment_path IS NULL "
                     + "AND company_name IN ('Google', 'Goldman Sachs', 'Amazon', 'Microsoft', 'Cisco')";
+
+    /**
+     * Sample notifications created by earlier versions of this seeder. They are
+     * removed on startup so student/admin portals only show notices that were
+     * actually sent through the application.
+     */
+    private static final String SEEDED_NOTIFICATIONS_SQL =
+            "DELETE FROM notifications WHERE "
+                    + "(title = ? AND message = ?) OR "
+                    + "(title = ? AND message = ?) OR "
+                    + "(title = ? AND message = ?) OR "
+                    + "(title = ? AND message = ?)";
+
+    private static final String[][] SEEDED_NOTIFICATIONS = {
+            {"Welcome to New Semester!", "Your semester classes have started. Check your timetable for schedule details."},
+            {"IA-1 Marks Published", "Internal Assessment 1 marks have been published. Check your marks section."},
+            {"New Placement Drive", "A new placement drive has been announced. Check placement notices for details."},
+            {"Library Book Due", "You have library books due for return. Please return them to avoid fines."}
+    };
 
     private final Random random = new Random(42); // Fixed seed for reproducibility
 
@@ -172,6 +190,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         cleanupLegacySeededPlacementNotices();
+        cleanupSeededNotifications();
         if (isSeedUpToDate()) {
             log.info("Academic seed data is up to date (7 faculty, 120 students, 8 semesters). Skipping seed.");
             return;
@@ -228,6 +247,22 @@ public class AcademicDataSeeder implements CommandLineRunner {
             }
         } catch (Exception e) {
             log.debug("Legacy placement cleanup skipped: {}", e.getMessage());
+        }
+    }
+
+    private void cleanupSeededNotifications() {
+        try {
+            Object[] args = new Object[SEEDED_NOTIFICATIONS.length * 2];
+            for (int i = 0; i < SEEDED_NOTIFICATIONS.length; i++) {
+                args[i * 2] = SEEDED_NOTIFICATIONS[i][0];
+                args[i * 2 + 1] = SEEDED_NOTIFICATIONS[i][1];
+            }
+            int removed = jdbcTemplate.update(SEEDED_NOTIFICATIONS_SQL, args);
+            if (removed > 0) {
+                log.info("Removed {} seeded notification(s).", removed);
+            }
+        } catch (Exception e) {
+            log.debug("Seeded notification cleanup skipped: {}", e.getMessage());
         }
     }
 
@@ -629,16 +664,6 @@ public class AcademicDataSeeder implements CommandLineRunner {
             seedSemesterMarks(sections, sectionAStudents, sectionBStudents);
         }
 
-        // Seed notifications
-        for (List<StudentProfile> yearStudents : studentsByYear.values()) {
-            List<StudentProfile> sectionAStudents = new ArrayList<>();
-            List<StudentProfile> sectionBStudents = new ArrayList<>();
-            for (StudentProfile s : yearStudents) {
-                if (s.getSection().equals("A")) sectionAStudents.add(s);
-                else sectionBStudents.add(s);
-            }
-            seedNotifications(sectionAStudents, sectionBStudents);
-        }
     }
 
     private void seedAttendance(List<Section> sections, List<StudentProfile> sectionA, List<StudentProfile> sectionB) {
@@ -719,37 +744,6 @@ public class AcademicDataSeeder implements CommandLineRunner {
                         .gradePoints(gradePoints)
                         .build();
                 semesterMarksRepository.save(marks);
-            }
-        }
-    }
-
-    private void seedNotifications(List<StudentProfile> sectionA, List<StudentProfile> sectionB) {
-        List<StudentProfile> allStudents = new ArrayList<>();
-        allStudents.addAll(sectionA);
-        allStudents.addAll(sectionB);
-
-        String[][] notifications = {
-                {"Welcome to New Semester!", "Your semester classes have started. Check your timetable for schedule details.", "ACADEMIC"},
-                {"IA-1 Marks Published", "Internal Assessment 1 marks have been published. Check your marks section.", "ACADEMIC"},
-                {"New Placement Drive", "A new placement drive has been announced. Check placement notices for details.", "PLACEMENT"},
-                {"Library Book Due", "You have library books due for return. Please return them to avoid fines.", "GENERAL"}
-        };
-
-        for (StudentProfile student : allStudents) {
-            int numNotifications = 3 + random.nextInt(3);
-            List<String[]> shuffled = new ArrayList<>(Arrays.asList(notifications));
-            Collections.shuffle(shuffled, random);
-
-            for (int i = 0; i < Math.min(numNotifications, shuffled.size()); i++) {
-                String[] notif = shuffled.get(i);
-                Notification notification = Notification.builder()
-                        .user(student.getUser())
-                        .title(notif[0])
-                        .message(notif[1])
-                        .type(NotificationType.valueOf(notif[2]))
-                        .isRead(random.nextBoolean())
-                        .build();
-                notificationRepository.save(notification);
             }
         }
     }
