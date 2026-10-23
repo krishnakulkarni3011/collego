@@ -17,7 +17,7 @@ import { downloadFile } from '../lib/download'
 import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
 import { InvigilationsTab } from '../components/dashboard/InvigilationsTab'
-import { FacultyDirectoryTab } from '../components/dashboard/FacultyDirectoryTab'
+import { CareerProfileTab } from '../components/dashboard/CareerProfileTab'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -74,12 +74,17 @@ const GLOBAL_NAV = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'subjectAssignments', label: 'My Subject Assignments', icon: BookUser },
   { id: 'questionPapers', label: 'Question Papers', icon: FileText },
-  { id: 'facultyDirectory', label: 'Faculty Directory', icon: Users },
+  { id: 'careerProfile', label: 'Career Profile', icon: Users },
   { id: 'invigilations', label: 'Invigilation Duties', icon: CalendarDays },
   { id: 'notices', label: 'Notices', icon: Megaphone },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'help', label: 'Help & Support', icon: HelpCircle },
 ]
+
+const NAV_CATEGORY = {
+  notices: 'NOTICE',
+  invigilations: 'INVIGILATION',
+}
 
 const SECTION_TABS = [
   { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
@@ -989,11 +994,11 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, tar
 }
 
 // ─── Notices Tab ─────────────────────────────────────────────────────────────
-function NoticesTab({ title, setTitle, message, setMessage, type, setType, targetYear, setTargetYear, departmentName, onSubmit, sentNotices, loading }) {
+function NoticesTab({ title, setTitle, message, setMessage, type, setType, targetYear, setTargetYear, departmentName, onSubmit, sentNotices, loading, inbox = [] }) {
   const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'EXAM']
   return (
     <div className="space-y-6">
-      <PageTitle icon={Megaphone} title="Notices" subtitle="Send announcements to students in a selected year of your department." accent="amber" image={uiImages.placementTalk} imageAlt="Placement talk" />
+      <PageTitle icon={Megaphone} title="Notices" subtitle="Send announcements to students in a selected year of your department and read messages sent to you." accent="amber" image={uiImages.placementTalk} imageAlt="Placement talk" />
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2"><Megaphone size={14} className="text-amber-500" /> Department Notice</h3>
         <p className="text-xs text-slate-500 mb-5">
@@ -1016,6 +1021,30 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, targe
           {loading ? <><RefreshCw size={13} className="animate-spin" /> Sending...</> : <><Send size={13} /> Send Notice</>}
         </Button>
       </div>
+      {inbox.length > 0 && (
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="px-5 py-4 border-b border-white/50 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-800">Inbox</h3>
+            <Badge variant="secondary">{inbox.filter(n => !n.read).length} unread</Badge>
+          </div>
+          <div className="divide-y divide-white/30">
+            {inbox.map(n => (
+              <div key={n.id} className="px-5 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{n.title}</p>
+                    <p className="text-xs text-slate-500 mt-1">{n.message}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <Badge variant={n.read ? 'secondary' : 'info'}>{n.read ? 'Read' : 'New'}</Badge>
+                    <p className="text-[10px] text-slate-400 mt-1">{timeAgo(n.createdAt)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {sentNotices.length > 0 && (
         <div className="glass-card overflow-hidden border border-white/60">
           <div className="px-5 py-4 border-b border-white/50"><h3 className="text-sm font-semibold text-slate-800">Sent Notices</h3></div>
@@ -1203,7 +1232,10 @@ export default function FacultyDashboard() {
   const [qpFileName, setQpFileName] = useState('')
   const [qpSelectedSectionId, setQpSelectedSectionId] = useState('')
   const [myQuestionPapers, setMyQuestionPapers] = useState([])
-  const [facultyDirectory, setFacultyDirectory] = useState([])
+  const [careerProfile, setCareerProfile] = useState(null)
+  const [careerLoading, setCareerLoading] = useState(false)
+  const [unreadCounts, setUnreadCounts] = useState({})
+  const [notifications, setNotifications] = useState([])
 
   // Analytics
   const [analytics, setAnalytics] = useState(null)
@@ -1233,6 +1265,21 @@ export default function FacultyDashboard() {
     fetchSections()
   }, [fetchSections])
 
+  const loadNotifications = useCallback(async () => {
+    try {
+      const [countsRes, notifRes] = await Promise.all([
+        api.get('/api/faculty/notifications/unread-counts'),
+        api.get('/api/faculty/notifications'),
+      ])
+      setUnreadCounts(countsRes.data || {})
+      setNotifications(Array.isArray(notifRes.data) ? notifRes.data : [])
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => {
+    loadNotifications()
+  }, [loadNotifications])
+
   useEffect(() => {
     if (activeTab === 'overview' && sections.length > 0) {
       setOverviewData({
@@ -1255,14 +1302,48 @@ export default function FacultyDashboard() {
     setSelectedSection(null)
     setActiveTab(tabId)
     if (tabId === 'questionPapers') loadMyQPs()
-    if (tabId === 'facultyDirectory') loadFacultyDirectory()
+    if (tabId === 'careerProfile') loadCareerProfile()
+    if (tabId === 'notices' || tabId === 'invigilations') markNavRead(tabId)
   }
 
-  const loadFacultyDirectory = async () => {
+  const loadCareerProfile = async () => {
+    setCareerLoading(true)
     try {
-      const res = await api.get('/api/faculty-directory')
-      setFacultyDirectory(Array.isArray(res.data) ? res.data : [])
-    } catch { showMsg('Failed to load faculty directory', 'error') }
+      const res = await api.get('/api/faculty/career-profile')
+      setCareerProfile(res.data)
+    } catch { showMsg('Failed to load your career profile', 'error') }
+    finally { setCareerLoading(false) }
+  }
+
+  const handleUploadCareerResume = async (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    try {
+      const res = await api.post('/api/faculty/career-profile/resume', fd)
+      setCareerProfile(res.data)
+      showMsg('Resume submitted — waiting for admin approval')
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to upload resume', 'error')
+      throw err
+    }
+  }
+
+  const handleRemoveCareerResume = async () => {
+    try {
+      const res = await api.delete('/api/faculty/career-profile/resume')
+      setCareerProfile(res.data)
+      showMsg('Resume removed')
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to remove resume', 'error')
+    }
+  }
+
+  const markNavRead = async (tabId) => {
+    const category = NAV_CATEGORY[tabId]
+    if (!category || !unreadCounts[category]) return
+    setUnreadCounts(prev => ({ ...prev, [category]: 0 }))
+    setNotifications(prev => prev.map(n => (n.category === category ? { ...n, read: true } : n)))
+    try { await api.post(`/api/faculty/notifications/categories/${category}/read`) } catch { /* optimistic */ }
   }
 
   const handleSectionSelect = (section) => {
@@ -1639,7 +1720,12 @@ export default function FacultyDashboard() {
   }, [activeTab])
 
   const navSections = [
-    { items: GLOBAL_NAV },
+    {
+      items: GLOBAL_NAV.map(item => ({
+        ...item,
+        badge: NAV_CATEGORY[item.id] ? (unreadCounts[NAV_CATEGORY[item.id]] || 0) : 0,
+      })),
+    },
     {
       title: 'My Sections',
       items: sections.map(sec => ({ id: `section-${sec.sectionId}`, label: sec.courseName, icon: Layers, meta: `Sec ${sec.sectionName} · ${targetYearLabel(sec.year)}` })),
@@ -1662,8 +1748,8 @@ export default function FacultyDashboard() {
         case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
         case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} />
         case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} targetYear={qpTargetYear} setTargetYear={setQpTargetYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
-        case 'facultyDirectory': return <FacultyDirectoryTab faculty={facultyDirectory} onDownload={handleDownload} accent="violet" />
-        case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} targetYear={noticeTargetYear} setTargetYear={setNoticeTargetYear} departmentName={facultyDepartmentName} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} />
+        case 'careerProfile': return <CareerProfileTab profile={careerProfile} loading={careerLoading} onUpload={handleUploadCareerResume} onRemove={handleRemoveCareerResume} onDownload={handleDownload} />
+        case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} targetYear={noticeTargetYear} setTargetYear={setNoticeTargetYear} departmentName={facultyDepartmentName} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} inbox={notifications} />
         case 'settings': return <SettingsTab showMsg={showMsg} accent="violet" />
         case 'help': return <HelpTab accent="violet" />
         case 'invigilations': return <InvigilationsTab showMsg={showMsg} />
@@ -1696,7 +1782,8 @@ export default function FacultyDashboard() {
       <PortalTopbar
         sidebarWidth={sidebarWidth} accent="violet"
         user={{ name: 'Faculty User', role: 'Faculty', email }}
-        placeholder="Search students, courses, papers..."
+        notificationCount={Object.values(unreadCounts).reduce((a, b) => a + (Number(b) || 0), 0)}
+        notifications={(notifications || []).filter(n => !n.read).map(n => ({ id: n.id, title: n.title, message: n.message }))}
         onLogout={async () => { await authService.logout(); navigate('/login') }}
       />
 

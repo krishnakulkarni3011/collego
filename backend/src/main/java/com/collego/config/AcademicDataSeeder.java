@@ -231,7 +231,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
         log.info("=== Academic Data Seeder Complete ===");
         log.info("Created: 1 department (CSE), {} courses, 7 faculty, 120 students (30 per year × 4 years)",
                 courseRepository.count());
-        log.info("Sample student login: USN format 1CG24CS001 / Student@123");
+        log.info("Sample student login: USN format 2BA26CS001 / Student@123");
 
         ensureAdminProfile();
     }
@@ -485,8 +485,10 @@ public class AcademicDataSeeder implements CommandLineRunner {
             for (int i = 0; i < 30; i++) {
                 String firstName = STUDENT_FIRST_NAMES[(globalIndex + i) % STUDENT_FIRST_NAMES.length];
                 String lastName = STUDENT_LAST_NAMES[(globalIndex + i) % STUDENT_LAST_NAMES.length];
-                // USN format: 1CG + 24 (admission year) + CS + 3-digit number
-                String usn = String.format("1CG24CS%03d", globalIndex + i + 1);
+                // USN format: 2BA + admission year (YY) + CS + 3-digit number.
+                // Each academic year restarts its numbering at 001.
+                int admissionYear = 2027 - year; // I Year -> 2026, Final Year -> 2023
+                String usn = String.format("2BA%02dCS%03d", admissionYear % 100, i + 1);
                 String email = "student" + (globalIndex + i + 1) + ".cse@collego.edu";
 
                 User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
@@ -512,7 +514,7 @@ public class AcademicDataSeeder implements CommandLineRunner {
                         .enrollmentNumber(usn) // USN stored as enrollmentNumber
                         .semester(currentSemester)
                         .section(section)
-                        .admissionYear(2024)
+                        .admissionYear(admissionYear)
                         .build();
                 yearStudents.add(studentProfileRepository.save(student));
             }

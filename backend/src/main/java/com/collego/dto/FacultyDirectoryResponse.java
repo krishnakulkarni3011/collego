@@ -22,5 +22,8 @@ public class FacultyDirectoryResponse {
     private String departmentCode;
     private String resumeFileName;
     private boolean hasResume;
+    /** NONE, PENDING, APPROVED or REJECTED. Only approved resumes are visible to students. */
+    private String resumeStatus;
+    private String resumeReviewNote;
     private boolean active;
 }

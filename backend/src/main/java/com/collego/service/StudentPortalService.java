@@ -392,6 +392,7 @@ public class StudentPortalService {
                         .title(n.getTitle())
                         .message(n.getMessage())
                         .type(n.getType().name())
+                        .category(n.getCategory() != null ? n.getCategory().name() : NotificationCategory.NOTICE.name())
                         .read(n.isRead())
                         .createdAt(n.getCreatedAt())
                         .build())
@@ -401,6 +402,29 @@ public class StudentPortalService {
     public long getUnreadNotificationCount(String email) {
         User user = getUserByEmail(email);
         return notificationRepository.countByUserIdAndIsReadFalse(user.getId());
+    }
+
+    /** Unread counters keyed by sidebar tab (NOTICE, QUESTION_PAPER, ...). */
+    public Map<String, Long> getUnreadCounts(String email) {
+        User user = getUserByEmail(email);
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (NotificationCategory category : NotificationCategory.values()) {
+            counts.put(category.name(),
+                    notificationRepository.countByUserIdAndCategoryAndIsReadFalse(user.getId(), category));
+        }
+        return counts;
+    }
+
+    @Transactional
+    public void markCategoryRead(String email, String category) {
+        User user = getUserByEmail(email);
+        NotificationCategory parsed;
+        try {
+            parsed = NotificationCategory.valueOf(category.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Unknown notification category: " + category);
+        }
+        notificationRepository.markCategoryRead(user.getId(), parsed);
     }
 
     @Transactional

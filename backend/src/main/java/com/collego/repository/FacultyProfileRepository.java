@@ -13,6 +13,7 @@ public interface FacultyProfileRepository extends JpaRepository<FacultyProfile, 
     List<FacultyProfile> findByDepartmentId(Long departmentId);
     long countByDepartmentId(Long departmentId);
     Optional<FacultyProfile> findByEmployeeId(String employeeId);
+    Optional<FacultyProfile> findByUserEmailIgnoreCase(String email);
     List<FacultyProfile> findByDepartmentCode(String code);
 
     /**

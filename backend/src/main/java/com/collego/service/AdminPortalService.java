@@ -38,6 +38,7 @@ public class AdminPortalService {
     private final SemesterMarksRepository semesterMarksRepository;
     private final QuestionPaperRepository questionPaperRepository;
     private final NotificationRepository notificationRepository;
+    private final BroadcastRepository broadcastRepository;
     // Question papers are published immediately by faculty; no admin approval step.
     private final PlacementNoticeRepository placementNoticeRepository;
     private final AuditService auditService;
@@ -670,6 +671,173 @@ public class AdminPortalService {
 
     private UserResponse buildUserResponse(User user) {
         return userService.getUserById(user.getId());
+    }
+
+    // ==================== Broadcast Center ====================
+
+    @Transactional
+    public BroadcastResponse createBroadcast(String adminEmail, CreateBroadcastRequest request) {
+        User sender = userRepository.findByEmailIgnoreCase(adminEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Admin account not found"));
+
+        BroadcastAudience audience;
+        try {
+            audience = BroadcastAudience.valueOf(request.getAudience().trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Unsupported audience: " + request.getAudience());
+        }
+
+        NotificationType type;
+        try {
+            type = request.getType() != null && !request.getType().isBlank()
+                    ? NotificationType.valueOf(request.getType().trim().toUpperCase(Locale.ROOT))
+                    : NotificationType.GENERAL;
+        } catch (IllegalArgumentException ex) {
+            type = NotificationType.GENERAL;
+        }
+
+        Department department = null;
+        Integer targetYear = null;
+        User singleRecipient = null;
+        List<User> recipients;
+
+        switch (audience) {
+            case ALL_STUDENTS -> recipients = studentProfiles().stream()
+                    .map(StudentProfile::getUser).filter(Objects::nonNull).collect(Collectors.toList());
+            case YEAR_STUDENTS -> {
+                targetYear = request.getTargetYear();
+                if (targetYear == null || targetYear < 1 || targetYear > 4) {
+                    throw new BadRequestException("Select a year between I Year and Final Year.");
+                }
+                final Integer year = targetYear;
+                recipients = studentProfiles().stream()
+                        .filter(s -> Objects.equals(
+                                com.collego.util.AcademicYearUtils.fromSemester(s.getSemester()), year))
+                        .map(StudentProfile::getUser).filter(Objects::nonNull).collect(Collectors.toList());
+            }
+            case DEPARTMENT_STUDENTS -> {
+                department = requireDepartment(request.getDepartmentId());
+                recipients = studentProfileRepository.findByDepartmentId(department.getId()).stream()
+                        .map(StudentProfile::getUser).filter(Objects::nonNull).collect(Collectors.toList());
+            }
+            case ALL_FACULTY -> recipients = facultyProfiles().stream()
+                    .map(FacultyProfile::getUser).filter(Objects::nonNull).collect(Collectors.toList());
+            case DEPARTMENT_FACULTY -> {
+                department = requireDepartment(request.getDepartmentId());
+                recipients = facultyProfileRepository.findByDepartmentId(department.getId()).stream()
+                        .map(FacultyProfile::getUser).filter(Objects::nonNull).collect(Collectors.toList());
+            }
+            case STUDENT, FACULTY -> {
+                if (request.getUserId() == null) {
+                    throw new BadRequestException("Select the person who should receive this message.");
+                }
+                singleRecipient = userRepository.findById(request.getUserId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Recipient not found"));
+                Role requiredRole = audience == BroadcastAudience.STUDENT ? Role.STUDENT : Role.FACULTY;
+                if (singleRecipient.getRole() != requiredRole) {
+                    throw new BadRequestException("The selected user is not a " + requiredRole.name().toLowerCase(Locale.ROOT) + ".");
+                }
+                recipients = List.of(singleRecipient);
+            }
+            default -> throw new BadRequestException("Unsupported audience: " + audience);
+        }
+
+        List<User> distinctRecipients = recipients.stream()
+                .filter(User::isActive)
+                .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a, LinkedHashMap::new))
+                .values().stream().collect(Collectors.toList());
+
+        if (distinctRecipients.isEmpty()) {
+            throw new BadRequestException("No active recipients match the selected audience.");
+        }
+
+        Broadcast broadcast = Broadcast.builder()
+                .sender(sender)
+                .title(request.getTitle().trim())
+                .message(request.getMessage().trim())
+                .type(type)
+                .audience(audience)
+                .targetYear(targetYear)
+                .department(department)
+                .recipient(singleRecipient)
+                .recipientCount(distinctRecipients.size())
+                .build();
+        broadcast = broadcastRepository.save(broadcast);
+
+        for (User user : distinctRecipients) {
+            notificationRepository.save(Notification.builder()
+                    .user(user)
+                    .title(broadcast.getTitle())
+                    .message(broadcast.getMessage())
+                    .type(type)
+                    .category(NotificationCategory.NOTICE)
+                    .build());
+        }
+
+        log.info("Admin {} broadcast '{}' ({}) to {} recipient(s)", adminEmail,
+                broadcast.getTitle(), audience, distinctRecipients.size());
+        return mapBroadcast(broadcast);
+    }
+
+    public List<BroadcastResponse> listBroadcasts() {
+        return broadcastRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(this::mapBroadcast)
+                .collect(Collectors.toList());
+    }
+
+    public List<BroadcastResponse> listBroadcastsBy(String adminEmail) {
+        User sender = userRepository.findByEmailIgnoreCase(adminEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Admin account not found"));
+        return broadcastRepository.findBySenderIdOrderByCreatedAtDesc(sender.getId()).stream()
+                .map(this::mapBroadcast)
+                .collect(Collectors.toList());
+    }
+
+    private List<StudentProfile> studentProfiles() {
+        return studentProfileRepository.findAll();
+    }
+
+    private List<FacultyProfile> facultyProfiles() {
+        return facultyProfileRepository.findAll();
+    }
+
+    private Department requireDepartment(Long departmentId) {
+        if (departmentId == null) {
+            throw new BadRequestException("Select a department.");
+        }
+        return departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
+    }
+
+    private BroadcastResponse mapBroadcast(Broadcast broadcast) {
+        String deptName = broadcast.getDepartment() != null ? broadcast.getDepartment().getName() : null;
+        String audienceLabel = switch (broadcast.getAudience()) {
+            case ALL_STUDENTS -> "All students";
+            case YEAR_STUDENTS -> com.collego.util.AcademicYearUtils.label(broadcast.getTargetYear()) + " students";
+            case DEPARTMENT_STUDENTS -> deptName != null ? deptName + " students" : "Department students";
+            case ALL_FACULTY -> "All faculty";
+            case DEPARTMENT_FACULTY -> deptName != null ? deptName + " faculty" : "Department faculty";
+            case STUDENT -> "Student · " + recipientName(broadcast.getRecipient());
+            case FACULTY -> "Faculty · " + recipientName(broadcast.getRecipient());
+        };
+        return BroadcastResponse.builder()
+                .id(broadcast.getId())
+                .title(broadcast.getTitle())
+                .message(broadcast.getMessage())
+                .type(broadcast.getType().name())
+                .audience(broadcast.getAudience().name())
+                .audienceLabel(audienceLabel)
+                .targetYear(broadcast.getTargetYear())
+                .departmentId(broadcast.getDepartment() != null ? broadcast.getDepartment().getId() : null)
+                .departmentName(deptName)
+                .recipientName(broadcast.getRecipient() != null ? recipientName(broadcast.getRecipient()) : null)
+                .recipientCount(broadcast.getRecipientCount())
+                .createdAt(broadcast.getCreatedAt())
+                .build();
+    }
+
+    private String recipientName(User user) {
+        return user != null ? (user.getFirstName() + " " + user.getLastName()).trim() : "—";
     }
 
 }

@@ -15,7 +15,7 @@ export function FacultyDirectoryTab({
   accent = 'blue',
   onDownload,
   title = 'Faculty Directory',
-  subtitle = 'Faculty members and their resumes, grouped by department.',
+  subtitle = 'Faculty members and their approved resumes, grouped by department.',
 }) {
   const [query, setQuery] = useState('')
 
@@ -83,7 +83,7 @@ export function FacultyDirectoryTab({
                   </div>
                   <div className="flex items-center justify-between gap-2 border-t border-white/60 pt-3">
                     <span className={`text-[10px] font-medium ${f.hasResume ? 'text-emerald-600' : 'text-slate-400'}`}>
-                      {f.hasResume ? 'Resume available' : 'No resume uploaded'}
+                      {f.hasResume ? 'Resume approved' : 'No resume available'}
                     </span>
                     <Button
                       variant="outline"

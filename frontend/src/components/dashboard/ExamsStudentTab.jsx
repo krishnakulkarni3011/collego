@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { BookMarked, CalendarDays, Download, ChevronDown, ChevronUp, RefreshCw, Send, AlertTriangle, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { BookMarked, CalendarDays, ChevronDown, ChevronUp, RefreshCw, Send, AlertTriangle, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import api from '../../services/api'
 import { PageTitle, Panel, EmptyState, Spinner } from './PortalUI'
 import { Badge } from '../ui/badge'
@@ -11,7 +11,7 @@ function fmtDate(value) {
   return new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-export function ExamsStudentTab({ showMsg, onDownload }) {
+export function ExamsStudentTab({ showMsg }) {
   const [exams, setExams] = useState([])
   const [courses, setCourses] = useState([])
   const [revaluations, setRevaluations] = useState([])
@@ -88,14 +88,14 @@ export function ExamsStudentTab({ showMsg, onDownload }) {
       <PageTitle
         icon={BookMarked}
         title="Examinations"
-        subtitle="Published exams, hall tickets and revaluation requests."
+        subtitle="Published exams, schedules and revaluation requests."
         accent="blue"
         image={uiImages.library} imageAlt="Students studying in the library"
       />
 
       {exams.length === 0 ? (
         <div className="glass-card p-12 border border-white/60">
-          <EmptyState icon={CalendarDays} title="No published exams" accent="blue" description="Your exam schedule and hall tickets will appear here once the examination section publishes them." />
+          <EmptyState icon={CalendarDays} title="No published exams" accent="blue" description="Your exam schedule will appear here once the examination section publishes it." />
         </div>
       ) : (
         <div className="space-y-4">
@@ -117,15 +117,6 @@ export function ExamsStudentTab({ showMsg, onDownload }) {
                   </button>
                   <div className="flex items-center gap-3">
                     <Badge variant={exam.status === 'PUBLISHED' ? 'success' : 'secondary'}>{exam.status}</Badge>
-                    {exam.hallTicketAvailable && (
-                      <Button
-                        variant="gradient"
-                        size="sm"
-                        onClick={() => onDownload(`/api/student/exams/${exam.id}/hall-ticket`, `hall-ticket-${exam.name.replace(/\s+/g, '-')}.pdf`)}
-                      >
-                        <span className="flex gap-1"><Download size={13} /> Hall ticket</span>
-                      </Button>
-                    )}
                   </div>
                 </div>
 
@@ -154,7 +145,7 @@ export function ExamsStudentTab({ showMsg, onDownload }) {
                       </div>
                     )}
                     <p className="px-5 py-3 text-[10px] text-slate-400">
-                      Seat numbers are printed on the hall ticket. Carry your college ID to every paper.
+                      Carry your college ID to every paper.
                     </p>
                   </div>
                 )}

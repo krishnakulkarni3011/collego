@@ -31,6 +31,12 @@ public class Notification {
     @Column(nullable = false)
     private NotificationType type;
 
+    /** Which portal tab this notification should badge. */
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column
+    private NotificationCategory category = NotificationCategory.NOTICE;
+
     @Builder.Default
     @Column(nullable = false)
     private boolean isRead = false;

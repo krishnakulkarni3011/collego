@@ -33,4 +33,11 @@ public class FacultyProfile {
 
     @Column(length = 1000)
     private String resumePath;
+
+    /** NONE, PENDING, APPROVED or REJECTED. Legacy admin uploads are treated as APPROVED. */
+    @Column(length = 20)
+    private String resumeStatus;
+
+    @Column(length = 500)
+    private String resumeReviewNote;
 }

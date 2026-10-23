@@ -8,8 +8,8 @@ import {
   Megaphone, FileText, CheckCircle2,
   Clock, MapPin, Activity, BookMarked, Briefcase, X,
   RefreshCw, Upload, Edit, Power, Filter, Trophy, Zap,
-  TrendingUp, Percent, XCircle, Wallet, Home, Landmark, Download,
-  UsersRound, CalendarDays, ScrollText, Layers, ChevronRight, ArrowLeft,
+  TrendingUp, XCircle, Wallet, Home, Landmark, Download,
+  UsersRound, CalendarDays, ScrollText, Layers, ChevronRight, ArrowLeft, Send,
 } from 'lucide-react'
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
@@ -51,6 +51,7 @@ const NOTICE_TYPES = {
   ACADEMIC: { variant: 'info', label: 'Academic' },
   PLACEMENT: { variant: 'purple', label: 'Placement' },
   EXAM: { variant: 'destructive', label: 'Exam' },
+  FEE: { variant: 'warning', label: 'Fee' },
   GENERAL: { variant: 'secondary', label: 'General' },
 }
 const EVENT_COLORS = { Placement: '#10b981', Academic: '#6366f1', Exam: '#ef4444', Event: '#f59e0b' }
@@ -61,9 +62,9 @@ const NAV_SECTIONS = [
     title: 'Management',
     items: [
       { id: 'academics', label: 'Academics', icon: BookOpen },
-      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
       { id: 'examinations', label: 'Examinations', icon: BookMarked },
       { id: 'placements', label: 'Placements', icon: Briefcase },
+      { id: 'broadcasts', label: 'Broadcast Center', icon: Send },
     ],
   },
   {
@@ -108,7 +109,7 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
     { icon: Megaphone, label: 'Create Notice', tab: 'announcements', accent: 'amber', grad: 'from-amber-500 to-orange-500' },
     { icon: BarChart3, label: 'Generate Report', tab: 'reports', accent: 'indigo', grad: 'from-indigo-500 to-blue-500' },
     { icon: BookOpen, label: 'Manage Courses', tab: 'academics', accent: 'emerald', grad: 'from-emerald-500 to-teal-500' },
-    { icon: ClipboardCheck, label: 'Take Attendance', tab: 'attendance', accent: 'emerald', grad: 'from-emerald-500 to-teal-500' },
+    { icon: ClipboardCheck, label: 'Broadcast', tab: 'broadcasts', accent: 'emerald', grad: 'from-emerald-500 to-teal-500' },
     { icon: BookMarked, label: 'Upload Marks', tab: 'examinations', accent: 'violet', grad: 'from-violet-500 to-fuchsia-500' },
     { icon: Briefcase, label: 'Placement Records', tab: 'placements', accent: 'amber', grad: 'from-amber-500 to-orange-500' },
   ]
@@ -130,7 +131,7 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
         <StatCard index={1} label="Faculty Members" value={overview?.totalFaculty ?? 0} icon={UsersRound} accent="violet"
           sub={`${overview?.totalSections ?? 0} sections running`} onClick={() => onTabChange('academics')} glow />
         <StatCard index={2} label="Average Attendance" value={overview?.overallAverageAttendance ?? 0} decimals={1} suffix="%" icon={ClipboardCheck} accent="emerald"
-          sub="college-wide average" onClick={() => onTabChange('attendance')} glow />
+          sub="college-wide average" glow />
         <StatCard index={3} label="Placed Students" value={placementStats?.studentsPlaced ?? 0} icon={Trophy} accent="amber"
           sub={`${placementStats?.totalOffersExtended ?? 0} offers extended`} onClick={() => onTabChange('placements')} glow />
       </div>
@@ -590,7 +591,7 @@ function studentYear(user) {
 
 function AcademicsTab({
   users, departments, overview, semesters, deptReports, showMsg,
-  onCreateUser, onEditUser, onToggleActive, onUploadResume,
+  onCreateUser, onEditUser, onToggleActive, onUploadResume, onReviewResume,
 }) {
   const [selectedDept, setSelectedDept] = useState(null)
   const [mode, setMode] = useState(null)
@@ -761,7 +762,7 @@ function AcademicsTab({
             <Users size={24} />
           </div>
           <h3 className="text-lg font-bold text-slate-900">Faculty</h3>
-          <p className="text-sm text-slate-500 mt-2">Manage department faculty and upload their resumes for students to view.</p>
+          <p className="text-sm text-slate-500 mt-2">Manage department faculty and approve their career-profile resumes.</p>
           <p className="text-xs font-semibold text-violet-600 mt-5 flex items-center gap-1">{selectedDept.totalFaculty || departmentFaculty.length} faculty <ChevronRight size={13} /></p>
         </button>
       </div>
@@ -783,7 +784,7 @@ function AcademicsTab({
           </>
         ) : (
           <>
-            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">USN / Enrollment No.</label><input value={form.enrollmentNumber} onChange={e => setForm({ ...form, enrollmentNumber: e.target.value })} placeholder="e.g., 1CG24CS001" className="collego-input" required /></div>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">USN / Enrollment No.</label><input value={form.enrollmentNumber} onChange={e => setForm({ ...form, enrollmentNumber: e.target.value })} placeholder="e.g., 2BA23CS001" className="collego-input" required /></div>
             <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Section</label><select value={form.section} onChange={e => setForm({ ...form, section: e.target.value })} className="collego-input"><option>A</option><option>B</option><option>C</option></select></div>
           </>
         )}
@@ -827,7 +828,7 @@ function AcademicsTab({
 
   const renderFaculty = () => (
     <>
-      <PageTitle icon={Users} title={`${selectedDept.departmentName} Faculty`} subtitle="Add, edit or remove faculty and manage resume documents."
+      <PageTitle icon={Users} title={`${selectedDept.departmentName} Faculty`} subtitle="Add, edit or remove faculty and review career-profile resumes."
         image={uiImages.classroom} imageAlt="Classroom lecture"
         actions={<Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Faculty'}</Button>} />
       {showCreate && renderCreateForm()}
@@ -848,17 +849,34 @@ function AcademicsTab({
                   <td className="text-slate-500 text-xs font-mono">{u.employeeId || '—'}</td>
                   <td className="text-slate-500 text-xs">{u.designation || 'Faculty'}</td>
                   <td style={{ textAlign: 'center' }}>
-                    <div className="flex items-center justify-center gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-600 hover:text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
-                        {resumeBusy === u.id ? <RefreshCw size={12} className="animate-spin" /> : <Upload size={12} />}
-                        {u.hasResume ? 'Replace' : 'Upload'}
-                        <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadResume(u, f); e.target.value = '' }} />
-                      </label>
-                      {u.hasResume && (
-                        <button onClick={() => downloadFile(`/api/faculty-directory/${u.facultyProfileId}/resume`, u.resumeFileName || 'faculty-resume.pdf').catch(() => {})}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:underline" title={u.resumeFileName || 'Download resume'}>
-                          <Download size={12} /> View
-                        </button>
+                    <div className="flex flex-col items-center gap-1.5">
+                      <Badge variant={u.resumeStatus === 'APPROVED' ? 'success' : u.resumeStatus === 'PENDING' ? 'warning' : u.resumeStatus === 'REJECTED' ? 'destructive' : 'secondary'} className="text-[9px] px-2 py-0.5">
+                        {u.resumeStatus ? u.resumeStatus.charAt(0) + u.resumeStatus.slice(1).toLowerCase() : 'None'}
+                      </Badge>
+                      <div className="flex items-center justify-center gap-2">
+                        <label className="cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-600 hover:text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
+                          {resumeBusy === u.id ? <RefreshCw size={12} className="animate-spin" /> : <Upload size={12} />}
+                          {u.hasResume ? 'Replace' : 'Upload'}
+                          <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadResume(u, f); e.target.value = '' }} />
+                        </label>
+                        {u.hasResume && (
+                          <button onClick={() => downloadFile(`/api/faculty-directory/${u.facultyProfileId}/resume`, u.resumeFileName || 'faculty-resume.pdf').catch(() => {})}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:underline" title={u.resumeFileName || 'Download resume'}>
+                            <Download size={12} /> View
+                          </button>
+                        )}
+                      </div>
+                      {u.resumeStatus === 'PENDING' && (
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => onReviewResume?.(u.facultyProfileId, true)}
+                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 px-2 py-1 rounded-lg hover:bg-emerald-50 transition-colors">
+                            <CheckCircle2 size={11} /> Approve
+                          </button>
+                          <button onClick={() => onReviewResume?.(u.facultyProfileId, false, null)}
+                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-500 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
+                            <XCircle size={11} /> Reject
+                          </button>
+                        </div>
                       )}
                     </div>
                   </td>
@@ -943,61 +961,165 @@ function AcademicsTab({
   )
 }
 
-function AttendanceTab({ attendanceSummary, overview }) {
-  const chartData = (attendanceSummary || []).map(d => ({
-    name: d.departmentName?.split(' ')[0] || 'N/A',
-    attendance: Math.round(d.averageAttendancePercentage || 0),
-  }))
-  const totals = (attendanceSummary || []).reduce((acc, d) => ({
-    students: acc.students + (d.totalStudents || 0),
-    above75: acc.above75 + (d.studentsAbove75 || 0),
-    below75: acc.below75 + (d.studentsBelow75 || 0),
-    below50: acc.below50 + (d.studentsBelow50 || 0),
-  }), { students: 0, above75: 0, below75: 0, below50: 0 })
+const AUDIENCE_OPTIONS = [
+  { value: 'ALL_STUDENTS', label: 'All students' },
+  { value: 'YEAR_STUDENTS', label: 'Students of a specific year' },
+  { value: 'DEPARTMENT_STUDENTS', label: 'Students of a department' },
+  { value: 'ALL_FACULTY', label: 'All faculty' },
+  { value: 'DEPARTMENT_FACULTY', label: 'Faculty of a department' },
+  { value: 'STUDENT', label: 'A particular student' },
+  { value: 'FACULTY', label: 'A particular faculty member' },
+]
+
+function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onSend }) {
+  const [audience, setAudience] = useState('ALL_STUDENTS')
+  const [targetYear, setTargetYear] = useState('1')
+  const [departmentId, setDepartmentId] = useState('')
+  const [userId, setUserId] = useState('')
+  const [type, setType] = useState('GENERAL')
+  const [title, setTitle] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const needsYear = audience === 'YEAR_STUDENTS'
+  const needsDepartment = audience === 'DEPARTMENT_STUDENTS' || audience === 'DEPARTMENT_FACULTY'
+  const isSingle = audience === 'STUDENT' || audience === 'FACULTY'
+  const recipientRole = audience === 'FACULTY' ? 'FACULTY' : 'STUDENT'
+  const people = (users || []).filter(u => u.role === recipientRole && u.active)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!title.trim() || !message.trim()) return
+    if (needsDepartment && !departmentId) return
+    if (isSingle && !userId) return
+    setBusy(true)
+    const ok = await onSend({
+      title: title.trim(),
+      message: message.trim(),
+      type,
+      audience,
+      targetYear: needsYear ? Number(targetYear) : null,
+      departmentId: needsDepartment ? Number(departmentId) : null,
+      userId: isSingle ? Number(userId) : null,
+    })
+    setBusy(false)
+    if (ok) {
+      setTitle('')
+      setMessage('')
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={ClipboardCheck} title="Attendance Management" subtitle="Department-wise attendance health and at-risk students." image={uiImages.classroom} imageAlt="Classroom lecture" />
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard index={0} label="Average Attendance" value={overview?.overallAverageAttendance ?? 0} decimals={1} suffix="%" icon={Percent} accent="emerald" glow />
-        <StatCard index={1} label="Above 75%" value={totals.above75} icon={CheckCircle2} accent="blue" glow />
-        <StatCard index={2} label="50% – 75%" value={totals.below75} icon={Activity} accent="amber" glow />
-        <StatCard index={3} label="Below 50%" value={totals.below50} icon={XCircle} accent="violet" glow />
-      </div>
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <Panel title="Attendance by Department" icon={BarChart3} accent="indigo">
-          {chartData.length === 0 ? <EmptyState icon={BarChart3} title="No data" accent="indigo" /> : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData} barSize={30} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip unit="%" />} cursor={{ fill: 'rgba(99,102,241,0.05)' }} />
-                <Bar dataKey="attendance" name="Attendance" radius={[8, 8, 0, 0]}>
-                  {chartData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Panel>
-        <Panel title="Department Breakdown" icon={Layers} accent="violet">
-          <div className="overflow-x-auto">
-            <table className="collego-table">
-              <thead><tr><th>Department</th><th style={{ textAlign: 'center' }}>Students</th><th style={{ textAlign: 'center' }}>Avg %</th><th style={{ textAlign: 'center' }}>&lt;75%</th></tr></thead>
-              <tbody>
-                {(attendanceSummary || []).map(d => (
-                  <tr key={d.departmentId} className="hover:bg-white/30 transition-colors">
-                    <td className="font-medium text-slate-800">{d.departmentName}</td>
-                    <td style={{ textAlign: 'center' }}>{d.totalStudents}</td>
-                    <td style={{ textAlign: 'center' }}><Badge variant={d.averageAttendancePercentage >= 75 ? 'success' : d.averageAttendancePercentage >= 50 ? 'warning' : 'destructive'}>{fmtNum(d.averageAttendancePercentage, 1)}%</Badge></td>
-                    <td style={{ textAlign: 'center' }} className="text-amber-600 font-semibold">{d.studentsBelow75}</td>
-                  </tr>
-                ))}
-                {(!attendanceSummary || attendanceSummary.length === 0) && <tr><td colSpan={4} className="text-center text-slate-400 py-12">No attendance data.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+      <PageTitle
+        icon={Send}
+        title="Broadcast Center"
+        subtitle="Send a direct notification to students or faculty — a whole group, a year, a department or one person."
+        accent="emerald"
+        image={uiImages.placementTalk}
+        imageAlt="Campus announcement"
+      />
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+        <div className="xl:col-span-3">
+          <Panel title="Compose message" icon={Send} accent="emerald">
+            <form onSubmit={submit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Send to</label>
+                  <select value={audience} onChange={e => { setAudience(e.target.value); setDepartmentId(''); setUserId('') }} className="collego-input">
+                    {AUDIENCE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Category</label>
+                  <select value={type} onChange={e => setType(e.target.value)} className="collego-input">
+                    <option value="GENERAL">General</option>
+                    <option value="ACADEMIC">Academic</option>
+                    <option value="PLACEMENT">Placement</option>
+                    <option value="FEE">Fee</option>
+                  </select>
+                </div>
+              </div>
+
+              {needsYear && (
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Year</label>
+                  <select value={targetYear} onChange={e => setTargetYear(e.target.value)} className="collego-input">
+                    {YEAR_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {needsDepartment && (
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Department</label>
+                  <select value={departmentId} onChange={e => setDepartmentId(e.target.value)} className="collego-input">
+                    <option value="">Select department</option>
+                    {(departments || []).map(d => (
+                      <option key={d.departmentId || d.id} value={d.departmentId || d.id}>{d.departmentName || d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {isSingle && (
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">{recipientRole === 'FACULTY' ? 'Faculty member' : 'Student'}</label>
+                  <select value={userId} onChange={e => setUserId(e.target.value)} className="collego-input">
+                    <option value="">Select {recipientRole === 'FACULTY' ? 'faculty' : 'student'}</option>
+                    {people.map(person => (
+                      <option key={person.id} value={person.id}>
+                        {person.firstName} {person.lastName}
+                        {person.enrollmentNumber ? ` · ${person.enrollmentNumber}` : person.employeeId ? ` · ${person.employeeId}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Title</label>
+                <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g., Semester fee deadline extended" className="collego-input" required />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Message</label>
+                <textarea value={message} onChange={e => setMessage(e.target.value)} rows={5} placeholder="Write the message recipients will see in their portal..." className="collego-input resize-none" required />
+              </div>
+
+              <div className="flex justify-end">
+                <Button type="submit" variant="gradient" size="sm" disabled={busy || !title.trim() || !message.trim()}>
+                  {busy ? <><RefreshCw size={13} className="animate-spin" /> Sending...</> : <><Send size={13} /> Send notification</>}
+                </Button>
+              </div>
+            </form>
+          </Panel>
+        </div>
+
+        <div className="xl:col-span-2">
+          <Panel title="Sent messages" icon={Megaphone} accent="indigo">
+            <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
+              {(broadcasts || []).map(b => {
+                const cfg = NOTICE_TYPES[b.type] || NOTICE_TYPES.GENERAL
+                return (
+                  <div key={b.id} className="p-4 rounded-2xl border border-white/60 bg-white/70">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <Badge variant={cfg.variant} className="text-[9px] px-2 py-0.5">{cfg.label}</Badge>
+                      <span className="text-[10px] text-slate-400">{timeAgo(b.createdAt)}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800">{b.title}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{b.message}</p>
+                    <p className="text-[10px] text-slate-400 mt-2">
+                      To {b.audienceLabel} · {b.recipientCount} recipient{b.recipientCount === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                )
+              })}
+              {(!broadcasts || broadcasts.length === 0) && (
+                <EmptyState icon={Megaphone} title="Nothing sent yet" accent="indigo" description="Messages you send will be listed here with their audience." />
+              )}
+            </div>
+          </Panel>
+        </div>
       </div>
     </div>
   )
@@ -1223,29 +1345,32 @@ function ReportsTab({ deptReports, subjectReports }) {
 }
 
 // ─── Notices & Events ────────────────────────────────────────────────────────
-function NoticesTab({ insights }) {
-  const notices = insights?.recentNotices || []
+function NoticesTab({ broadcasts = [], insights }) {
+  const notices = broadcasts
   const events = insights?.upcomingEvents || []
   return (
     <div className="space-y-6">
-      <PageTitle icon={Megaphone} title="Notices & Events" subtitle="Latest broadcasts and the campus activity calendar." image={uiImages.placementTalk} imageAlt="Placement talk" />
+      <PageTitle icon={Megaphone} title="Notices & Events" subtitle="Messages you sent from the Broadcast Center, plus the campus activity calendar." image={uiImages.placementTalk} imageAlt="Placement talk" />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <Panel title="Recent Notices" icon={Megaphone} accent="amber">
+        <Panel title="Your broadcasts" icon={Megaphone} accent="amber">
           <div className="space-y-3">
             {notices.map(n => {
               const cfg = NOTICE_TYPES[n.type] || NOTICE_TYPES.GENERAL
               return (
-                <div key={n.id} className="p-4 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm cursor-pointer hover:bg-white transition-colors">
-                  <div className="flex items-center gap-2 mb-1.5">
+                <div key={n.id} className="p-4 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <Badge variant={cfg.variant} className="text-[9px] px-2 py-0.5">{cfg.label}</Badge>
                     <span className="text-[10px] text-slate-400">{timeAgo(n.createdAt)}</span>
+                    <span className="text-[10px] text-slate-400 ml-auto">
+                      To {n.audienceLabel} · {n.recipientCount} recipient{n.recipientCount === 1 ? '' : 's'}
+                    </span>
                   </div>
                   <p className="text-sm font-semibold text-slate-800">{n.title}</p>
                   <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
                 </div>
               )
             })}
-            {notices.length === 0 && <EmptyState icon={Megaphone} title="No notices yet" accent="amber" />}
+            {notices.length === 0 && <EmptyState icon={Megaphone} title="No notices sent yet" accent="amber" description="Use the Broadcast Center to message students or faculty." />}
           </div>
         </Panel>
         <Panel title="Upcoming Events" icon={CalendarDays} accent="indigo">
@@ -1320,6 +1445,7 @@ export default function AdminDashboard() {
   const [insights, setInsights] = useState(null)
   const [semesters, setSemesters] = useState([])
   const [importResult, setImportResult] = useState(null)
+  const [broadcasts, setBroadcasts] = useState([])
 
   const sidebarWidth = collapsed ? 76 : 248
   const showMsg = useCallback((text, type = 'success') => setToast({ text, type }), [])
@@ -1332,7 +1458,7 @@ export default function AdminDashboard() {
   }, [])
 
   const loadAll = useCallback(async () => {
-    const [ovRes, usRes, dpRes, drRes, srRes, asRes, psRes, pnRes, inRes, semRes] = await Promise.allSettled([
+    const [ovRes, usRes, dpRes, drRes, srRes, asRes, psRes, pnRes, inRes, semRes, bcRes] = await Promise.allSettled([
       api.get('/api/admin/overview'),
       api.get('/api/admin/users'),
       api.get('/api/departments'),
@@ -1343,6 +1469,7 @@ export default function AdminDashboard() {
       api.get('/api/placement/notices'),
       api.get('/api/admin/dashboard/insights'),
       api.get('/api/semesters'),
+      api.get('/api/admin/broadcasts'),
     ])
     if (ovRes.status === 'fulfilled') setOverview(ovRes.value.data)
     if (usRes.status === 'fulfilled') setUsers(Array.isArray(usRes.value.data) ? usRes.value.data : usRes.value.data?.content || [])
@@ -1354,6 +1481,7 @@ export default function AdminDashboard() {
     if (pnRes.status === 'fulfilled') setPlacementNotices(Array.isArray(pnRes.value.data) ? pnRes.value.data : [])
     if (inRes.status === 'fulfilled') setInsights(inRes.value.data)
     if (semRes.status === 'fulfilled') setSemesters(Array.isArray(semRes.value.data) ? semRes.value.data : [])
+    if (bcRes.status === 'fulfilled') setBroadcasts(Array.isArray(bcRes.value.data) ? bcRes.value.data : [])
   }, [])
 
   const handleSemesterChange = async (semId) => {
@@ -1402,8 +1530,33 @@ export default function AdminDashboard() {
     }
   }
 
-  const onUploadResume = async (facultyProfileId, file) => {
-    if (!facultyProfileId) {
+  const handleSendBroadcast = async (payload) => {
+    try {
+      await api.post('/api/admin/broadcasts', payload)
+      showMsg('Message sent successfully')
+      const res = await api.get('/api/admin/broadcasts')
+      setBroadcasts(Array.isArray(res.data) ? res.data : [])
+      return true
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to send message', 'error')
+      return false
+    }
+  }
+
+  const onReviewResume = async (facultyProfileId, approve, note) => {
+    try {
+      await api.put(`/api/admin/faculty/${facultyProfileId}/resume/${approve ? 'approve' : 'reject'}`, approve ? undefined : { note })
+      showMsg(approve ? 'Resume approved' : 'Resume rejected')
+      await loadUsers()
+      await loadAll()
+      return true
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to review resume', 'error')
+      return false
+    }
+  }
+
+  const onUploadResume = async (facultyProfileId, file) => {    if (!facultyProfileId) {
       showMsg('Faculty profile not found', 'error')
       return false
     }
@@ -1463,17 +1616,15 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadAll() }, [loadAll])
 
-  const unreadCount = insights?.recentNotices?.filter(n => !n.read).length || 0
-
   const renderTab = () => {
     switch (activeTab) {
       case 'overview': return <OverviewTab overview={overview} deptReports={deptReports} attendanceSummary={attendanceSummary} placementStats={placementStats} insights={insights} semesters={semesters} onTabChange={setActiveTab} onSemesterChange={handleSemesterChange} />
-      case 'academics': return <AcademicsTab users={users} departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} showMsg={showMsg} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onUploadResume={onUploadResume} />
-      case 'attendance': return <AttendanceTab attendanceSummary={attendanceSummary} overview={overview} />
+      case 'academics': return <AcademicsTab users={users} departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} showMsg={showMsg} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onUploadResume={onUploadResume} onReviewResume={onReviewResume} />
       case 'examinations': return <ExamsAdminTab showMsg={showMsg} />
       case 'placements': return <PlacementsTab placementStats={placementStats} notices={placementNotices} departments={departments} onCreatePlacement={onCreatePlacement} onDeactivatePlacement={onDeactivatePlacement} />
+      case 'broadcasts': return <BroadcastCenterTab broadcasts={broadcasts} users={users} departments={departments} onSend={handleSendBroadcast} />
       case 'reports': return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} />
-      case 'announcements': return <NoticesTab insights={insights} />
+      case 'announcements': return <NoticesTab broadcasts={broadcasts} insights={insights} />
       case 'settings': return <SettingsTab showMsg={showMsg} accent="indigo" />
       case 'help': return <HelpTab accent="indigo" />
       default: return null
@@ -1491,9 +1642,8 @@ export default function AdminDashboard() {
       <PortalTopbar
         sidebarWidth={sidebarWidth} accent="indigo"
         user={{ name: 'Admin', role: 'System Administrator', email: 'admin@collego.edu' }}
-        placeholder="Search students, departments, reports..."
-        notificationCount={unreadCount}
-        notifications={(insights?.recentNotices || []).map(n => ({ id: n.id, title: n.title, message: n.message }))}
+        notificationCount={0}
+        notifications={(broadcasts || []).map(b => ({ id: b.id, title: b.title, message: b.message }))}
         onLogout={() => { authService.clearTokens(); navigate('/login') }}
       />
       <main className="main-content" style={{ marginLeft: sidebarWidth }}>

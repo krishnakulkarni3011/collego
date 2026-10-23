@@ -48,10 +48,10 @@ public class AiOutputGuard {
     private static final Pattern EMAIL = Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
 
     /**
-     * Enrolment-number shape, e.g. 1CG24CS001. A student may only ever see their
+     * Enrolment-number shape, e.g. 2BA23CS001. A student may only ever see their
      * own enrolment number, so any other one in a reply is a cross-user identifier.
      */
-    private static final Pattern ENROLMENT_NUMBER = Pattern.compile("\\b\\d{1,2}CG\\d{2}CS\\d{3}\\b");
+    private static final Pattern ENROLMENT_NUMBER = Pattern.compile("\\b\\d{1,2}[A-Z]{2}\\d{2}[A-Z]{2}\\d{3}\\b");
 
     /** Credential-shaped keys that must never appear in an AI reply. */
     private static final List<String> FORBIDDEN_TOKENS = List.of(

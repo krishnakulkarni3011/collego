@@ -159,6 +159,42 @@ public class AdminController {
         return ResponseEntity.ok(facultyDirectoryService.removeResume(facultyId));
     }
 
+    /** Faculty-uploaded resumes awaiting review (status optional: PENDING/APPROVED/REJECTED). */
+    @GetMapping("/faculty-resumes")
+    public ResponseEntity<List<FacultyDirectoryResponse>> listFacultyResumes(
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(facultyDirectoryService.listForAdmin(status));
+    }
+
+    @PutMapping("/faculty/{facultyId}/resume/approve")
+    public ResponseEntity<FacultyDirectoryResponse> approveFacultyResume(@PathVariable Long facultyId) {
+        return ResponseEntity.ok(facultyDirectoryService.reviewResume(facultyId, true, null));
+    }
+
+    @PutMapping("/faculty/{facultyId}/resume/reject")
+    public ResponseEntity<FacultyDirectoryResponse> rejectFacultyResume(
+            @PathVariable Long facultyId,
+            @RequestBody(required = false) Map<String, String> body) {
+        String note = body != null ? body.get("note") : null;
+        return ResponseEntity.ok(facultyDirectoryService.reviewResume(facultyId, false, note));
+    }
+
+    // ==================== Broadcast Center ====================
+
+    @PostMapping("/broadcasts")
+    public ResponseEntity<BroadcastResponse> createBroadcast(
+            Authentication auth,
+            @Valid @RequestBody CreateBroadcastRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(adminPortalService.createBroadcast(auth.getName(), request));
+    }
+
+    /** Messages sent by the signed-in admin, newest first. */
+    @GetMapping("/broadcasts")
+    public ResponseEntity<List<BroadcastResponse>> listBroadcasts(Authentication auth) {
+        return ResponseEntity.ok(adminPortalService.listBroadcastsBy(auth.getName()));
+    }
+
     // ==================== Bulk Import (Phase 5) ====================
 
     @PostMapping("/users/import")

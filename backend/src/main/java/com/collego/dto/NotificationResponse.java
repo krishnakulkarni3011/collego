@@ -12,6 +12,7 @@ public class NotificationResponse {
     private String title;
     private String message;
     private String type;
+    private String category;
     private boolean read;
     private LocalDateTime createdAt;
 }

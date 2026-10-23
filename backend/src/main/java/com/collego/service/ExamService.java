@@ -5,6 +5,7 @@ import com.collego.entity.*;
 import com.collego.exception.BadRequestException;
 import com.collego.exception.ResourceNotFoundException;
 import com.collego.repository.*;
+import com.collego.util.AcademicYearUtils;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.Element;
@@ -95,8 +96,31 @@ public class ExamService {
         if (next == ExamStatus.PUBLISHED && examScheduleRepository.countByExamId(examId) == 0) {
             throw new BadRequestException("Add at least one paper before publishing this exam.");
         }
+        boolean newlyPublished = next == ExamStatus.PUBLISHED && exam.getStatus() != ExamStatus.PUBLISHED;
         exam.setStatus(next);
-        return mapExam(examRepository.save(exam));
+        ExamResponse response = mapExam(examRepository.save(exam));
+        if (newlyPublished) {
+            notifyExamPublished(exam);
+        }
+        return response;
+    }
+
+    private void notifyExamPublished(Exam exam) {
+        int year = AcademicYearUtils.fromSemester(exam.getSemester().getNumber());
+        List<StudentProfile> students = studentProfileRepository.findAll().stream()
+                .filter(s -> Objects.equals(AcademicYearUtils.fromSemester(s.getSemester()), year))
+                .collect(Collectors.toList());
+        for (StudentProfile student : students) {
+            notificationRepository.save(Notification.builder()
+                    .user(student.getUser())
+                    .title("Examination published: " + exam.getName())
+                    .message(exam.getName() + " (" + exam.getSemester().getName() + ") is now published."
+                            + " Check the Examinations tab for your schedule.")
+                    .type(NotificationType.ACADEMIC)
+                    .category(NotificationCategory.EXAM)
+                    .build());
+        }
+        log.info("Published exam '{}' and notified {} students", exam.getName(), students.size());
     }
 
     @Transactional
@@ -152,7 +176,9 @@ public class ExamService {
                 .invigilator(invigilator)
                 .build();
 
-        return mapSchedule(examScheduleRepository.save(schedule));
+        ExamSchedule saved = examScheduleRepository.save(schedule);
+        notifyInvigilator(saved, invigilator);
+        return mapSchedule(saved);
     }
 
     @Transactional
@@ -172,7 +198,25 @@ public class ExamService {
                     .orElseThrow(() -> new ResourceNotFoundException("Faculty not found"));
         }
         schedule.setInvigilator(faculty);
-        return mapSchedule(examScheduleRepository.save(schedule));
+        ExamSchedule saved = examScheduleRepository.save(schedule);
+        notifyInvigilator(saved, faculty);
+        return mapSchedule(saved);
+    }
+
+    private void notifyInvigilator(ExamSchedule schedule, FacultyProfile faculty) {
+        if (faculty == null || faculty.getUser() == null) return;
+        String when = schedule.getExamDate() != null ? " on " + schedule.getExamDate() : "";
+        if (schedule.getStartTime() != null) {
+            when += " at " + schedule.getStartTime();
+        }
+        notificationRepository.save(Notification.builder()
+                .user(faculty.getUser())
+                .title("New invigilation duty")
+                .message(schedule.getExam().getName() + " · " + schedule.getCourse().getName()
+                        + when + (schedule.getRoom() != null ? " · Room " + schedule.getRoom() : ""))
+                .type(NotificationType.ACADEMIC)
+                .category(NotificationCategory.INVIGILATION)
+                .build());
     }
 
     public List<Map<String, Object>> listInvigilators() {

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  GraduationCap, ChevronRight, ChevronLeft, Search, LogOut, Bell,
-  Grid3X3, Calendar, CheckCircle2, X, Building2,
+  GraduationCap, ChevronRight, ChevronLeft, LogOut, Bell,
+  Calendar, CheckCircle2, X, Building2,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import heroImg from '../../assets/hero.png'
@@ -404,8 +404,18 @@ export function PortalSidebar({
                 >
                   <Icon size={17} className={cn('shrink-0', isActive ? a.activeIcon : 'text-slate-400 group-hover:text-slate-100')} />
                   {!collapsed && <span className="text-[13px] font-medium leading-none flex-1 min-w-0 truncate">{item.label}</span>}
+                  {!collapsed && item.badge > 0 && (
+                    <span className="ml-auto shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </span>
+                  )}
                   {item.meta && !collapsed && (
                     <span className="text-[9px] text-slate-400 ml-auto shrink-0">{item.meta}</span>
+                  )}
+                  {collapsed && item.badge > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </span>
                   )}
                   {isActive && !collapsed && !item.meta && <ChevronRight size={12} className={cn('ml-auto', a.activeIcon)} />}
                   {collapsed && (
@@ -455,57 +465,22 @@ export function PortalSidebar({
 
 // ─── Topbar (premium) ──────────────────────────────────────────────────────────
 export function PortalTopbar({
-  sidebarWidth, accent = 'indigo', user = {}, placeholder = 'Search...',
-  notificationCount = 0, notifications = [], onLogout, onApps,
-  searchValue, onSearchChange,
+  sidebarWidth, accent = 'indigo', user = {},
+  notificationCount = 0, notifications = [], onLogout,
 }) {
   const a = ACCENTS[accent] || ACCENTS.indigo
   const [showNotif, setShowNotif] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
-  const searchRef = useRef(null)
   const initials = user.initials || (user.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'U')
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'long', year: 'numeric' })
 
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        searchRef.current?.focus()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
-
   return (
     <header className="topbar px-5 gap-3" style={{ left: sidebarWidth }}>
-      {/* Search */}
-      <div className={cn('hidden sm:flex items-center gap-2 bg-white border border-white/60 rounded-2xl px-4 py-2.5 w-full max-w-md transition-all backdrop-blur-sm', a.focus)}>
-        <Search size={15} className="text-slate-400 shrink-0" />
-        <input
-          ref={searchRef}
-          value={searchValue ?? ''}
-          onChange={(e) => onSearchChange?.(e.target.value)}
-          className="bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none w-full"
-          placeholder={placeholder}
-        />
-        <kbd className="text-[9px] text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded font-mono hidden md:block shrink-0">Ctrl K</kbd>
-      </div>
-
       <div className="flex items-center gap-2 ml-auto">
         <div className="hidden xl:flex items-center gap-2 bg-white border border-white/60 rounded-2xl px-3.5 py-2.5 backdrop-blur-sm">
           <Calendar size={14} className={a.text} />
           <p className="text-xs text-slate-500 font-medium">{dateStr}</p>
         </div>
-
-        {/* Apps */}
-        <button
-          onClick={onApps}
-          className="p-2.5 rounded-2xl text-slate-400 hover:text-slate-700 hover:bg-slate-50/60 transition-all"
-          title="Apps"
-        >
-          <Grid3X3 size={18} />
-        </button>
 
         {/* Notifications */}
         <div className="relative">

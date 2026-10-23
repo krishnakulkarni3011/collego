@@ -30,6 +30,7 @@ public class UserResponse {
     private String designation;
     private String resumeFileName;
     private boolean hasResume;
+    private String resumeStatus;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;

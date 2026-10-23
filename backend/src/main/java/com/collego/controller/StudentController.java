@@ -105,6 +105,19 @@ public class StudentController {
         return ResponseEntity.ok(Map.of("unreadCount", count));
     }
 
+    @GetMapping("/notifications/unread-counts")
+    public ResponseEntity<Map<String, Long>> getUnreadCounts(Authentication auth) {
+        return ResponseEntity.ok(studentPortalService.getUnreadCounts(auth.getName()));
+    }
+
+    @PostMapping("/notifications/categories/{category}/read")
+    public ResponseEntity<Map<String, String>> markCategoryRead(
+            Authentication auth,
+            @PathVariable String category) {
+        studentPortalService.markCategoryRead(auth.getName(), category);
+        return ResponseEntity.ok(Map.of("message", "Notifications marked as read"));
+    }
+
     @PutMapping("/notifications/{id}/read")
     public ResponseEntity<Map<String, String>> markNotificationRead(
             Authentication auth,

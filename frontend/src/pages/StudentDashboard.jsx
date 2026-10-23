@@ -574,11 +574,6 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
               <Download size={12} /> Attachment
             </Button>
           )}
-          {a.submissionId && (
-            <Button variant="outline" size="sm" onClick={() => onDownload(`/api/student/submissions/${a.submissionId}/file`, `assignment-${a.id}-submission`)}>
-              <FileText size={12} /> My submission
-            </Button>
-          )}
           {canSubmit && !submitted && (
             <Button variant="gradient" size="sm" onClick={() => setShowSubmit(v => !v)}>
               <Upload size={12} /> {showSubmit ? 'Cancel' : 'Submit'}
@@ -1252,6 +1247,15 @@ function AiQuestionPaperInsightsTab() {
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
+// Maps a sidebar tab to the notification category that badges it.
+const TAB_CATEGORY = {
+  notifications: 'NOTICE',
+  questionPapers: 'QUESTION_PAPER',
+  materials: 'MATERIAL',
+  assignments: 'ASSIGNMENT',
+  exams: 'EXAM',
+}
+
 export default function StudentDashboard() {
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
@@ -1271,6 +1275,7 @@ export default function StudentDashboard() {
   const [materials, setMaterials] = useState([])
   const [questionPapers, setQuestionPapers] = useState([])
   const [facultyDirectory, setFacultyDirectory] = useState([])
+  const [unreadCounts, setUnreadCounts] = useState({})
   const [loadingTab, setLoadingTab] = useState(false)
 
   const sidebarWidth = collapsed ? 76 : 248
@@ -1314,7 +1319,7 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const [prRes, atRes, ovRes, cgRes, notRes, ttRes, imRes, plRes, semRes, asRes, maRes, qpRes, fdRes] = await Promise.allSettled([
+      const [prRes, atRes, ovRes, cgRes, notRes, ttRes, imRes, plRes, semRes, asRes, maRes, qpRes, fdRes, ucRes] = await Promise.allSettled([
         api.get('/api/student/profile'),
         api.get('/api/student/attendance'),
         api.get('/api/student/attendance/overall'),
@@ -1328,6 +1333,7 @@ export default function StudentDashboard() {
         api.get('/api/student/materials'),
         api.get('/api/student/question-papers'),
         api.get('/api/faculty-directory'),
+        api.get('/api/student/notifications/unread-counts'),
       ])
       if (prRes.status === 'fulfilled') setProfile(prRes.value.data)
       if (atRes.status === 'fulfilled') setSubjects(Array.isArray(atRes.value.data) ? atRes.value.data : [])
@@ -1342,6 +1348,7 @@ export default function StudentDashboard() {
       if (maRes.status === 'fulfilled') setMaterials(Array.isArray(maRes.value.data) ? maRes.value.data : [])
       if (qpRes.status === 'fulfilled') setQuestionPapers(Array.isArray(qpRes.value.data) ? qpRes.value.data : [])
       if (fdRes.status === 'fulfilled') setFacultyDirectory(Array.isArray(fdRes.value.data) ? fdRes.value.data : [])
+      if (ucRes.status === 'fulfilled') setUnreadCounts(ucRes.value.data || {})
     }
     load()
   }, [])
@@ -1350,6 +1357,7 @@ export default function StudentDashboard() {
     try {
       await api.put(`/api/student/notifications/${id}/read`)
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+      setUnreadCounts(prev => ({ ...prev, NOTICE: Math.max(0, (prev.NOTICE || 0) - 1) }))
     } catch { showMsg('Failed to mark as read', 'error') }
   }
 
@@ -1364,9 +1372,28 @@ export default function StudentDashboard() {
 
   const unreadCount = notifications.filter(n => !n.read).length
 
+  const navSections = NAV_SECTIONS.map(section => ({
+    ...section,
+    items: section.items.map(item => ({
+      ...item,
+      badge: TAB_CATEGORY[item.id] ? (unreadCounts[TAB_CATEGORY[item.id]] || 0) : 0,
+    })),
+  }))
+
+  const handleTabChange = useCallback(async (id) => {
+    setActiveTab(id)
+    const category = TAB_CATEGORY[id]
+    if (!category || !unreadCounts[category]) return
+    setUnreadCounts(prev => ({ ...prev, [category]: 0 }))
+    setNotifications(prev => prev.map(n => (n.category === category ? { ...n, read: true } : n)))
+    try {
+      await api.post(`/api/student/notifications/categories/${category}/read`)
+    } catch { /* badge already cleared optimistically */ }
+  }, [unreadCounts])
+
   const renderTab = () => {
     switch (activeTab) {
-      case 'overview': return <OverviewTab profile={profile} overall={overall} subjects={subjects} cgpa={cgpa} notifications={notifications} placements={placements} timetable={timetable} onTabChange={setActiveTab} />
+      case 'overview': return <OverviewTab profile={profile} overall={overall} subjects={subjects} cgpa={cgpa} notifications={notifications} placements={placements} timetable={timetable} onTabChange={handleTabChange} />
       case 'attendance': return <AttendanceTab overall={overall} subjects={subjects} semesters={semesters} onSemesterChange={handleSemesterChange} loading={loadingTab} />
       case 'marks': return <MarksTab internalMarks={internalMarks} cgpa={cgpa} />
       case 'assignments': return <AssignmentsTab assignments={assignments} loading={loadingTab} onSubmit={handleSubmitAssignment} onDownload={handleDownload} />
@@ -1396,13 +1423,12 @@ export default function StudentDashboard() {
       <Toast message={toast} onClose={() => setToast({ text: '', type: 'success' })} />
       <PortalSidebar
         collapsed={collapsed} onToggle={() => setCollapsed(c => !c)}
-        navSections={NAV_SECTIONS} activeTab={activeTab} onTabChange={setActiveTab}
+        navSections={navSections} activeTab={activeTab} onTabChange={handleTabChange}
         accent="emerald" portalLabel="Student Portal"
       />
       <PortalTopbar
         sidebarWidth={sidebarWidth} accent="emerald"
         user={{ name: `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || 'Student', role: profile?.departmentName ? `Student · ${profile.departmentName}` : 'Student', email: profile?.email }}
-        placeholder="Search subjects, notices..."
         notificationCount={unreadCount}
         notifications={(notifications || []).map(n => ({ id: n.id, title: n.title, message: n.message }))}
         onLogout={() => { authService.clearTokens(); navigate('/login') }}

@@ -384,6 +384,13 @@ public class FacultyPortalService {
 
         assignment = assignmentRepository.save(assignment);
 
+        notifyDepartmentYear(section.getCourse() != null ? section.getCourse().getDepartment() : faculty.getDepartment(),
+                assignment.getTargetYear(),
+                "New assignment: " + assignment.getTitle(),
+                "A new assignment was posted for " + section.getCourse().getName()
+                        + (assignment.getDueDate() != null ? ". Due " + assignment.getDueDate() : "."),
+                NotificationCategory.ASSIGNMENT);
+
         log.info("Faculty {} created assignment '{}' for section {}", email, request.getTitle(), section.getId());
 
         return mapAssignmentToResponse(assignment);
@@ -697,6 +704,12 @@ public class FacultyPortalService {
 
         material = courseMaterialRepository.save(material);
 
+        notifyDepartmentYear(section.getCourse() != null ? section.getCourse().getDepartment() : faculty.getDepartment(),
+                material.getTargetYear(),
+                "New study material: " + material.getTitle(),
+                "New study material was shared for " + section.getCourse().getName() + ".",
+                NotificationCategory.MATERIAL);
+
         log.info("Faculty {} created course material '{}' for section {}", email, request.getTitle(), section.getId());
 
         return mapMaterialToResponse(material);
@@ -786,6 +799,12 @@ public class FacultyPortalService {
 
         qp = questionPaperRepository.save(qp);
 
+        notifyDepartmentYear(department, qp.getTargetYear(),
+                "New question paper: " + course.getName(),
+                "A " + qp.getExamType().replace('_', ' ').toLowerCase(Locale.ROOT)
+                        + " question paper was uploaded for " + course.getName() + ".",
+                NotificationCategory.QUESTION_PAPER);
+
         log.info("Faculty {} uploaded question paper for {} ({})", email, course.getName(), request.getExamType());
 
         return mapQuestionPaperToResponse(qp);
@@ -851,6 +870,62 @@ public class FacultyPortalService {
         result.put("message", "Notice sent successfully to " + sent + " students in "
                 + AcademicYearUtils.label(targetYear) + " of " + dept.getName());
         return result;
+    }
+
+    private void notifyDepartmentYear(Department department, Integer targetYear,
+                                      String title, String message, NotificationCategory category) {
+        if (department == null || targetYear == null) return;
+        List<StudentProfile> students = studentProfileRepository.findByDepartmentId(department.getId()).stream()
+                .filter(s -> Objects.equals(AcademicYearUtils.fromSemester(s.getSemester()), targetYear))
+                .collect(Collectors.toList());
+        for (StudentProfile student : students) {
+            notificationRepository.save(Notification.builder()
+                    .user(student.getUser())
+                    .title(title)
+                    .message(message)
+                    .type(NotificationType.ACADEMIC)
+                    .category(category)
+                    .build());
+        }
+    }
+
+    // ==================== Notifications ====================
+
+    public List<NotificationResponse> getNotifications(String email) {
+        User user = getUserByEmail(email);
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(n -> NotificationResponse.builder()
+                        .id(n.getId())
+                        .title(n.getTitle())
+                        .message(n.getMessage())
+                        .type(n.getType().name())
+                        .category(n.getCategory() != null ? n.getCategory().name() : NotificationCategory.NOTICE.name())
+                        .read(n.isRead())
+                        .createdAt(n.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    public Map<String, Long> getUnreadCounts(String email) {
+        User user = getUserByEmail(email);
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (NotificationCategory category : NotificationCategory.values()) {
+            counts.put(category.name(),
+                    notificationRepository.countByUserIdAndCategoryAndIsReadFalse(user.getId(), category));
+        }
+        return counts;
+    }
+
+    @Transactional
+    public void markCategoryRead(String email, String category) {
+        User user = getUserByEmail(email);
+        NotificationCategory parsed;
+        try {
+            parsed = NotificationCategory.valueOf(category.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Unknown notification category: " + category);
+        }
+        notificationRepository.markCategoryRead(user.getId(), parsed);
     }
 
     private Integer validateTargetYear(Integer targetYear) {
@@ -1298,6 +1373,12 @@ public class FacultyPortalService {
             qp.setFileName(file.getOriginalFilename() != null ? file.getOriginalFilename() : uniqueName);
             qp = questionPaperRepository.save(qp);
         }
+
+        notifyDepartmentYear(department, qp.getTargetYear(),
+                "New question paper: " + course.getName(),
+                "A " + qp.getExamType().replace('_', ' ').toLowerCase(Locale.ROOT)
+                        + " question paper was uploaded for " + course.getName() + ".",
+                NotificationCategory.QUESTION_PAPER);
 
         log.info("Faculty {} uploaded question paper for {} ({})", email, course.getName(), request.getExamType());
 

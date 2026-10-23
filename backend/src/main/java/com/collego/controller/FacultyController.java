@@ -2,6 +2,7 @@ package com.collego.controller;
 
 import com.collego.dto.*;
 import com.collego.service.FacultyPortalService;
+import com.collego.service.FacultyDirectoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -25,6 +26,7 @@ import java.util.Map;
 public class FacultyController {
 
     private final FacultyPortalService facultyPortalService;
+    private final FacultyDirectoryService facultyDirectoryService;
 
     // ==================== Sections ====================
 
@@ -336,5 +338,55 @@ public class FacultyController {
             Authentication auth,
             @PathVariable Long sectionId) {
         return ResponseEntity.ok(facultyPortalService.getAnalytics(auth.getName(), sectionId));
+    }
+
+    // ==================== Notifications ====================
+
+    @GetMapping("/notifications")
+    public ResponseEntity<List<NotificationResponse>> getNotifications(Authentication auth) {
+        return ResponseEntity.ok(facultyPortalService.getNotifications(auth.getName()));
+    }
+
+    @GetMapping("/notifications/unread-counts")
+    public ResponseEntity<Map<String, Long>> getUnreadCounts(Authentication auth) {
+        return ResponseEntity.ok(facultyPortalService.getUnreadCounts(auth.getName()));
+    }
+
+    @PostMapping("/notifications/categories/{category}/read")
+    public ResponseEntity<Map<String, String>> markCategoryRead(
+            Authentication auth,
+            @PathVariable String category) {
+        facultyPortalService.markCategoryRead(auth.getName(), category);
+        return ResponseEntity.ok(Map.of("message", "Notifications marked as read"));
+    }
+
+    // ==================== Career Profile (own resume) ====================
+
+    @GetMapping("/career-profile")
+    public ResponseEntity<FacultyDirectoryResponse> getCareerProfile(Authentication auth) {
+        return ResponseEntity.ok(facultyDirectoryService.getOwnProfile(auth.getName()));
+    }
+
+    @PostMapping(value = "/career-profile/resume", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<FacultyDirectoryResponse> uploadCareerResume(
+            Authentication auth,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(facultyDirectoryService.uploadOwnResume(auth.getName(), file));
+    }
+
+    @GetMapping("/career-profile/resume")
+    public ResponseEntity<byte[]> downloadCareerResume(Authentication auth) throws IOException {
+        FacultyDirectoryResponse profile = facultyDirectoryService.getOwnProfile(auth.getName());
+        byte[] bytes = facultyDirectoryService.downloadOwnResume(auth.getName());
+        String filename = profile.getResumeFileName() != null ? profile.getResumeFileName() : "resume.pdf";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(bytes);
+    }
+
+    @DeleteMapping("/career-profile/resume")
+    public ResponseEntity<FacultyDirectoryResponse> removeCareerResume(Authentication auth) {
+        return ResponseEntity.ok(facultyDirectoryService.removeOwnResume(auth.getName()));
     }
 }

@@ -40,9 +40,11 @@ public class AuthService {
         // Try to find user by email first
         User user = userRepository.findByEmailIgnoreCase(cleanUsername).orElse(null);
 
-        // If not found by email, try USN (enrollmentNumber) for students
-        if (user == null && cleanUsername.matches("1CG\\d{2}CS\\d{3}")) {
-            StudentProfile student = studentProfileRepository.findByEnrollmentNumber(cleanUsername).orElse(null);
+        // If not found by email, try USN (enrollmentNumber) for students.
+        // USNs are stored upper-case, so accept lower-case input too.
+        String normalizedUsn = cleanUsername.toUpperCase(java.util.Locale.ROOT);
+        if (user == null && normalizedUsn.matches("\\d{1,2}[A-Z]{2}\\d{2}[A-Z]{2}\\d{3}")) {
+            StudentProfile student = studentProfileRepository.findByEnrollmentNumber(normalizedUsn).orElse(null);
             if (student != null) {
                 user = student.getUser();
             }

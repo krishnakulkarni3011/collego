@@ -137,7 +137,8 @@ public class UserService {
     private record ProfileExtra(Long departmentId, String departmentName, String departmentCode,
                                 String enrollmentNumber, Integer semester, String section,
                                 Integer admissionYear, Long facultyProfileId, String employeeId,
-                                String designation, String resumeFileName, boolean hasResume) {}
+                                String designation, String resumeFileName, boolean hasResume,
+                                String resumeStatus) {}
 
     private ProfileExtra getProfileExtra(User user) {
         if (user.getRole() == Role.STUDENT) {
@@ -150,7 +151,7 @@ public class UserService {
                             p.getSemester(),
                             p.getSection(),
                             p.getAdmissionYear(),
-                            null, null, null, null, false))
+                            null, null, null, null, false, null))
                     .orElse(emptyExtra());
         }
         if (user.getRole() == Role.FACULTY) {
@@ -163,14 +164,20 @@ public class UserService {
                             p.getEmployeeId(),
                             p.getDesignation(),
                             p.getResumeFileName(),
-                            p.getResumePath() != null && !p.getResumePath().isBlank()))
+                            p.getResumePath() != null && !p.getResumePath().isBlank(),
+                            resolveResumeStatus(p)))
                     .orElse(emptyExtra());
         }
         return emptyExtra();
     }
 
+    static String resolveResumeStatus(com.collego.entity.FacultyProfile profile) {
+        if (profile.getResumePath() == null || profile.getResumePath().isBlank()) return "NONE";
+        return profile.getResumeStatus() != null ? profile.getResumeStatus() : "APPROVED";
+    }
+
     private ProfileExtra emptyExtra() {
-        return new ProfileExtra(null, null, null, null, null, null, null, null, null, null, null, false);
+        return new ProfileExtra(null, null, null, null, null, null, null, null, null, null, null, false, null);
     }
 
     private UserResponse mapToUserResponse(User user, ProfileExtra extra) {
@@ -193,6 +200,7 @@ public class UserService {
                 .designation(extra.designation())
                 .resumeFileName(extra.resumeFileName())
                 .hasResume(extra.hasResume())
+                .resumeStatus(extra.resumeStatus())
                 .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now())
                 .build();
     }

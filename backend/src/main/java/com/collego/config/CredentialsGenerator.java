@@ -14,7 +14,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(3) // Run after AcademicDataSeeder
+@Order(4) // Run after AcademicDataSeeder and UsnMigration
 @SuppressWarnings("null")
 public class CredentialsGenerator implements CommandLineRunner {
 
@@ -52,7 +52,7 @@ public class CredentialsGenerator implements CommandLineRunner {
         for (StudentProfile student : students) {
             User user = student.getUser();
             Integer admissionYear = student.getAdmissionYear();
-            int year = (admissionYear != null) ? (admissionYear - 2023) : 1; // Year 1, 2, 3, 4
+            int year = (admissionYear != null) ? (2027 - admissionYear) : 1; // Year 1, 2, 3, 4
             
             if (year != currentYear) {
                 currentYear = year;
