@@ -7,6 +7,7 @@ import {
 import { cn } from '../../lib/utils'
 import heroImg from '../../assets/hero.png'
 import welcomeCampus from '../../assets/ui/welcome-campus.webp'
+import collegoLockupWhite from '../../assets/brand/collego-lockup-white.png'
 
 // ─── Premium accent token sets (per portal) ────────────────────────────────────
 export const ACCENTS = {
@@ -344,21 +345,35 @@ export function PortalSidebar({
   const a = ACCENTS[accent] || ACCENTS.indigo
   return (
     <aside className={cn('sidebar', collapsed && 'collapsed')} style={{ '--nav-accent': a.bar }}>
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-[80px] border-b border-white/10 shrink-0">
-        <div className={cn('w-11 h-11 rounded-2xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-lg text-white', a.grad, a.shadow)}>
-          <GraduationCap size={21} />
-        </div>
-        <AnimatePresence mode="wait">
-          {!collapsed && (
+      {/* Brand */}
+      <div className="flex flex-col items-center justify-center px-4 h-[94px] border-b border-white/10 shrink-0">
+        <AnimatePresence mode="wait" initial={false}>
+          {collapsed ? (
             <motion.div
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
+              key="mark"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.15 }}
-              className="min-w-0"
+              className={cn('w-10 h-10 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg text-white', a.grad, a.shadow)}
             >
-              <p className="text-sm font-extrabold text-white leading-tight tracking-wide">{brand}</p>
+              <GraduationCap size={19} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="logo"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+              className="flex flex-col items-center gap-1.5"
+            >
+              <img
+                src={collegoLockupWhite}
+                alt={`${brand} — ${portalLabel}`}
+                className="h-[55px] w-auto select-none drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)]"
+                draggable={false}
+              />
               <p className="text-[9px] text-slate-400 tracking-[0.18em] uppercase font-semibold">{portalLabel}</p>
             </motion.div>
           )}

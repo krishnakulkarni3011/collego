@@ -10,6 +10,7 @@ import {
 import { authService } from '../services/authService'
 import { cn } from '../lib/utils'
 import { Button } from '../components/ui/button'
+import collegoLogo from '../assets/brand/collego-logo.png'
 
 const ROLES = [
   {
@@ -168,17 +169,18 @@ export default function Login() {
       <Particles />
 
       {/* Brand header */}
-      <header className="relative z-10 flex flex-col items-center text-center px-6 pt-10 pb-8 lg:pt-14">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/25">
-            <GraduationCap size={24} className="text-white" />
-          </div>
-          <div className="text-left">
-            <p className="text-xl lg:text-2xl font-extrabold text-slate-900 tracking-wide">COLLEGO</p>
-            <p className="text-[10px] text-slate-400 tracking-[0.2em] uppercase font-semibold">AI College ERP</p>
-          </div>
-        </div>
-        <h1 className="mt-5 text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
+      <header className="relative z-10 flex flex-col items-center text-center px-6 pt-6 pb-6 lg:pt-10 lg:pb-8">
+        <motion.img
+          src={collegoLogo}
+          alt="Collego — Campus. Reimagined."
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          style={{ height: 'clamp(112px, 17vh, 164px)' }}
+          className="w-auto select-none drop-shadow-[0_14px_30px_rgba(15,23,42,0.12)]"
+          draggable={false}
+        />
+        <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
           The Future of{' '}
           <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-500 bg-clip-text text-transparent">
             College Management
