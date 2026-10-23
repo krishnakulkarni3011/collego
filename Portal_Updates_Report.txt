@@ -2,7 +2,8 @@ COLLEGO - PORTAL UPDATES REPORT (updates.txt)
 =============================================
 Date: 24 October 2026
 Scope: login page, admin portal, faculty portal, student portal, database
-Status: implemented and verified locally. Production is NOT updated yet.
+Status: implemented, verified locally, and deployed to production
+        (https://65-0-244-196.sslip.io) on 24 October 2026.
 
 ------------------------------------------------------------
 DONE
@@ -116,14 +117,28 @@ NOT YET DONE / DEFERRED
 ------------------------------------------------------------
 
 - AI services: deliberately not touched in this round.
-- Production deployment: the live site still runs the previous frontend and
-  backend. Pushing main would also deploy the untested Phase 10 backend
-  commit, so this has been left for an explicit decision.
 - Admin sidebar badges: the admin is the sender of broadcasts and has no
   unread inbox, so no admin badge was added. Pending resume approvals are
   visible in Academics instead.
 - Existing notification rows created before this update are backfilled to
   category NOTICE on startup, so they count toward the Notifications badge.
+
+------------------------------------------------------------
+DEPLOYMENT (24 October 2026)
+------------------------------------------------------------
+- Backend and frontend images were built for linux/amd64 and pushed to ECR as
+  collego-backend:latest and collego-frontend:latest (tagged portals-700db29).
+- Both containers were recreated on the production EC2 instance; nginx was
+  restarted so it re-resolved the new container addresses.
+- The backend startup migration rewrote 120 production USNs and backfilled
+  212 existing notifications to the NOTICE category.
+- Production spot checks: USN login (2BA26CS001 and 2BA23CS001), admin
+  broadcasts list, faculty career profile, student faculty directory and an
+  approved resume download from S3 (HTTP 200, 635 KB) all work.
+- student1.cse@collego.edu (2BA26CS001) had a different password hash from the
+  other seeded accounts, so it was reset to the documented Student@123.
+- The AI microservice remains unhealthy on production, as before this change;
+  the portal does not depend on it.
 
 ------------------------------------------------------------
 VERIFICATION
@@ -134,10 +149,11 @@ VERIFICATION
   creation to all students (120 recipients), per-category mark-as-read,
   faculty resume upload (PENDING), admin approval, student directory
   visibility and student download all verified against the local stack.
-- UI screenshots verified at 1600x1000: login (no Google), student overview
-  (no search/grid, badge on Notifications), assignments (no My submission),
-  examinations (no Hall ticket), admin Broadcast Center, admin Notices &
-  Events with audience, admin resume approval, faculty Career Profile.
+- UI screenshots verified at 1600x1000 locally and on the live site: login
+  (no Google), student overview (no search/grid, badge on Notifications),
+  assignments (no My submission), examinations (no Hall ticket), admin
+  Broadcast Center, admin Notices & Events with audience, admin resume
+  approval, faculty Career Profile.
 
 ------------------------------------------------------------
 STUDENT CREDENTIALS
