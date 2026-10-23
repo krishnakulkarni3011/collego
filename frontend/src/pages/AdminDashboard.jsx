@@ -29,21 +29,11 @@ import {
   WelcomeBanner, ChartTooltip, EmptyState, AnimatedNumber, ACCENTS, ImageStrip,
 } from '../components/dashboard/PortalUI'
 import { uiImages } from '../assets/uiImages'
+import { timeAgo } from '../lib/time'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtNum = (n, dp = 1) => (n == null ? '—' : Number(n).toFixed(dp))
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
-const timeAgo = (ts) => {
-  if (!ts) return ''
-  const diff = Date.now() - new Date(ts).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return 'Just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  return d === 1 ? 'Yesterday' : `${d}d ago`
-}
 
 const PIE_COLORS = ['#4f46e5', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6']
 const RANK_COLORS = ['#f59e0b', '#94a3b8', '#cd7f32', '#6366f1', '#6366f1']

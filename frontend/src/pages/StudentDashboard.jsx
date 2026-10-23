@@ -29,20 +29,10 @@ import {
 } from '../components/dashboard/PortalUI'
 import { uiImages } from '../assets/uiImages'
 import welcomeStudent from '../assets/ui/welcome-student.webp'
+import { timeAgo } from '../lib/time'
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 const fmtNum = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
-const timeAgo = (ts) => {
-  if (!ts) return ''
-  const diff = Date.now() - new Date(ts).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return 'Just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  return d === 1 ? 'Yesterday' : `${d}d ago`
-}
 
 const GRADE_COLORS = { O: '#10b981', 'A+': '#059669', A: '#06b6d4', 'B+': '#3b82f6', B: '#6366f1', C: '#f59e0b', P: '#f59e0b', F: '#ef4444' }
 const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']

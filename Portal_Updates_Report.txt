@@ -55,6 +55,12 @@ DONE
    - Faculty sidebar shows counts on Notices (inbox) and Invigilation Duties.
    - Opening a tab marks that category read and clears its badge immediately.
    - The top-bar bell still shows the total unread count.
+   - The faculty Notices tab now also lists an Inbox of messages received from
+     the admin (previously it only showed notices the faculty had sent).
+   - Relative times ("Just now", "5m ago") are now parsed correctly: the
+     backend serialises timestamps without an offset from a UTC container, so
+     the shared helper treats offset-less values as UTC instead of browser
+     local time. Fresh notifications no longer read "5h ago" in IST.
 
 6. STUDENT - ASSIGNMENTS
    - Removed the "My submission" option from every assignment card.

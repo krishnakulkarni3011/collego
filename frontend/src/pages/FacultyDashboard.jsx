@@ -27,6 +27,7 @@ import {
 } from '../components/dashboard/PortalUI'
 import { uiImages } from '../assets/uiImages'
 import welcomeFaculty from '../assets/ui/welcome-faculty.webp'
+import { timeAgo } from '../lib/time'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
@@ -1025,7 +1026,7 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, targe
         <div className="glass-card overflow-hidden border border-white/60">
           <div className="px-5 py-4 border-b border-white/50 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-800">Inbox</h3>
-            <Badge variant="secondary">{inbox.filter(n => !n.read).length} unread</Badge>
+            <span className="text-[10px] text-slate-400">Messages sent to you</span>
           </div>
           <div className="divide-y divide-white/30">
             {inbox.map(n => (
@@ -1035,10 +1036,7 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, targe
                     <p className="text-sm font-semibold text-slate-800">{n.title}</p>
                     <p className="text-xs text-slate-500 mt-1">{n.message}</p>
                   </div>
-                  <div className="text-right shrink-0">
-                    <Badge variant={n.read ? 'secondary' : 'info'}>{n.read ? 'Read' : 'New'}</Badge>
-                    <p className="text-[10px] text-slate-400 mt-1">{timeAgo(n.createdAt)}</p>
-                  </div>
+                  <p className="text-[10px] text-slate-400 shrink-0">{timeAgo(n.createdAt)}</p>
                 </div>
               </div>
             ))}
