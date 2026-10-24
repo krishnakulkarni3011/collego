@@ -1,0 +1,109 @@
+================================================================
+COLLEGO - PORTAL UPDATES, ROUND 2
+Implemented: 24 October 2026
+Live site: https://65-0-244-196.sslip.io
+Commit: 7bec5d7 (local, not pushed)
+================================================================
+
+SCOPE
+-----
+Requirements taken from updates.txt (24 Oct 2026, 12:24):
+  1. Admin portal - Academics: admin must not upload faculty resumes; only
+     approve/reject and view the resumes faculty upload themselves.
+  2. Admin portal - adding a student/faculty member must email the entered
+     address with the admin-entered details, the temporary password and the
+     portal link, sent from collego.admin@gmail.com.
+  3. Faculty portal - the top-right profile must show the faculty member's
+     name and department.
+
+AI features were explicitly deferred by the user and were not touched.
+
+
+DONE
+----
+1. ADMIN CAN NO LONGER UPLOAD RESUMES
+   - Removed the Upload/Replace control (file picker) from the faculty table
+     in Admin > Academics > <Department> > Faculty. The Resume column now
+     only shows the status badge (None / Pending / Approved / Rejected) and a
+     "View" link for resumes the faculty uploaded.
+   - Removed the backend endpoints POST /api/admin/faculty/{id}/resume and
+     DELETE /api/admin/faculty/{id}/resume, plus the matching service
+     methods, so the capability cannot be used even by calling the API.
+   - Admin can still review (Approve / Reject with a note) and download any
+     faculty resume, including pending ones, from the same table.
+   - Faculty continue to upload/replace/remove their own resume in
+     Faculty Portal > Career Profile; self-uploads always start as PENDING.
+
+2. ACCOUNT-CREATION EMAIL
+   - Creating a student or faculty member now sends a plain-text email to the
+     address entered by the admin.
+   - The email contains: name, role, email, and the rest of the information
+     entered by the admin (USN, department, semester, section, admission year
+     for students; employee ID, designation, department for faculty), the
+     temporary password, the sign-in link and a note that the password can be
+     changed from Settings.
+   - Sender/account: collego.admin@gmail.com (SMTP smtp.gmail.com:587, TLS,
+     Gmail app password). Configurable through MAIL_ENABLED, MAIL_HOST,
+     MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM and FRONTEND_URL.
+   - Mail failures are logged and never roll back account creation, so the
+     admin is never blocked by an SMTP problem.
+   - The admin success toast now reads:
+     "User created - login details sent to <email>".
+   - Production: MAIL_ENABLED=true and the Gmail app password are set in
+     /opt/collego/.env (file mode 600) and passed to the backend container.
+     A real test email was delivered to collego.admin@gmail.com and the
+     backend logged "Email sent to collego.admin@gmail.com
+     (Your Collego account is ready)". The temporary test account was then
+     deleted from the database.
+   - Local development: mail stays log-only (MAIL_ENABLED=false) and the full
+     message is written to the backend log for inspection.
+
+3. FACULTY TOP-RIGHT PROFILE
+   - The faculty portal now loads the signed-in faculty member's career
+     profile on mount and shows the real name plus department in the top bar
+     (e.g. "Prof S.R Karjol" / "Professor - Computer Science & Engineering")
+     instead of the placeholder "Faculty User" / "Faculty".
+   - Verified on the live site: header text is
+     "Prof S.R Karjol  Professor - Computer Science & Engineering".
+
+4. CONFIGURATION AND DEPLOYMENT
+   - docker-compose.yml and docker-compose.prod.yml now pass MAIL_* and
+     FRONTEND_URL to the backend container.
+   - application.yml / application-prod.yml default the mail sender and
+     username to collego.admin@gmail.com and the SMTP host to
+     smtp.gmail.com (port 587, STARTTLS).
+   - Production images rebuilt for linux/amd64 and pushed to ECR:
+        collego-backend:latest  + collego-backend:round2-7bec5d7
+        collego-frontend:latest + collego-frontend:round2-7bec5d7
+     The EC2 stack was updated (compose file replaced, .env extended) and the
+     backend/frontend containers recreated. Backend is healthy.
+   - Backups kept on the server: docker-compose.prod.yml.bak-round1 and
+     .env.bak-round1.
+
+5. VERIFICATION
+   - Backend: 54/54 Maven tests pass (BUILD SUCCESS).
+   - Frontend: production build succeeds; no new lint warnings.
+   - Local: created a test student and faculty through the admin API; both
+     emails were generated with the correct details (checked in the backend
+     log with mail disabled). Test accounts removed from the database.
+   - Live: admin login OK, department -> faculty table renders with 0 file
+     inputs (no upload option) and status/View only; faculty header shows the
+     real name and department; account email actually delivered via Gmail
+     SMTP; test account removed.
+   - Screenshots: C:\Users\krish\AppData\Local\Temp\opencode\prod-round2-shots\
+
+
+NOT YET DONE / DEFERRED
+-----------------------
+- AI features: not implemented. Deferred by the user ("do not implement AI
+  features yet"). ai-service/main.py, Phase10_LLM_Integration_Plan.txt and
+  Phase11_Cloud_LLM_Plan.txt remain the user's own work and were not touched.
+- Local commits 7bec5d7 (and the earlier f667124, 700db29, 5f1c859) are not
+  pushed to origin. Production was deployed manually from local images, so a
+  push is not required; pushing would trigger the CI deploy of the same code.
+- The Gmail app password is stored only in /opt/collego/.env on the server.
+  If it is rotated in the Google account, update MAIL_PASSWORD there and
+  recreate the backend container.
+- Account emails are plain text (no HTML template, no logo). Not requested.
+- "Forgot password" emails reuse the same SMTP account and are now live too,
+  but were not part of this round's requested scope and were not re-tested.
