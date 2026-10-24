@@ -5,6 +5,7 @@ import com.collego.ai.AiHistorySanitizer;
 import com.collego.ai.AiRateLimiter;
 import com.collego.ai.AiScope;
 import com.collego.ai.AiScopeFactory;
+import com.collego.ai.AiStudentInsights;
 import com.collego.dto.*;
 import com.collego.entity.*;
 import com.collego.repository.*;
@@ -58,10 +59,9 @@ public class AiController {
     private final AiScopeFactory aiScopeFactory;
     private final AiChatOrchestrator aiChatOrchestrator;
     private final AiRateLimiter aiRateLimiter;
+    private final AiStudentInsights aiStudentInsights;
 
-    // Repositories for fetching context data to pass to AI
-    private final UserRepository userRepository;
-    private final StudentProfileRepository studentProfileRepository;
+    // Repository for fetching question-paper context to pass to AI
     private final QuestionPaperRepository questionPaperRepository;
 
     // ── Health ─────────────────────────────────────────────────────────────────
@@ -118,8 +118,7 @@ public class AiController {
             return rateLimited();
         }
         String email = auth.getName();
-        Map<String, Object> request = buildPerformancePredictionPayload(email);
-        return ResponseEntity.ok(aiService.predictPerformance(request));
+        return ResponseEntity.ok(aiStudentInsights.performancePrediction(email));
     }
 
     // ── Feature 4: Attendance Risk (Student only) ──────────────────────────────
@@ -131,8 +130,7 @@ public class AiController {
             return rateLimited();
         }
         String email = auth.getName();
-        Map<String, Object> request = buildAttendanceRiskPayload(email);
-        return ResponseEntity.ok(aiService.attendanceRisk(request));
+        return ResponseEntity.ok(aiStudentInsights.attendanceRisk(email));
     }
 
     // ── Feature 5: Resume Analyzer ─────────────────────────────────────────────
@@ -147,7 +145,7 @@ public class AiController {
         }
         String resumeText = body.get("resumeText") == null ? "" : String.valueOf(body.get("resumeText"));
         String targetRole = body.get("targetRole") == null ? null : String.valueOf(body.get("targetRole"));
-        Map<String, Object> profile = buildStudentProfileForPlacement(auth.getName());
+        Map<String, Object> profile = aiStudentInsights.studentProfile(auth.getName());
         return ResponseEntity.ok(aiService.analyzeResume(resumeText, targetRole, profile));
     }
 
@@ -162,10 +160,7 @@ public class AiController {
             return rateLimited();
         }
         // Merge student profile from DB into request (identity from JWT only).
-        Map<String, Object> studentProfile = buildStudentProfileForPlacement(auth.getName());
-        Map<String, Object> request = new HashMap<>(body);
-        request.put("student", studentProfile);
-        return ResponseEntity.ok(aiService.placementAssistant(request));
+        return ResponseEntity.ok(aiStudentInsights.placementAssistant(auth.getName(), body));
     }
 
     // ── Feature 7: Question Paper Insights ────────────────────────────────────
@@ -230,98 +225,6 @@ public class AiController {
         } catch (Exception e) {
             log.debug("Context build failed for {}: {}", email, e.getMessage());
             return Map.of();
-        }
-    }
-
-    /**
-     * Builds the performance prediction payload with semester history.
-     */
-    private Map<String, Object> buildPerformancePredictionPayload(String email) {
-        try {
-            User user = userRepository.findByEmail(email).orElse(null);
-            if (user == null) return Map.of("semesterHistory", List.of());
-
-            StudentProfile student = studentProfileRepository.findByUserId(user.getId()).orElse(null);
-            if (student == null) return Map.of("semesterHistory", List.of());
-
-            // Build semester history from CGPA data
-            CgpaResponse cgpa = studentPortalService.calculateCgpa(email);
-            List<Map<String, Object>> semHistory = cgpa.getSemesters().stream().map(sem -> {
-                Map<String, Object> s = new HashMap<>();
-                s.put("semesterNumber", sem.getSemesterNumber());
-                s.put("sgpa", sem.getSgpa());
-                s.put("totalCredits", sem.getTotalCredits());
-                return s;
-            }).collect(Collectors.toList());
-
-            // Get current attendance
-            double attPct = 0;
-            try {
-                OverallAttendanceResponse att = studentPortalService.getOverallAttendance(email);
-                attPct = att.getOverallPercentage();
-            } catch (Exception ignored) {}
-
-            return Map.of(
-                    "studentId", student.getId(),
-                    "semesterHistory", semHistory,
-                    "currentAttendance", attPct,
-                    "currentSemester", student.getSemester()
-            );
-        } catch (Exception e) {
-            log.warn("Performance prediction payload build failed: {}", e.getMessage());
-            return Map.of("semesterHistory", List.of());
-        }
-    }
-
-    /**
-     * Builds the attendance risk payload.
-     */
-    private Map<String, Object> buildAttendanceRiskPayload(String email) {
-        try {
-            List<SubjectAttendanceResponse> subjectAtt = studentPortalService.getAttendance(email, null);
-            List<Map<String, Object>> subjectData = subjectAtt.stream().map(s -> {
-                Map<String, Object> m = new HashMap<>();
-                m.put("courseName", s.getCourseName());
-                m.put("courseCode", s.getCourseCode());
-                m.put("totalClasses", s.getTotalClasses());
-                m.put("present", s.getPresent());
-                m.put("percentage", s.getPercentage());
-                return m;
-            }).collect(Collectors.toList());
-            return Map.of("subjectAttendance", subjectData);
-        } catch (Exception e) {
-            log.warn("Attendance risk payload build failed: {}", e.getMessage());
-            return Map.of("subjectAttendance", List.of());
-        }
-    }
-
-    /**
-     * Builds minimal student profile for placement assistant.
-     */
-    private Map<String, Object> buildStudentProfileForPlacement(String email) {
-        try {
-            User user = userRepository.findByEmail(email).orElse(null);
-            if (user == null) return Map.of("cgpa", 0.0);
-
-            StudentProfile student = studentProfileRepository.findByUserId(user.getId()).orElse(null);
-            double cgpa = 0.0;
-            try {
-                CgpaResponse cgpaResp = studentPortalService.calculateCgpa(email);
-                cgpa = cgpaResp.getCumulativeCgpa();
-            } catch (Exception ignored) {}
-
-            Map<String, Object> profile = new HashMap<>();
-            profile.put("cgpa", cgpa);
-            profile.put("department", student != null && student.getDepartment() != null
-                    ? student.getDepartment().getName() : "");
-            profile.put("currentSemester", student != null ? student.getSemester() : 0);
-            profile.put("skills", List.of());
-            profile.put("interests", List.of());
-            profile.put("hasBacklogs", false);
-            return profile;
-        } catch (Exception e) {
-            log.warn("Student placement profile build failed: {}", e.getMessage());
-            return Map.of("cgpa", 0.0, "skills", List.of(), "hasBacklogs", false);
         }
     }
 

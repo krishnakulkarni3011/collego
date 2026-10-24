@@ -1,9 +1,9 @@
 """
-Collego AI Service — Phase 9
+Collego AI Service — Phase 10
 FastAPI microservice implementing AI features called by the Spring Boot backend.
 
 Features:
-  1. AI College Assistant (RAG chatbot)
+  1. AI College Assistant (grounded, tool-calling chatbot)
   2. Smart AI Search (intent classification + route navigation)
   3. Student Performance Prediction (local linear-regression projection)
   4. Attendance Risk Prediction (early-warning model)
@@ -11,9 +11,13 @@ Features:
   6. AI Placement Assistant (company recommendations + mock interview)
   7. AI Question Paper Insights (topic weightage)
 
-All LLM features degrade gracefully to deterministic stubs when the local model
-server is unreachable. LLM inference runs on a local Ollama instance (free
-forever: no API key, no quota, and student data never leaves this infrastructure).
+LLM inference runs on a CLOUD provider (Groq by default) using its free tier:
+no local model, nothing stored on the workstation, and the provider is
+swappable by env alone.
+
+Every failure mode degrades to the deterministic Phase 9 stubs instead of
+failing: no API key, an exhausted daily budget, an open circuit breaker, a
+rate limit, or a provider outage.
 
 ML features (3 & 4) use pure-Python linear regression locally — no external key
 is needed and no LLM is involved.
@@ -28,6 +32,8 @@ import os
 import json
 import re
 import math
+import time
+import asyncio
 import httpx
 
 app = FastAPI(
@@ -45,15 +51,29 @@ app.add_middleware(
 )
 
 # ── Config ────────────────────────────────────────────────────────────────────
-# Phase 10: inference runs on a LOCAL Ollama server. Free forever — no API key,
-# no quota, and no student data ever leaves this infrastructure.
-PROVIDER        = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
-LLM_BASE_URL    = os.getenv("LLM_BASE_URL", "http://localhost:11434").rstrip("/")
-DEFAULT_MODEL   = os.getenv("AI_MODEL", "qwen2.5:7b-instruct")
-EMBED_MODEL     = os.getenv("AI_EMBED_MODEL", "nomic-embed-text")
-NUM_CTX         = int(os.getenv("AI_NUM_CTX", "4096"))
+# Phase 10: inference runs on a CLOUD provider (Groq by default) using its free
+# tier — no local model, nothing stored on the workstation, and no quota
+# surprises. The provider is swappable by env alone, and every failure mode
+# (no key, rate limit, provider down, daily budget spent) degrades to the
+# deterministic Phase 9 stubs instead of failing.
+PROVIDER        = os.getenv("LLM_PROVIDER", "groq").strip().lower()
+LLM_BASE_URL    = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
+LLM_API_KEY     = os.getenv("LLM_API_KEY", "")
+DEFAULT_MODEL   = os.getenv("LLM_MODEL", "openai/gpt-oss-120b")
 TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "60"))
 AI_ENABLED      = os.getenv("AI_ENABLED", "true").strip().lower() not in ("0", "false", "no")
+
+# Optional second provider used when the primary is rate-limited or down.
+FALLBACK_PROVIDER   = os.getenv("LLM_FALLBACK_PROVIDER", "").strip().lower()
+FALLBACK_BASE_URL   = os.getenv("LLM_FALLBACK_BASE_URL", "").rstrip("/")
+FALLBACK_API_KEY    = os.getenv("LLM_FALLBACK_API_KEY", "")
+FALLBACK_MODEL      = os.getenv("LLM_FALLBACK_MODEL", "")
+
+# Shared free-tier protection. The daily budget is a hard ceiling for the whole
+# instance; the circuit breaker stops hammering a provider that is rate-limiting
+# us. Both fall back to the stubs.
+DAILY_CALL_BUDGET   = int(os.getenv("AI_DAILY_CALL_BUDGET", "8000"))
+CIRCUIT_BREAKER_SECS = float(os.getenv("CIRCUIT_BREAKER_SECONDS", "60"))
 
 # Phase 10 security: untrusted client history is bounded and role-filtered.
 MAX_HISTORY_TURNS = 6
@@ -113,63 +133,217 @@ def _normalise_tool_calls(raw: Any) -> List[Dict[str, Any]]:
     return out
 
 
+class _ProviderUnavailable(Exception):
+    """Raised when no LLM provider can serve the request (the caller stubs)."""
+
+
+class _CircuitBreaker:
+    """
+    Stops us hammering a provider that is rate-limiting us.
+
+    A 429 (or a run of 5xx) trips the breaker; while it is open every request
+    is served by the deterministic stubs instead of burning quota. After the
+    reset window the breaker half-opens and the next request tries the provider
+    again.
+    """
+
+    def __init__(self, reset_seconds: float):
+        self._reset_seconds = max(1.0, reset_seconds)
+        self._open_until = 0.0
+        self._trips = 0
+        self._last_reason = ""
+
+    @property
+    def is_open(self) -> bool:
+        return time.monotonic() < self._open_until
+
+    def trip(self, reason: str, seconds: Optional[float] = None) -> None:
+        self._trips += 1
+        self._last_reason = reason
+        window = self._reset_seconds if seconds is None else max(1.0, seconds)
+        self._open_until = time.monotonic() + window
+
+    def reset(self) -> None:
+        self._open_until = 0.0
+        self._last_reason = ""
+
+    @property
+    def trips(self) -> int:
+        return self._trips
+
+    @property
+    def last_reason(self) -> str:
+        return self._last_reason
+
+    @property
+    def seconds_remaining(self) -> float:
+        return max(0.0, self._open_until - time.monotonic())
+
+
+class _DailyBudget:
+    """
+    Hard ceiling on provider requests per UTC day for the whole instance.
+
+    The shared free tier is finite, so one enthusiastic user must not be able
+    to spend it. When the budget is spent the stubs take over.
+    """
+
+    def __init__(self, limit: int):
+        self._limit = limit
+        self._day = ""
+        self._used = 0
+
+    def consume(self) -> bool:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if today != self._day:
+            self._day = today
+            self._used = 0
+        if self._limit <= 0 or self._used >= self._limit:
+            return False
+        self._used += 1
+        return True
+
+    @property
+    def used(self) -> int:
+        return self._used
+
+    @property
+    def limit(self) -> int:
+        return self._limit
+
+
+_breaker = _CircuitBreaker(CIRCUIT_BREAKER_SECS)
+_budget = _DailyBudget(DAILY_CALL_BUDGET)
+
+
+async def _call_openai_compatible(client: httpx.AsyncClient, base_url: str, api_key: str,
+                                  model: str, payload: Dict[str, Any],
+                                  json_mode: bool) -> Dict[str, Any]:
+    """
+    One chat-completions call against any OpenAI-compatible endpoint.
+
+    base_url is everything up to (but not including) /chat/completions, e.g.
+    https://api.groq.com/openai/v1 or https://openrouter.ai/api/v1.
+    """
+    url = f"{base_url}/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    body = dict(payload)
+    body["model"] = model
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+
+    response = await client.post(url, headers=headers, json=body)
+    if response.status_code == 400 and json_mode and "response_format" in (response.text or ""):
+        # This model does not support JSON mode - retry once without it.
+        body.pop("response_format", None)
+        response = await client.post(url, headers=headers, json=body)
+    if response.status_code >= 400:
+        # Log a short body so a provider-side schema rejection is diagnosable.
+        print(f"[ai-service] provider {response.status_code}: {(response.text or '')[:600]}")
+    response.raise_for_status()
+
+    choice = (response.json().get("choices") or [{}])[0]
+    message = choice.get("message") or {}
+    return {
+        "content": message.get("content") or "",
+        "toolCalls": _normalise_tool_calls(message.get("tool_calls")),
+    }
+
+
+async def _provider_request(client: httpx.AsyncClient, base_url: str, api_key: str,
+                             model: str, payload: Dict[str, Any],
+                             json_mode: bool) -> Dict[str, Any]:
+    """A single provider request, counted against the daily budget."""
+    if not _budget.consume():
+        raise _ProviderUnavailable("daily provider call budget exhausted")
+    return await _call_openai_compatible(client, base_url, api_key, model, payload, json_mode)
+
+
+async def _try_fallback(client: httpx.AsyncClient, payload: Dict[str, Any],
+                        json_mode: bool) -> Optional[Dict[str, Any]]:
+    """Try the secondary provider once. Returns None when it is unusable."""
+    if not FALLBACK_PROVIDER or not FALLBACK_API_KEY:
+        return None
+    base = FALLBACK_BASE_URL or LLM_BASE_URL
+    model = FALLBACK_MODEL or DEFAULT_MODEL
+    try:
+        return await _provider_request(client, base, FALLBACK_API_KEY, model, payload, json_mode)
+    except Exception:
+        return None
+
+
 async def call_llm_raw(system_prompt: str, messages: List[Dict[str, Any]], *,
                        tools: Optional[List[Dict[str, Any]]] = None,
                        max_tokens: int = 1000,
                        json_mode: bool = False) -> Dict[str, Any]:
     """
-    One LLM call against the configured backend.
+    One LLM call against the configured cloud provider.
 
-    Returns {"content": str, "toolCalls": [{"name", "arguments"}]}. The backend
-    is either the local Ollama server (default) or any OpenAI-compatible server,
-    switchable by env alone so a machine without a GPU can point at another box.
+    Returns {"content": str, "toolCalls": [{"name", "arguments"}]}.
+
+    Raises _ProviderUnavailable when no provider can serve the request; every
+    caller falls back to the deterministic stubs in that case.
     """
-    # A dead LLM backend must fail fast (5s connect) so the deterministic stub
+    if not AI_ENABLED:
+        raise _ProviderUnavailable("llm disabled by configuration")
+    if not LLM_API_KEY:
+        raise _ProviderUnavailable("no api key configured")
+    if _breaker.is_open:
+        raise _ProviderUnavailable(f"circuit breaker open ({_breaker.seconds_remaining:.0f}s)")
+
+    payload: Dict[str, Any] = {
+        "messages": [{"role": "system", "content": system_prompt}] + messages,
+        "max_tokens": max_tokens,
+        "temperature": 0.2,      # grounding task, not creative writing
+    }
+    if tools:
+        payload["tools"] = [{"type": "function", "function": t} for t in tools]
+
+    # A dead provider must fail fast (5s connect) so the deterministic stub
     # answers immediately instead of leaving the request hanging.
     timeout = httpx.Timeout(TIMEOUT_SECONDS, connect=5.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
-        if PROVIDER == "ollama":
-            payload: Dict[str, Any] = {
-                "model": DEFAULT_MODEL,
-                "messages": [{"role": "system", "content": system_prompt}] + messages,
-                "stream": False,
-                "options": {
-                    "temperature": 0.2,      # grounding task, not creative writing
-                    "num_ctx": NUM_CTX,      # 4096 keeps the KV cache inside 6 GB VRAM
-                    "num_predict": max_tokens,
-                },
-            }
-            if tools:
-                payload["tools"] = [{"type": "function", "function": t} for t in tools]
-            if json_mode:
-                payload["format"] = "json"
-            response = await client.post(f"{LLM_BASE_URL}/api/chat", json=payload)
-            response.raise_for_status()
-            message = response.json().get("message") or {}
-            return {
-                "content": message.get("content") or "",
-                "toolCalls": _normalise_tool_calls(message.get("tool_calls")),
-            }
-
-        # OpenAI-compatible backend
-        payload = {
-            "model": DEFAULT_MODEL,
-            "messages": [{"role": "system", "content": system_prompt}] + messages,
-            "max_tokens": max_tokens,
-            "temperature": 0.2,
-        }
-        if tools:
-            payload["tools"] = [{"type": "function", "function": t} for t in tools]
-        if json_mode:
-            payload["response_format"] = {"type": "json_object"}
-        response = await client.post(f"{LLM_BASE_URL}/v1/chat/completions", json=payload)
-        response.raise_for_status()
-        choice = (response.json().get("choices") or [{}])[0]
-        message = choice.get("message") or {}
-        return {
-            "content": message.get("content") or "",
-            "toolCalls": _normalise_tool_calls(message.get("tool_calls")),
-        }
+        try:
+            result = await _provider_request(client, LLM_BASE_URL, LLM_API_KEY,
+                                             DEFAULT_MODEL, payload, json_mode)
+            _breaker.reset()
+            return result
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            if status == 429:
+                # The TPM window is per minute; back off just long enough for it
+                # to refill instead of disabling the feature for five minutes.
+                _breaker.trip("rate limited (429)", 60)
+                fallback = await _try_fallback(client, payload, json_mode)
+                if fallback is not None:
+                    return fallback
+                raise _ProviderUnavailable("provider rate limited (429)")
+            if status >= 500:
+                _breaker.trip(f"provider error {status}")
+                fallback = await _try_fallback(client, payload, json_mode)
+                if fallback is not None:
+                    return fallback
+                raise _ProviderUnavailable(f"provider error {status}")
+            # 400/401/404 are request/config problems, not a provider outage.
+            # Do not open the breaker: the next, well-formed request should run.
+            raise _ProviderUnavailable(f"provider rejected the request ({status})")
+        except httpx.RequestError as exc:
+            # A DNS/TLS blip should not disable the assistant for minutes.
+            await asyncio.sleep(0.8)
+            try:
+                result = await _provider_request(client, LLM_BASE_URL, LLM_API_KEY,
+                                                 DEFAULT_MODEL, payload, json_mode)
+                _breaker.reset()
+                return result
+            except Exception:
+                _breaker.trip("provider unreachable", 30)
+                fallback = await _try_fallback(client, payload, json_mode)
+                if fallback is not None:
+                    return fallback
+                raise _ProviderUnavailable(f"provider unreachable: {exc}")
 
 
 async def call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 1000,
@@ -185,15 +359,13 @@ async def call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 1000,
 
 
 async def _llm_reachable() -> bool:
-    """Cheap reachability probe so /health reports the real backend state."""
-    if not AI_ENABLED:
+    """Cheap reachability probe so /health reports the real provider state."""
+    if not AI_ENABLED or not LLM_API_KEY:
         return False
     try:
         async with httpx.AsyncClient(timeout=2.5) as client:
-            if PROVIDER == "ollama":
-                response = await client.get(f"{LLM_BASE_URL}/api/tags")
-            else:
-                response = await client.get(f"{LLM_BASE_URL}/v1/models")
+            response = await client.get(f"{LLM_BASE_URL}/models",
+                                        headers={"Authorization": f"Bearer {LLM_API_KEY}"})
             return response.status_code < 500
     except Exception:
         return False
@@ -208,21 +380,29 @@ async def health_check():
     return {
         "status": "UP",
         "service": "collego-ai-service",
-        "version": "10.0.0",
+        "version": "11.0.0",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "ai_enabled": AI_ENABLED,
         "llm": {
             "provider": PROVIDER,
             "model": DEFAULT_MODEL,
-            "embedModel": EMBED_MODEL,
             "baseUrl": LLM_BASE_URL,
-            "numCtx": NUM_CTX,
+            "apiKeyConfigured": bool(LLM_API_KEY),
+            "fallbackProvider": FALLBACK_PROVIDER or None,
+            "dailyBudget": {"used": _budget.used, "limit": _budget.limit},
+            "circuitBreaker": {
+                "open": _breaker.is_open,
+                "trips": _breaker.trips,
+                "lastReason": _breaker.last_reason or None,
+                "secondsRemaining": round(_breaker.seconds_remaining),
+            },
             "reachable": await _llm_reachable(),
+            "servingStubs": (not AI_ENABLED) or (not LLM_API_KEY) or _breaker.is_open,
         },
         "features": [
             "chat", "smart-search", "performance-prediction",
             "attendance-risk", "resume-analyzer", "placement-assistant",
-            "question-paper-insights", "embeddings"
+            "question-paper-insights"
         ]
     }
 
@@ -301,13 +481,26 @@ async def chat(req: ChatRequest):
 
     messages: List[Dict[str, Any]] = list(history)
     messages.append({"role": "user", "content": message})
-    for item in req.toolTrace or []:
+    for index, item in enumerate(req.toolTrace or []):
         name = str(item.get("name", "tool")) if isinstance(item, dict) else "tool"
         content = item.get("content") if isinstance(item, dict) else item
-        messages.append({"role": "assistant", "content": ""})
+        # OpenAI-compatible providers (Groq included) require every tool result
+        # to answer an assistant tool_call with the same id. The Spring side
+        # sends a compact trace, so synthesise a matching call here.
+        call_id = f"call_{index}"
+        messages.append({
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [{
+                "id": call_id,
+                "type": "function",
+                "function": {"name": name, "arguments": "{}"},
+            }],
+        })
         messages.append({
             "role": "tool",
-            "tool_name": name,
+            "tool_call_id": call_id,
+            "name": name,
             "content": content if isinstance(content, str) else json.dumps(content, default=str),
         })
 
@@ -321,6 +514,12 @@ async def chat(req: ChatRequest):
             max_tokens=600,
             json_mode=False,
         )
+    except _ProviderUnavailable as exc:
+        # No key, budget spent, breaker open, rate limited or provider down:
+        # degrade to the deterministic stub instead of failing the whole chat.
+        print(f"[ai-service] provider unavailable ({exc}); using stub")
+        lower = message.lower()
+        return ChatResponse(reply=_stub_chat_response(lower, req.context), intent=_detect_intent(lower))
     except httpx.HTTPStatusError as e:
         # Model missing (404) or backend error: degrade to the deterministic stub
         # instead of failing the whole chat.
@@ -328,7 +527,7 @@ async def chat(req: ChatRequest):
         lower = message.lower()
         return ChatResponse(reply=_stub_chat_response(lower, req.context), intent=_detect_intent(lower))
     except httpx.RequestError:
-        # Local model down: degrade to the deterministic stub instead of failing.
+        # Provider unreachable: degrade to the deterministic stub instead of failing.
         lower = message.lower()
         return ChatResponse(reply=_stub_chat_response(lower, req.context), intent=_detect_intent(lower))
 
@@ -1109,40 +1308,56 @@ class EmbedRequest(BaseModel):
 @app.post("/embed")
 async def embed(req: EmbedRequest):
     """
-    Phase 10: local embeddings for scoped retrieval.
+    Phase 11: embeddings for scoped retrieval.
 
     Only the caller's own candidate documents are ever sent here, and ranking
-    happens in the Spring Boot layer under an AiScope, so retrieval cannot widen
-    data access. Degrades to an empty result when the embedding model is absent.
+    happens in the Spring Boot layer under an AiScope, so retrieval can never
+    widen data access.
+
+    Groq (the default cloud provider) has no embeddings endpoint, so this
+    returns an empty result and the retriever falls back to keyword ranking.
+    Set EMBED_PROVIDER / EMBED_BASE_URL / EMBED_API_KEY / EMBED_MODEL to use a
+    provider that does serve embeddings.
     """
-    if not AI_ENABLED:
-        return {"embeddings": [], "model": None, "error": "llm backend disabled"}
+    embed_provider = os.getenv("EMBED_PROVIDER", "").strip().lower()
+    embed_base_url = os.getenv("EMBED_BASE_URL", "").rstrip("/")
+    embed_api_key = os.getenv("EMBED_API_KEY", "")
+    embed_model = os.getenv("EMBED_MODEL", "")
+
+    if not (embed_provider and embed_base_url and embed_model):
+        return {"embeddings": [], "model": embed_model or None,
+                "error": "no embedding provider configured; the retriever uses keyword ranking"}
 
     texts = [t for t in (req.texts or []) if t and t.strip()][:64]
     if not texts:
-        return {"embeddings": [], "model": EMBED_MODEL}
+        return {"embeddings": [], "model": embed_model}
 
     embeddings: List[List[float]] = []
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(TIMEOUT_SECONDS, connect=5.0)) as client:
-            if PROVIDER == "ollama":
+            headers = {"Content-Type": "application/json"}
+            if embed_api_key:
+                headers["Authorization"] = f"Bearer {embed_api_key}"
+            if embed_provider == "ollama":
                 for text in texts:
                     response = await client.post(
-                        f"{LLM_BASE_URL}/api/embeddings",
-                        json={"model": EMBED_MODEL, "prompt": text[:4000]},
+                        f"{embed_base_url}/api/embeddings",
+                        headers=headers,
+                        json={"model": embed_model, "prompt": text[:4000]},
                     )
                     response.raise_for_status()
                     embeddings.append(response.json().get("embedding", []))
             else:
                 response = await client.post(
-                    f"{LLM_BASE_URL}/v1/embeddings",
-                    json={"model": EMBED_MODEL, "input": texts},
+                    f"{embed_base_url}/embeddings",
+                    headers=headers,
+                    json={"model": embed_model, "input": texts},
                 )
                 response.raise_for_status()
                 for item in response.json().get("data", []):
                     embeddings.append(item.get("embedding", []))
     except Exception as e:
-        return {"embeddings": [], "model": EMBED_MODEL, "error": str(e)[:200]}
+        return {"embeddings": [], "model": embed_model, "error": str(e)[:200]}
 
-    return {"embeddings": embeddings, "model": EMBED_MODEL}
+    return {"embeddings": embeddings, "model": embed_model}
 

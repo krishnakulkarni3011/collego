@@ -44,6 +44,8 @@ services:
       EC2_INSTANCE_ID: ${EC2_INSTANCE_ID}
       # Phase 8/9: AI microservice URL (Docker internal)
       AI_SERVICE_URL: http://collego-ai-service:8000
+      # Keep the tool loop inside Groq's 8k TPM free-tier budget.
+      AI_MAX_TOOL_ROUNDS: ${AI_MAX_TOOL_ROUNDS:-1}
       # Spring profile
       SPRING_PROFILES_ACTIVE: prod
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
@@ -90,17 +92,20 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
-      # Phase 10: LOCAL Ollama inference — free forever, no API key, no quota, and
-      # student data never leaves your infrastructure.
-      # Point LLM_BASE_URL at wherever Ollama actually runs (the optional `ollama`
-      # service below, a lab machine, or a GPU host). If it is unreachable the AI
-      # features degrade to the deterministic Phase 9 stubs instead of failing.
+      # Cloud inference on Groq's free tier (OpenAI-compatible API).
+      # The key lives in /opt/collego/.env only. If the key is missing or the
+      # provider is unreachable the AI features degrade to deterministic stubs.
       AI_ENABLED: ${AI_ENABLED:-true}
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      LLM_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434}
-      AI_MODEL: ${AI_MODEL:-qwen2.5:7b-instruct}
-      AI_EMBED_MODEL: ${AI_EMBED_MODEL:-nomic-embed-text}
-      AI_NUM_CTX: ${AI_NUM_CTX:-4096}
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-120b}
+      LLM_FALLBACK_PROVIDER: ${LLM_FALLBACK_PROVIDER:-groq}
+      LLM_FALLBACK_BASE_URL: ${LLM_FALLBACK_BASE_URL:-https://api.groq.com/openai/v1}
+      LLM_FALLBACK_API_KEY: ${LLM_FALLBACK_API_KEY:-}
+      LLM_FALLBACK_MODEL: ${LLM_FALLBACK_MODEL:-openai/gpt-oss-20b}
+      AI_DAILY_CALL_BUDGET: ${AI_DAILY_CALL_BUDGET:-900}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-60}
     expose:
       - "8000"
     networks:
@@ -112,10 +117,11 @@ services:
         awslogs-region: ${AWS_REGION}
         awslogs-stream: ai-service
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 
   # Phase 10: optional local Ollama for AI inference. Off by default — enable on a
   # host with >= 16 GB RAM (GPU strongly preferred for the 7B model):

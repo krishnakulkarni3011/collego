@@ -58,6 +58,11 @@ class AiWiringTest {
         assertTrue(student.contains("get_my_attendance"));
         assertTrue(student.contains("get_my_cgpa"));
         assertTrue(student.contains("search_my_study_material"));
+        // Prediction, attendance risk and placement readiness live in the one
+        // AI Assistant tab, so their tools must be student-scoped too.
+        assertTrue(student.contains("get_my_performance_prediction"));
+        assertTrue(student.contains("get_my_attendance_risk"));
+        assertTrue(student.contains("get_my_placement_readiness"));
 
         // A student must never be offered section-wide or cohort-wide tools.
         assertFalse(student.contains("get_section_roster"), "students must not get section tools");
@@ -77,6 +82,27 @@ class AiWiringTest {
         assertFalse(faculty.contains("get_my_attendance"));
         assertFalse(faculty.contains("get_my_cgpa"));
         assertFalse(faculty.contains("search_my_study_material"));
+        assertFalse(faculty.contains("get_my_performance_prediction"));
+        assertFalse(faculty.contains("get_my_attendance_risk"));
+        assertFalse(faculty.contains("get_my_placement_readiness"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void studentInsightToolsTakeNoIdentityArgument() {
+        // Identity is taken from the JWT scope only. If the model cannot pass a
+        // studentId, it cannot ask for anyone else's prediction or risk report.
+        for (String name : List.of(
+                "get_my_performance_prediction",
+                "get_my_attendance_risk",
+                "get_my_placement_readiness")) {
+            AiTool tool = aiToolRegistry.require(name, Role.STUDENT);
+            Map<String, Object> properties =
+                    (Map<String, Object>) tool.parameters().get("properties");
+            assertFalse(properties.containsKey("studentId"), name + " accepts a studentId");
+            assertFalse(properties.containsKey("userId"), name + " accepts a userId");
+            assertFalse(properties.containsKey("email"), name + " accepts an email");
+        }
     }
 
     @Test
@@ -136,5 +162,7 @@ class AiWiringTest {
                 () -> aiToolRegistry.require("get_section_roster", Role.STUDENT));
         assertThrows(AiAccessDeniedException.class,
                 () -> aiToolRegistry.require("get_my_attendance", Role.FACULTY));
+        assertThrows(AiAccessDeniedException.class,
+                () -> aiToolRegistry.require("get_my_placement_readiness", Role.FACULTY));
     }
 }

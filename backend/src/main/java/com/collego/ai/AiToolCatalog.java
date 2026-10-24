@@ -54,6 +54,7 @@ public class AiToolCatalog {
     private final AttendanceRepository attendanceRepository;
     private final UserRepository userRepository;
     private final AiRagService aiRagService;
+    private final AiStudentInsights aiStudentInsights;
 
     public List<AiTool> tools() {
         List<AiTool> tools = new ArrayList<>();
@@ -125,6 +126,26 @@ public class AiToolCatalog {
                         + "announcements for study-related questions. Returns the most relevant items.",
                 Set.of(Role.STUDENT), oneString("query", "What the asker is looking for."),
                 (scope, args) -> aiRagService.retrieve(scope, stringArg(args, "query"), 4)));
+
+        tools.add(new SimpleAiTool("get_my_performance_prediction",
+                "Predict the asker's next-semester SGPA/CGPA, trend and risk level from their own academic history.",
+                Set.of(Role.STUDENT), noArgs(),
+                (scope, args) -> aiStudentInsights.performancePrediction(scope.email())));
+
+        tools.add(new SimpleAiTool("get_my_attendance_risk",
+                "Attendance risk per subject for the asker, with classes needed to reach 75% and recommendations.",
+                Set.of(Role.STUDENT), noArgs(),
+                (scope, args) -> aiStudentInsights.attendanceRisk(scope.email())));
+
+        tools.add(new SimpleAiTool("get_my_placement_readiness",
+                "Placement readiness for the asker: eligible drives, skill gaps, mock interview questions and advice.",
+                Set.of(Role.STUDENT),
+                oneString("requestType", "One of: recommend, mock-interview, skill-gap. Default recommend."),
+                (scope, args) -> {
+                    String requestType = stringArg(args, "requestType");
+                    if (requestType == null || requestType.isBlank()) requestType = "recommend";
+                    return aiStudentInsights.placementAssistant(scope.email(), Map.of("requestType", requestType));
+                }));
 
         // ── Faculty tools (assigned sections only) ──────────────────────────────
         tools.add(new SimpleAiTool("get_my_sections",

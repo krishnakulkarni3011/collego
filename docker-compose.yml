@@ -24,19 +24,21 @@ services:
       dockerfile: Dockerfile
     container_name: collego-ai-service
     environment:
-      # Phase 10: inference runs on a LOCAL Ollama server — free forever, no API
-      # key, no quota, and student data never leaves this machine.
+      # Cloud inference on Groq's free tier (OpenAI-compatible API).
+      # The key lives in .env only. If the key is missing or the provider is
+      # unreachable the service degrades to deterministic stubs.
       AI_ENABLED: ${AI_ENABLED:-true}
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      # Default targets Ollama running natively on the host (recommended on a
-      # Windows box with an NVIDIA GPU — it uses the GPU directly).
-      # To run Ollama inside compose instead:
-      #   docker compose --profile ollama up
-      #   LLM_BASE_URL=http://ollama:11434 docker compose --profile ollama up
-      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
-      AI_MODEL: ${AI_MODEL:-qwen2.5:7b-instruct}
-      AI_EMBED_MODEL: ${AI_EMBED_MODEL:-nomic-embed-text}
-      AI_NUM_CTX: ${AI_NUM_CTX:-4096}
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-120b}
+      # Free-tier fallback when the primary model is rate limited.
+      LLM_FALLBACK_PROVIDER: ${LLM_FALLBACK_PROVIDER:-groq}
+      LLM_FALLBACK_BASE_URL: ${LLM_FALLBACK_BASE_URL:-https://api.groq.com/openai/v1}
+      LLM_FALLBACK_API_KEY: ${LLM_FALLBACK_API_KEY:-}
+      LLM_FALLBACK_MODEL: ${LLM_FALLBACK_MODEL:-openai/gpt-oss-20b}
+      AI_DAILY_CALL_BUDGET: ${AI_DAILY_CALL_BUDGET:-900}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-60}
     extra_hosts:
       # Needed on Linux hosts so host.docker.internal resolves.
       - "host.docker.internal:host-gateway"
@@ -97,6 +99,8 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       # Phase 9: AI microservice URL (Docker internal network)
       collego.ai-service.url: http://collego-ai-service:8000
+      # Keep the tool loop inside Groq's 8k TPM free-tier budget.
+      AI_MAX_TOOL_ROUNDS: ${AI_MAX_TOOL_ROUNDS:-1}
     ports:
       - "8081:8080"
     volumes:

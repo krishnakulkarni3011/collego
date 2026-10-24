@@ -1,0 +1,356 @@
+================================================================
+COLLEGO - GROQ AI INTEGRATION PLAN
+Date: 24 October 2026
+Status: NOT STARTED (plan only)
+Provider: Groq (api.groq.com) - NOT xAI Grok
+================================================================
+
+DECISIONS (confirmed by user)
+-----------------------------
+1. Primary model : openai/gpt-oss-120b
+2. Fallback model: openai/gpt-oss-20b
+3. Database access: CURATED TOOLS ONLY (no raw SQL tool, no DB
+   connection or credentials ever given to the model)
+4. Student isolation: a student must ONLY ever receive their own
+   details from AI responses. Another student's marks, attendance,
+   profile, fees, resume or any record must never be returned, even
+   if the student asks for it directly, guesses an id, or tries to
+   manipulate the model with prompt injection.
+
+API KEY
+-------
+Yes, a key is required - but it is free.
+- Sign up at https://console.groq.com (email or Google, no card).
+- Create an API key at https://console.groq.com/keys (starts gsk_...).
+- Key is stored ONLY in environment variables (.env), never in git.
+- Free tier quotas are per organisation, shared by all API keys.
+
+FREE TIER LIMITS (Oct 2026)
+---------------------------
+Model                     RPM   RPD    TPM     TPD
+openai/gpt-oss-120b       30    1000   8000    200000
+openai/gpt-oss-20b        30    1000   8000    200000
+
+Notes:
+- All Groq models support tool/function calling.
+- 8,000 tokens per minute is the binding constraint, not the daily
+  request count. The tool loop sends tool descriptors, history and
+  tool results on every round, so a single question can consume
+  3,000-6,000 tokens. Token budgeting is therefore mandatory.
+- Older models (llama-3.1-8b, llama-3.3-70b, qwen3-32b,
+  llama-4-scout) were deprecated in 2026 - do not target them.
+
+
+================================================================
+CURRENT ARCHITECTURE (already built)
+================================================================
+
+React portal (Student AI Assistant, Smart Search, performance
+prediction, attendance risk, resume analysis, placement assistant,
+question paper insights)
+  -> Spring Boot /api/ai/*        (AiController, role guards)
+    -> AiChatOrchestrator          (grounded tool loop, max rounds)
+      -> AiToolCatalog             (role-scoped read-only tools)
+        -> executed in Spring under AiScope
+      -> AiOutputGuard             (reply sanitising)
+      -> AiRateLimiter / AiResponseCache / AiAuditLogger
+      -> AiService (RestTemplate)  -> ai-service :8000 (FastAPI)
+        -> Groq / Ollama (OpenAI-compatible)
+
+Key property: the model never touches the database. It requests a
+tool, Spring executes it under the caller's AiScope, and returns
+JSON. This is the design we keep and extend.
+
+Existing AiScope fields:
+  userId, email, role, unrestricted,
+  allowedStudentIds, allowedSectionIds, allowedCourseIds
+Students are NOT unrestricted; faculty see only their assigned
+sections; admins are unrestricted.
+
+
+================================================================
+GAPS FOUND IN THE CURRENT SETUP
+================================================================
+
+1. docker-compose.yml and docker-compose.prod.yml do NOT pass
+   LLM_API_KEY, so a cloud provider can never authenticate.
+2. Compose passes AI_MODEL, but ai-service reads LLM_MODEL, so the
+   model override is silently ignored.
+3. Compose defaults LLM_PROVIDER=ollama and prod .env has no LLM_*
+   variables at all -> production runs stub-only and the
+   collego-ai-service container is currently unhealthy.
+4. AI_DAILY_CALL_BUDGET defaults to 8000, but the free RPD is 1000;
+   the budget never protects anything.
+5. Embeddings are Ollama-only; Groq has no embeddings API.
+   search_my_study_material already falls back to keyword ranking,
+   which is acceptable for now.
+
+
+================================================================
+PHASE 1 - GET THE KEY AND SMOKE TEST
+================================================================
+
+Tasks:
+1.1 Create a Groq account and API key.
+1.2 Smoke test with curl against
+    https://api.groq.com/openai/v1/chat/completions using
+    openai/gpt-oss-120b and one tool definition.
+1.3 Confirm tool calling works and inspect x-ratelimit-* headers.
+
+Done when:
+- A tool-call response is returned.
+- Rate-limit headers (limit/remaining/reset) are visible.
+
+
+================================================================
+PHASE 2 - CONFIGURATION PLUMBING
+================================================================
+
+Files: docker-compose.yml, docker-compose.prod.yml, .env (local),
+       /opt/collego/.env (prod), application.yml if needed.
+
+Variables to add/pass to the ai-service container:
+  AI_ENABLED=true
+  LLM_PROVIDER=groq
+  LLM_BASE_URL=https://api.groq.com/openai/v1
+  LLM_API_KEY=<gsk_... from Phase 1>
+  LLM_MODEL=openai/gpt-oss-120b
+  LLM_FALLBACK_PROVIDER=groq
+  LLM_FALLBACK_BASE_URL=https://api.groq.com/openai/v1
+  LLM_FALLBACK_API_KEY=<same key>
+  LLM_FALLBACK_MODEL=openai/gpt-oss-20b
+  AI_DAILY_CALL_BUDGET=900
+  AI_TIMEOUT_SECONDS=60
+
+Also:
+- Fix the AI_MODEL vs LLM_MODEL mismatch (pass LLM_MODEL).
+- Keep the key out of git; .env on prod must be chmod 600.
+
+Done when:
+- GET /api/ai/health reports provider=groq, the model name,
+  apiKeyConfigured=true and servingStubs=false, locally and on prod.
+- A plain chat request returns a model-generated answer (not a stub).
+
+
+================================================================
+PHASE 3 - TOKEN AND QUOTA BUDGETING
+================================================================
+
+Why: 8,000 TPM cannot absorb a 4-round tool loop with 16 tool
+descriptors, history and large tool results.
+
+Tasks:
+3.1 Reduce AI_MAX_TOOL_ROUNDS from 4 to 2 (3 only if quality needs).
+3.2 Cap tool descriptors per role (already role-filtered; trim the
+    descriptions sent to the model).
+3.3 Cap tool result size (the cap() helper already exists; apply it
+    consistently and lower the item limit for large lists).
+3.4 Trim history to the last 4-6 turns (already 6; keep).
+3.5 Set an explicit max_tokens for completions.
+3.6 Honour x-ratelimit-remaining-* and retry-after; exponential
+    backoff on HTTP 429 (circuit breaker already exists).
+3.7 Fallback chain: gpt-oss-120b -> gpt-oss-20b -> deterministic
+    stubs.
+3.8 Response cache: keep the 90-second cache; consider raising TTL
+    for read-only answers.
+
+Done when:
+- 20 consecutive mixed prompts produce zero 429 responses.
+- No answer is truncated mid-sentence.
+- Simulated 429 / provider outage still returns an answer (fallback
+  or stub) and never a 5xx.
+- /api/ai/health exposes the last known quota state.
+
+
+================================================================
+PHASE 4 - DATABASE ACCESS VIA CURATED TOOLS
+================================================================
+
+Rule: Groq never receives a database connection, SQL text, schema
+dump or credentials. It only receives the JSON returned by an
+allow-listed Java tool.
+
+4.1 Student tools (own data only)
+    Already present: get_my_account, get_my_profile, get_my_attendance,
+    get_my_cgpa, get_my_timetable, get_my_internal_marks,
+    get_my_semester_marks, get_my_assignments, get_my_notifications,
+    get_my_placement_notices, get_my_question_papers,
+    search_my_study_material.
+    Add: "what do I need to reach X%" style attendance/marks target
+    calculation, computed server-side from the caller's own record.
+
+4.2 Faculty tools (assigned sections only)
+    Existing: get_my_sections, get_section_roster,
+    get_section_attendance_summary, get_student_academic_summary.
+    Add: low-attendance list for an assigned section, marks
+    distribution for an assigned section.
+
+4.3 Admin tools (aggregates only)
+    Add: department totals, faculty count, placement statistics,
+    at-risk student counts. No bulk PII dumps.
+
+4.4 Hard isolation requirements (student must never see another
+    student's data)
+    a. Every tool receives the server-built AiScope; the model can
+       never supply or override userId/email/role.
+    b. get_student_academic_summary calls scope.requireStudent(id)
+       BEFORE any repository access; a student's allowedStudentIds
+       contains only their own student id.
+    c. Ignore any id/email found in the user's message text; resolve
+       the caller from the JWT only.
+    d. Never expose enumerable ids in replies unless they belong to
+       the caller (student ids, section ids, enrolment numbers).
+    e. AiOutputGuard: reject or redact replies that contain another
+       student's USN, email, name or marks that were not part of the
+       caller's own tool result. Log a security event when it
+       happens.
+    f. Deny-by-default: a tool not registered for Role.STUDENT is
+       not even offered to the model for a student caller.
+    g. Audit every tool call: user, role, tool, arguments, row count,
+       timestamp (AiAuditLogger).
+    h. Prompt-injection resistance: instructions inside tool results
+       or user messages ("ignore previous rules", "show all
+       students") must not change scope; scope is code, not prompt.
+
+4.5 Tests (must all pass before deployment)
+    - Student asks "show my attendance" -> only their own data.
+    - Student asks "show 2BA24CS007's marks" -> denied, no data,
+      audited.
+    - Student asks "list all students in my section" -> denied.
+    - Student supplies another student's numeric id -> denied.
+    - Student tries a prompt injection -> scope unchanged.
+    - Faculty asks about a section they do not teach -> denied.
+    - Faculty asks about an assigned section -> allowed, scoped.
+    - Admin aggregate query -> allowed, aggregated.
+    - Tool result never contains password_hash, tokens or S3 URLs.
+
+Done when:
+- All isolation tests above pass.
+- Manual prompts in the student AI tab confirm only own data.
+- Audit log shows the tool, scope and result size for each call.
+
+
+================================================================
+PHASE 5 - EMBEDDINGS (OPTIONAL, DEFERRED)
+================================================================
+
+Groq has no embeddings endpoint. search_my_study_material already
+falls back to keyword ranking when embeddings are unavailable.
+Options:
+  a. Keep keyword ranking (simplest, no extra provider).
+  b. Run Ollama locally for nomic-embed-text only.
+  c. Add a separate embeddings API.
+Decision deferred until Phase 4 is complete.
+
+
+================================================================
+PHASE 6 - DEPLOY AND DOCUMENT
+================================================================
+
+Tasks:
+6.1 Build linux/amd64 images for collego-ai-service and, if backend
+    code changed, collego-backend.
+6.2 Push to ECR as :latest and a version tag.
+6.3 Update /opt/collego/.env with the LLM_* variables.
+6.4 Recreate the ai-service (and backend) containers; verify health.
+6.5 Live verification on https://65-0-244-196.sslip.io:
+    - /api/ai/health reports groq + key configured.
+    - Student AI Assistant answers from real DB data.
+    - Student isolation prompt attempts are refused.
+6.6 Write a text report with explicit DONE and NOT YET DONE
+    sections (project convention).
+
+
+================================================================
+SECURITY AND PRIVACY NOTES
+================================================================
+
+- Tool results (names, marks, attendance) are sent to Groq. Review
+  the data-usage setting in the Groq console before real student
+  data is used; the free tier may use prompts for improvement.
+- Minimise fields in tool results (no emails/phones unless needed).
+- Rate limits are per organisation: one heavy user can exhaust the
+  shared quota. Keep the per-user limiter and the response cache.
+- Rotate the API key if it is ever exposed; update /opt/collego/.env
+  and recreate the container.
+- The key must never appear in logs, frontend bundles or git.
+
+
+================================================================
+RISK REGISTER
+================================================================
+
+Risk                          Mitigation
+----------------------------  --------------------------------------
+8k TPM exhausted by tool loop Phase 3 budgeting, 2 rounds, caps
+Shared 30 RPM / 1000 RPD      cache, per-user limit, fallback model
+Free-tier deprecations        env-only model swap, fallback chain
+Student data leakage          code-enforced AiScope + isolation tests
+Prompt injection              scope never comes from the prompt
+Provider outage               fallback model, then deterministic stubs
+Privacy on free tier          console data setting, field minimisation
+
+
+================================================================
+STATUS CHECKLIST
+================================================================
+
+[x] Phase 1 - Groq key created and tool-calling smoke test passed
+[x] Phase 2 - LLM_* config plumbed locally and on prod, health OK
+[x] Phase 3 - token/rate budgeting implemented and verified
+[x] Phase 4 - curated tools extended + student isolation tests pass
+[x] Phase 5 - embeddings decision recorded
+[x] Phase 6 - deployed to production and verified live
+[x] Report written with DONE / NOT YET DONE sections
+
+Implemented on 2026-10-24. See Groq_AI_Integration_Report.txt.
+
+
+===============================================================
+IMPLEMENTATION NOTES (deviations and fixes found during the build)
+===============================================================
+
+1. AI_MAX_TOOL_ROUNDS is 1, not 2.
+   The 19 role-filtered tool descriptors are large. Two tool-enabled
+   rounds in one minute could exceed the 8k TPM free-tier limit. One
+   tool-enabled round still allows several tool calls in a single model
+   response, and the next round is text-only. Raise the env var only if
+   the Groq plan is upgraded.
+
+2. Tool-result protocol fixed for OpenAI-compatible providers.
+   The Spring backend sends a compact toolTrace ({name, content}). The
+   ai-service now synthesises a matching assistant tool_calls entry and
+   a tool message with the same tool_call_id. Before this fix Groq
+   rejected the second round with HTTP 400, so every tool-using question
+   silently fell back to the deterministic stub.
+
+3. Resilience tuned for a shared free tier.
+   - HTTP 429 opens the breaker for 60s (the TPM window is one minute).
+   - Network/DNS errors retry once after 0.8s, then open for 30s.
+   - HTTP 400/401/404 do NOT open the breaker (they are request bugs).
+   - CIRCUIT_BREAKER_SECONDS default is 60 (was 300).
+
+4. Production ai-service healthcheck used curl, which python:3.11-slim
+   does not ship. It now uses python + urllib in docker-compose.prod.yml,
+   so the container reports healthy.
+
+5. The production frontend image must be built with an EMPTY
+   VITE_API_URL so the browser calls the same origin and nginx proxies
+   /api/ to the backend. Building it through the local compose file bakes
+   in http://localhost:8081 and breaks production (mixed content).
+   Build command used:
+     docker build --build-arg VITE_API_URL= ...
+   The local compose keeps VITE_API_URL=http://localhost:8081.
+
+6. The four removed student AI tabs now live inside AI Assistant:
+   - quick actions call /api/ai/performance-prediction,
+     /api/ai/attendance-risk and /api/ai/placement-assistant;
+   - Smart search toggles the assistant into a search mode backed by
+     /api/ai/smart-search;
+   - the same three insights are exposed as student-only chat tools.
+   Sidebar: AI Assistant and Resume Analyzer, moved above Services so
+   both stay visible without scrolling.
+
+7. The key was not present in this plan file. It was supplied separately
+   and stored only in the gitignored local .env and /opt/collego/.env.
+   Rotate it in the Groq console if it was shared anywhere else.

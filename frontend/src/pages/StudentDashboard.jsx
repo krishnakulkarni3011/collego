@@ -55,24 +55,21 @@ const NAV_SECTIONS = [
     ],
   },
   {
+    // Kept above Services so the two AI entries stay visible without
+    // scrolling on a laptop-height sidebar.
+    title: 'AI Assistant',
+    items: [
+      { id: 'aiAssistant', label: 'AI Assistant', icon: Sparkles },
+      { id: 'aiResumeAnalyzer', label: 'Resume Analyzer', icon: FileText },
+    ],
+  },
+  {
     title: 'Services',
     items: [
       { id: 'placements', label: 'Placements', icon: Briefcase },
       { id: 'notifications', label: 'Notifications', icon: Bell },
       { id: 'settings', label: 'Settings', icon: Settings },
       { id: 'help', label: 'Help & Support', icon: HelpCircle },
-    ],
-  },
-  {
-    title: 'AI Assistant',
-    items: [
-      { id: 'aiAssistant', label: 'AI Assistant', icon: Sparkles },
-      { id: 'aiPrediction', label: 'AI Prediction', icon: Target },
-      { id: 'aiSmartSearch', label: 'Smart Search', icon: Search },
-      { id: 'aiAttendanceRisk', label: 'Attendance Risk', icon: AlertTriangle },
-      { id: 'aiResumeAnalyzer', label: 'Resume Analyzer', icon: FileText },
-      { id: 'aiPlacementAssistant', label: 'Placement Assistant', icon: Briefcase },
-      { id: 'aiQpInsights', label: 'QP Insights', icon: FileText },
     ],
   },
 ]
@@ -830,32 +827,138 @@ function DocumentsTab({ cgpa, showMessage }) {
 }
 
 // ─── AI Assistant ────────────────────────────────────────────────────────────
+// Smart Search, Performance Prediction, Attendance Risk and Placement
+// Readiness all live inside this one tab: the deterministic insights are
+// rendered as assistant replies, and natural-language questions use the
+// scoped chat tools on the backend.
+const fmtNumber = (value, digits = 2) =>
+  typeof value === 'number' ? value.toFixed(digits) : (value ?? '—')
+
+const formatPerformanceInsight = (r) => [
+  '📈 Performance prediction',
+  '',
+  `Predicted SGPA: ${fmtNumber(r.predictedSgpa)}`,
+  `Predicted CGPA: ${fmtNumber(r.predictedCgpa)}`,
+  `Trend: ${r.trend || '—'}`,
+  `Risk level: ${r.riskLevel || '—'}`,
+  `Confidence: ${Math.round((r.confidenceScore || 0) * 100)}%`,
+  ...(r.insights?.length ? ['', ...r.insights.map(i => `• ${i}`)] : []),
+].join('\n')
+
+const formatAttendanceRisk = (r) => [
+  '⚠️ Attendance risk',
+  '',
+  `Overall risk: ${r.overallRisk || '—'}`,
+  r.summary || '',
+  ...(r.riskItems?.length
+    ? ['', ...r.riskItems.map(i => {
+      const note = i.riskLevel === 'DEFAULTER'
+        ? ' — critical: contact your faculty'
+        : i.classesNeededToReach75 > 0
+          ? ` — ${i.classesNeededToReach75} classes to reach 75%`
+          : i.riskLevel === 'SAFE' ? ' — on track' : ' — keep attending'
+      return `• ${i.courseCode} ${i.courseName}: ${fmtNumber(i.currentPercentage, 1)}% (${i.riskLevel})${note}`
+    })]
+    : []),
+  ...(r.recommendations?.length ? ['', 'Recommendations:', ...r.recommendations.map(i => `• ${i}`)] : []),
+].filter(Boolean).join('\n')
+
+const formatPlacementReadiness = (r) => [
+  '💼 Placement readiness',
+  '',
+  r.advice || '',
+  ...(r.recommendations?.length
+    ? ['', 'Recommended drives:', ...r.recommendations.map(c => `• ${c.companyName || c.company || c.name || 'Company'}${c.role ? ` — ${c.role}` : ''}`)]
+    : []),
+  ...(r.skillGaps?.length ? ['', 'Skill gaps:', ...r.skillGaps.map(s => `• ${s}`)] : []),
+  ...(r.mockInterviewQuestions?.length ? ['', 'Mock interview questions:', ...r.mockInterviewQuestions.slice(0, 5).map(s => `• ${s}`)] : []),
+].filter(Boolean).join('\n')
+
 function AiAssistantTab({ overall, cgpa }) {
-  const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Collego AI 🤖 Ask me anything about your attendance, marks, placements, timetable, and more!" }])
+  const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Collego AI 🤖 Ask me anything about your attendance, marks, placements, timetable, and more. You can also use the quick tools below for predictions, risk analysis, placement readiness and smart search." }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [actionLoading, setActionLoading] = useState('')
+  const [mode, setMode] = useState('chat') // 'chat' | 'search'
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return
-    const text = input
+  const append = (content) => setMessages(prev => [...prev, { role: 'assistant', content }])
+
+  const sendMessage = async (override) => {
+    const text = (typeof override === 'string' ? override : input).trim()
+    if (!text || loading) return
     setMessages(prev => [...prev, { role: 'user', content: text }])
     setInput('')
     setLoading(true)
     try {
-      const res = await api.post('/api/ai/chat', { message: text, history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })), context: { attendance: overall, cgpa } })
-      setMessages(prev => [...prev, { role: 'assistant', content: res.data.reply || "I couldn't process that. Please try again." }])
+      if (mode === 'search') {
+        const res = await api.post('/api/ai/smart-search', { query: text })
+        const route = res.data?.route ? `\n\nOpen: ${res.data.route}` : ''
+        append(`${res.data?.message || 'No matching records found.'}${route}`)
+      } else {
+        const res = await api.post('/api/ai/chat', { message: text, history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })), context: { attendance: overall, cgpa } })
+        append(res.data.reply || "I couldn't process that. Please try again.")
+      }
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'AI service is temporarily offline. Please try again later.' }])
+      append('AI service is temporarily offline. Please try again later.')
     } finally { setLoading(false) }
+  }
+
+  const runInsight = async (kind) => {
+    if (actionLoading) return
+    setActionLoading(kind)
+    const prompts = {
+      performance: 'Predict my performance',
+      risk: 'Show my attendance risk',
+      placement: 'Am I placement ready?',
+    }
+    setMessages(prev => [...prev, { role: 'user', content: prompts[kind] }])
+    try {
+      if (kind === 'performance') {
+        const res = await api.get('/api/ai/performance-prediction')
+        append(formatPerformanceInsight(res.data || {}))
+      } else if (kind === 'risk') {
+        const res = await api.get('/api/ai/attendance-risk')
+        append(formatAttendanceRisk(res.data || {}))
+      } else {
+        const res = await api.post('/api/ai/placement-assistant', { requestType: 'recommend' })
+        append(formatPlacementReadiness(res.data || {}))
+      }
+    } catch {
+      append('That insight is unavailable right now. Please try again in a moment.')
+    } finally { setActionLoading('') }
   }
 
   const quickPrompts = ['What is my current attendance?', 'Show my CGPA', 'What placements are available?', 'Show my timetable', 'Where are my study materials?']
 
+  const tools = [
+    { key: 'performance', label: 'Performance prediction', icon: Target, onClick: () => runInsight('performance') },
+    { key: 'risk', label: 'Attendance risk', icon: AlertTriangle, onClick: () => runInsight('risk') },
+    { key: 'placement', label: 'Placement readiness', icon: Briefcase, onClick: () => runInsight('placement') },
+    { key: 'search', label: 'Smart search', icon: Search, onClick: () => { setMode('search'); setInput('') } },
+  ]
+
+  const busy = loading || Boolean(actionLoading)
+
   return (
     <div className="space-y-4 flex flex-col h-[calc(100vh-160px)]">
-      <PageTitle icon={Sparkles} title="AI College Assistant" subtitle="Your 24/7 academic companion." accent="violet"
+      <PageTitle icon={Sparkles} title="AI College Assistant" subtitle="Ask anything, or use the built-in prediction, risk, placement and search tools." accent="violet"
         image={uiImages.onlineLearning} imageAlt="Student learning online"
         actions={<Badge variant="purple">AI Powered</Badge>} />
+
+      <div className="flex flex-wrap gap-2">
+        {tools.map(({ key, label, icon: Icon, onClick }) => (
+          <button key={key} onClick={onClick} disabled={busy}
+            className={cn(
+              'text-xs px-3 py-1.5 rounded-xl font-medium border transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5',
+              mode === 'search' && key === 'search'
+                ? 'bg-violet-600 text-white border-violet-600'
+                : 'bg-white border-white/60 text-slate-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600'
+            )}>
+            <Icon size={13} /> {label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex-1 glass-card overflow-hidden flex flex-col min-h-[400px] border border-white/60">
         <div className="flex-1 overflow-y-auto p-5 space-y-3.5 pr-3">
           {messages.map((msg, i) => (
@@ -871,7 +974,7 @@ function AiAssistantTab({ overall, cgpa }) {
               </div>
             </motion.div>
           ))}
-          {loading && (
+          {busy && (
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shrink-0"><Bot size={14} className="text-white" /></div>
               <div className="bg-slate-100/60 px-4 py-3 rounded-2xl rounded-bl-sm">
@@ -880,161 +983,27 @@ function AiAssistantTab({ overall, cgpa }) {
             </div>
           )}
         </div>
-        <div className="border-t border-white/60 p-4 flex gap-2">
-          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder="Ask about attendance, marks, placements, timetable..." className="collego-input flex-1" />
-          <Button variant="gradient" size="sm" onClick={sendMessage} disabled={loading || !input.trim()} className="px-5"><Send size={14} /> Send</Button>
+        <div className="border-t border-white/60 p-4">
+          {mode === 'search' && (
+            <div className="flex items-center gap-2 mb-2 text-[11px] text-violet-600">
+              <Search size={12} /> Smart search mode — searching your own college records.
+              <button onClick={() => setMode('chat')} className="ml-auto text-slate-400 hover:text-slate-600 underline">Back to chat</button>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+              placeholder={mode === 'search' ? "Search e.g. 'attendance below 75%', 'DBMS materials'..." : 'Ask about attendance, marks, placements, timetable...'} className="collego-input flex-1" />
+            <Button variant="gradient" size="sm" onClick={() => sendMessage()} disabled={busy || !input.trim()} className="px-5">
+              {mode === 'search' ? <><Search size={14} /> Search</> : <><Send size={14} /> Send</>}
+            </Button>
+          </div>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
         {quickPrompts.map(p => (
-          <button key={p} onClick={() => setInput(p)} className="text-xs bg-white border border-white/60 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600 text-slate-500 px-3 py-1.5 rounded-xl font-medium transition-all active:scale-95">{p}</button>
+          <button key={p} onClick={() => { setMode('chat'); setInput(p) }} className="text-xs bg-white border border-white/60 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600 text-slate-500 px-3 py-1.5 rounded-xl font-medium transition-all active:scale-95">{p}</button>
         ))}
       </div>
-    </div>
-  )
-}
-
-// ─── AI Prediction ───────────────────────────────────────────────────────────
-function AiPredictionTab() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      try {
-        const res = await api.get('/api/ai/performance-prediction')
-        setData(res.data)
-      } catch (e) { setError(e.response?.data?.message || 'AI prediction service unavailable.') }
-      finally { setLoading(false) }
-    }
-    load()
-  }, [])
-
-  const RISK = { LOW: { v: 'success', label: 'Low Risk' }, MEDIUM: { v: 'warning', label: 'Medium Risk' }, HIGH: { v: 'destructive', label: 'High Risk' } }
-  return (
-    <div className="space-y-6">
-      <PageTitle icon={Target} title="AI Performance Prediction" subtitle="CGPA/SGPA projection from your academic history using trend analysis." accent="indigo"
-        actions={<Badge variant="purple">AI Powered</Badge>} />
-      {loading && <div className="flex justify-center py-16"><Spinner color="indigo" /></div>}
-      {error && <div className="glass-card p-5 border-red-100/50 bg-red-50/10"><p className="text-red-600 text-sm">{error}</p></div>}
-      {data && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatCard index={0} label="Predicted SGPA" value={data.predictedSgpa ?? 0} decimals={2} icon={TrendingUp} accent="indigo" glow />
-          <div className="glass-card p-6 border border-white/60">
-            <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-4">Risk Level</p>
-            <div className="flex items-center gap-2">
-              <Badge variant={RISK[data.riskLevel]?.v ?? 'secondary'}>{RISK[data.riskLevel]?.label ?? data.riskLevel}</Badge>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-4">Based on attendance & past performance</p>
-          </div>
-          <div className="glass-card p-6 border border-white/60">
-            <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-4">Trend</p>
-            <p className="text-sm font-semibold text-slate-700 mt-2">{data.trend}</p>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── AI Smart Search ─────────────────────────────────────────────────────────
-function AiSmartSearchTab() {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState(null)
-  const [loading, setLoading] = useState(false)
-
-  const search = async () => {
-    if (!query.trim()) return
-    setLoading(true)
-    try {
-      const res = await api.post('/api/ai/smart-search', { query })
-      setResults(res.data)
-    } catch { setResults(null) }
-    finally { setLoading(false) }
-  }
-
-  return (
-    <div className="space-y-6">
-      <PageTitle icon={Search} title="AI Smart Search" subtitle="Search across attendance, marks, placements, notices, and more using natural language." accent="indigo"
-        actions={<Badge variant="purple">AI Powered</Badge>} />
-      <div className="glass-card p-6 border border-white/60">
-        <div className="flex gap-2 mb-6">
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g., 'Show my attendance below 75%', 'Find placement notices for CSE'..." className="collego-input flex-1" />
-          <Button variant="gradient" onClick={search} disabled={loading || !query.trim()} className="px-5">
-            {loading ? (
-              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Searching...</span>
-            ) : (
-              <span className="flex gap-1"><Search size={14} /> Search</span>
-            )}
-          </Button>
-        </div>
-        {loading && <div className="flex justify-center py-8"><Spinner color="indigo" /></div>}
-        {results && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-slate-800">Search Results</h3>
-            {Object.entries(results).map(([key, value]) => (
-              <div key={key} className="p-4 rounded-xl border border-white/60 bg-white/50">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{key}</p>
-                <p className="text-sm text-slate-700">{JSON.stringify(value)}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── AI Attendance Risk ──────────────────────────────────────────────────────
-function AiAttendanceRiskTab() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      try {
-        const res = await api.get('/api/ai/attendance-risk')
-        setData(res.data)
-      } catch (e) { setError(e.response?.data?.message || 'Attendance risk service unavailable.') }
-      finally { setLoading(false) }
-    }
-    load()
-  }, [])
-
-  return (
-    <div className="space-y-6">
-      <PageTitle icon={AlertTriangle} title="Attendance Risk Early Warning" subtitle="AI-powered early warning for students at risk of low attendance." accent="amber"
-        actions={<Badge variant="purple">AI Powered</Badge>} />
-      {loading && <div className="flex justify-center py-16"><Spinner color="amber" /></div>}
-      {error && <div className="glass-card p-5 border-red-100/50 bg-red-50/10"><p className="text-red-600 text-sm">{error}</p></div>}
-      {data && (
-        <div className="space-y-4">
-          <div className="glass-card p-6 border border-white/60">
-            <h3 className="text-sm font-semibold text-slate-800 mb-4">Subject Attendance Risk</h3>
-            <div className="space-y-3">
-              {(data.subjectAttendance || []).map((s, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-white/60 bg-white/50">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{s.courseName}</p>
-                    <p className="text-[10px] text-slate-500 font-mono">{s.courseCode}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono text-slate-400">{s.present} / {s.totalClasses}</span>
-                    <Badge variant={Number(s.percentage) >= 75 ? 'success' : Number(s.percentage) >= 50 ? 'warning' : 'destructive'}>
-                      {Number(s.percentage).toFixed(1)}%
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -1084,151 +1053,6 @@ function AiResumeAnalyzerTab() {
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Analysis Result</h3>
           <div className="space-y-3">
             <p className="text-sm text-slate-700">{typeof result === 'string' ? result : JSON.stringify(result)}</p>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── AI Placement Assistant ──────────────────────────────────────────────────
-function AiPlacementAssistantTab() {
-  const [query, setQuery] = useState('')
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-
-  const ask = async () => {
-    if (!query.trim()) return
-    setLoading(true)
-    try {
-      const res = await api.post('/api/ai/placement-assistant', { query })
-      setResult(res.data)
-    } catch { setResult(null) }
-    finally { setLoading(false) }
-  }
-
-  return (
-    <div className="space-y-6">
-      <PageTitle icon={Briefcase} title="AI Placement Assistant" subtitle="AI-powered placement recommendations and mock interview preparation." accent="emerald"
-        actions={<Badge variant="purple">AI Powered</Badge>} />
-      <div className="glass-card p-6 border border-white/60">
-        <div className="space-y-4">
-          <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Ask about placements</label>
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g., 'Which companies are hiring CSE students?', 'Help me prepare for Google interview'..." className="collego-input" />
-          </div>
-          <Button variant="gradient" onClick={ask} disabled={loading || !query.trim()} className="w-auto px-6">
-            {loading ? (
-              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Thinking...</span>
-            ) : (
-              <span className="flex gap-1"><Briefcase size={14} /> Get Advice</span>
-            )}
-          </Button>
-        </div>
-      </div>
-      {result && (
-        <div className="glass-card p-6 border border-white/60">
-          <h3 className="text-sm font-semibold text-slate-800 mb-4">Placement Guidance</h3>
-          <div className="space-y-3">
-            <p className="text-sm text-slate-700">{typeof result === 'string' ? result : JSON.stringify(result)}</p>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── AI Question Paper Insights ───────────────────────────────────────────────
-function AiQuestionPaperInsightsTab() {
-  const [courseId, setCourseId] = useState('')
-  const [courseCode, setCourseCode] = useState('')
-  const [courseName, setCourseName] = useState('')
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-
-  const getInsights = async () => {
-    if (!courseId.trim()) return
-    setLoading(true)
-    try {
-      const res = await api.get('/api/ai/question-paper-insights', {
-        params: { courseId: Number(courseId), courseCode, courseName }
-      })
-      setResult(res.data)
-    } catch { setResult(null) }
-    finally { setLoading(false) }
-  }
-
-  return (
-    <div className="space-y-6">
-      <PageTitle icon={FileText} title="AI Question Paper Insights" subtitle="Analyze past question papers for topic weightage and trends." accent="indigo"
-        actions={<Badge variant="purple">AI Powered</Badge>} />
-      <div className="glass-card p-6 border border-white/60">
-        <div className="space-y-4">
-          <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course ID</label>
-            <input value={courseId} onChange={e => setCourseId(e.target.value)} placeholder="e.g., 101" className="collego-input" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Code (optional)</label>
-              <input value={courseCode} onChange={e => setCourseCode(e.target.value)} placeholder="CS101" className="collego-input" />
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Name (optional)</label>
-              <input value={courseName} onChange={e => setCourseName(e.target.value)} placeholder="Data Structures" className="collego-input" />
-            </div>
-          </div>
-          <Button variant="gradient" onClick={getInsights} disabled={loading || !courseId.trim()} className="w-auto px-6">
-            {loading ? (
-              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Analyzing...</span>
-            ) : (
-              <span className="flex gap-1"><FileText size={14} /> Get Insights</span>
-            )}
-          </Button>
-        </div>
-      </div>
-      {result && (
-        <div className="glass-card p-6 border border-white/60">
-          <h3 className="text-sm font-semibold text-slate-800 mb-4">Question Paper Analysis</h3>
-          <div className="space-y-4">
-            {typeof result === 'string' ? (
-              <p className="text-sm text-slate-700">{result}</p>
-            ) : (
-              <div>
-                {result.topicWeightage && (
-                  <div>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-2">Topic Weightage</p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {Object.entries(result.topicWeightage).map(([topic, weight]) => (
-                        <div key={topic} className="p-3 rounded-xl border border-white/60 bg-white/50">
-                          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{topic}</p>
-                          <p className="text-sm font-bold text-slate-800">{weight}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {result.importantQuestions && Array.isArray(result.importantQuestions) && (
-                  <div>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-2">Important Questions</p>
-                    <ul className="space-y-2 text-sm text-slate-700">
-                      {result.importantQuestions.map((q, i) => (
-                        <li key={i} className="flex items-start gap-2 pl-3">
-                          <span className="text-indigo-500">•</span>
-                          {q}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {result.examPattern && (
-                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-                    <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-1">Exam Pattern</p>
-                    <p className="text-sm text-slate-700">{result.examPattern}</p>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1396,12 +1220,7 @@ export default function StudentDashboard() {
       case 'notifications': return <NotificationsTab notifications={notifications} onMarkRead={handleMarkRead} />
       case 'documents': return <DocumentsTab cgpa={cgpa} showMessage={showMsg} />
       case 'aiAssistant': return <AiAssistantTab overall={overall} cgpa={cgpa} />
-      case 'aiPrediction': return <AiPredictionTab />
-      case 'aiSmartSearch': return <AiSmartSearchTab />
-      case 'aiAttendanceRisk': return <AiAttendanceRiskTab />
       case 'aiResumeAnalyzer': return <AiResumeAnalyzerTab />
-      case 'aiPlacementAssistant': return <AiPlacementAssistantTab />
-      case 'aiQpInsights': return <AiQuestionPaperInsightsTab />
       case 'settings': return <SettingsTab showMsg={showMsg} accent="blue" />
       case 'help': return <HelpTab accent="blue" />
       default: return null
