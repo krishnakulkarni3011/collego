@@ -580,8 +580,8 @@ function studentYear(user) {
 }
 
 function AcademicsTab({
-  users, departments, overview, semesters, deptReports, showMsg,
-  onCreateUser, onEditUser, onToggleActive, onUploadResume, onReviewResume,
+  users, departments, overview, semesters, deptReports,
+  onCreateUser, onEditUser, onToggleActive, onReviewResume,
 }) {
   const [selectedDept, setSelectedDept] = useState(null)
   const [mode, setMode] = useState(null)
@@ -589,7 +589,6 @@ function AcademicsTab({
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [resumeBusy, setResumeBusy] = useState(null)
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', enrollmentNumber: '', section: 'A', employeeId: '', designation: '' })
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', semester: '', section: '', enrollmentNumber: '', employeeId: '', designation: '' })
 
@@ -668,17 +667,6 @@ function AcademicsTab({
     const ok = await onEditUser(editing.id, payload)
     setBusy(false)
     if (ok) setEditing(null)
-  }
-
-  const uploadResume = async (u, file) => {
-    if (!file || !u.facultyProfileId) {
-      showMsg('Faculty profile not ready for resume upload', 'error')
-      return
-    }
-    setResumeBusy(u.id)
-    const ok = await onUploadResume(u.facultyProfileId, file)
-    setResumeBusy(null)
-    return ok
   }
 
   const departmentFaculty = useMemo(() => {
@@ -844,11 +832,6 @@ function AcademicsTab({
                         {u.resumeStatus ? u.resumeStatus.charAt(0) + u.resumeStatus.slice(1).toLowerCase() : 'None'}
                       </Badge>
                       <div className="flex items-center justify-center gap-2">
-                        <label className="cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-600 hover:text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
-                          {resumeBusy === u.id ? <RefreshCw size={12} className="animate-spin" /> : <Upload size={12} />}
-                          {u.hasResume ? 'Replace' : 'Upload'}
-                          <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadResume(u, f); e.target.value = '' }} />
-                        </label>
                         {u.hasResume && (
                           <button onClick={() => downloadFile(`/api/faculty-directory/${u.facultyProfileId}/resume`, u.resumeFileName || 'faculty-resume.pdf').catch(() => {})}
                             className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:underline" title={u.resumeFileName || 'Download resume'}>
@@ -1485,7 +1468,7 @@ export default function AdminDashboard() {
   const onCreateUser = async (payload) => {
     try {
       await api.post('/api/admin/users', payload)
-      showMsg('User created successfully')
+      showMsg(`User created — login details sent to ${payload.email}`)
       loadUsers()
       loadAll()
       return true
@@ -1546,24 +1529,6 @@ export default function AdminDashboard() {
     }
   }
 
-  const onUploadResume = async (facultyProfileId, file) => {    if (!facultyProfileId) {
-      showMsg('Faculty profile not found', 'error')
-      return false
-    }
-    const fd = new FormData()
-    fd.append('file', file)
-    try {
-      await api.post(`/api/admin/faculty/${facultyProfileId}/resume`, fd)
-      showMsg('Faculty resume uploaded')
-      await loadUsers()
-      await loadAll()
-      return true
-    } catch (err) {
-      showMsg(err.response?.data?.message || 'Failed to upload resume', 'error')
-      return false
-    }
-  }
-
   const onCreatePlacement = async ({ file, ...payload }) => {
     const fd = new FormData()
     Object.entries(payload).forEach(([key, value]) => {
@@ -1609,7 +1574,7 @@ export default function AdminDashboard() {
   const renderTab = () => {
     switch (activeTab) {
       case 'overview': return <OverviewTab overview={overview} deptReports={deptReports} attendanceSummary={attendanceSummary} placementStats={placementStats} insights={insights} semesters={semesters} onTabChange={setActiveTab} onSemesterChange={handleSemesterChange} />
-      case 'academics': return <AcademicsTab users={users} departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} showMsg={showMsg} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onUploadResume={onUploadResume} onReviewResume={onReviewResume} />
+      case 'academics': return <AcademicsTab users={users} departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onReviewResume={onReviewResume} />
       case 'examinations': return <ExamsAdminTab showMsg={showMsg} />
       case 'placements': return <PlacementsTab placementStats={placementStats} notices={placementNotices} departments={departments} onCreatePlacement={onCreatePlacement} onDeactivatePlacement={onDeactivatePlacement} />
       case 'broadcasts': return <BroadcastCenterTab broadcasts={broadcasts} users={users} departments={departments} onSend={handleSendBroadcast} />

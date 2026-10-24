@@ -23,6 +23,7 @@ public class UserService {
     private final FacultyProfileRepository facultyProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final EmailService emailService;
 
     @Transactional
     public UserResponse createUser(CreateUserRequest request, String adminEmail, String ipAddress) {
@@ -85,7 +86,65 @@ public class UserService {
         auditService.log(null, adminEmail, "USER_CREATED", "User", user.getId(),
                 "Created " + role + " account: " + user.getEmail(), ipAddress);
 
+        // Email the credentials to the address the admin entered. EmailService
+        // never throws, so a mail outage cannot roll back the new account.
+        sendAccountEmail(user, role, department, request);
+
         return getUserById(user.getId());
+    }
+
+    /**
+     * Sends the details entered by the admin plus the temporary password and a
+     * link to the portal, so the new student or faculty member can sign in.
+     */
+    private void sendAccountEmail(User user, Role role, Department department, CreateUserRequest request) {
+        String fullName = (user.getFirstName() + " " + user.getLastName()).trim();
+        boolean isStudent = role == Role.STUDENT;
+        String departmentName = department != null ? department.getName() : "—";
+
+        StringBuilder body = new StringBuilder();
+        body.append("Hello ").append(fullName).append(",\n\n")
+                .append("Your Collego ").append(isStudent ? "student" : "faculty")
+                .append(" account has been created by the administration.\n\n")
+                .append("ACCOUNT DETAILS\n")
+                .append("---------------\n")
+                .append("Name: ").append(fullName).append('\n')
+                .append("Role: ").append(isStudent ? "Student" : "Faculty").append('\n')
+                .append("Email: ").append(user.getEmail()).append('\n');
+
+        if (isStudent) {
+            body.append("USN: ").append(display(request.getEnrollmentNumber())).append('\n')
+                    .append("Department: ").append(departmentName).append('\n')
+                    .append("Semester: ").append(display(request.getSemester())).append('\n')
+                    .append("Section: ").append(display(request.getSection())).append('\n')
+                    .append("Admission year: ").append(display(request.getAdmissionYear())).append('\n');
+        } else {
+            body.append("Employee ID: ").append(display(request.getEmployeeId())).append('\n')
+                    .append("Designation: ").append(display(request.getDesignation())).append('\n')
+                    .append("Department: ").append(departmentName).append('\n');
+        }
+
+        body.append("Temporary password: ").append(request.getPassword()).append("\n\n")
+                .append("SIGN IN\n")
+                .append("-------\n")
+                .append(emailService.frontendUrl()).append('\n')
+                .append(isStudent
+                        ? "Use your USN or email above with the temporary password.\n"
+                        : "Use your email above with the temporary password.\n")
+                .append("You can change this password after signing in from Settings.\n\n")
+                .append("Regards,\n")
+                .append("Collego Administration\n");
+
+        emailService.send(
+                user.getEmail(),
+                "Your Collego account is ready",
+                body.toString());
+    }
+
+    private String display(Object value) {
+        if (value == null) return "—";
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? "—" : text;
     }
 
     public List<UserResponse> getAllUsers() {

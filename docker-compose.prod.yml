@@ -18,6 +18,14 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://65-0-244-196.sslip.io,https://api-65-0-244-196.sslip.io}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # Account-creation email (Gmail SMTP from collego.admin@gmail.com).
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-collego.admin@gmail.com}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-collego.admin@gmail.com}
+      FRONTEND_URL: ${FRONTEND_URL:-https://65-0-244-196.sslip.io}
       # S3 / AWS
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}

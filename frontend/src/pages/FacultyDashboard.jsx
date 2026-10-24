@@ -1313,6 +1313,16 @@ export default function FacultyDashboard() {
     finally { setCareerLoading(false) }
   }
 
+  // The top-right profile shows the signed-in faculty member's name and
+  // department, so load the profile even before the Career Profile tab opens.
+  useEffect(() => {
+    let cancelled = false
+    api.get('/api/faculty/career-profile')
+      .then(res => { if (!cancelled) setCareerProfile(res.data) })
+      .catch(() => { /* the tab will surface the error if it persists */ })
+    return () => { cancelled = true }
+  }, [])
+
   const handleUploadCareerResume = async (file) => {
     const fd = new FormData()
     fd.append('file', file)
@@ -1779,7 +1789,13 @@ export default function FacultyDashboard() {
       />
       <PortalTopbar
         sidebarWidth={sidebarWidth} accent="violet"
-        user={{ name: 'Faculty User', role: 'Faculty', email }}
+        user={{
+          name: careerProfile?.name || 'Faculty',
+          role: careerProfile?.departmentName
+            ? `${careerProfile.designation ? `${careerProfile.designation} · ` : ''}${careerProfile.departmentName}`
+            : 'Faculty',
+          email,
+        }}
         notificationCount={Object.values(unreadCounts).reduce((a, b) => a + (Number(b) || 0), 0)}
         notifications={(notifications || []).filter(n => !n.read).map(n => ({ id: n.id, title: n.title, message: n.message }))}
         onLogout={async () => { await authService.logout(); navigate('/login') }}

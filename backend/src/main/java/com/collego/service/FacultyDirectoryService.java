@@ -92,18 +92,6 @@ public class FacultyDirectoryService {
         return map(findByEmail(email), true);
     }
 
-    /** Admin upload — immediately approved, kept for backwards compatibility. */
-    @Transactional
-    public FacultyDirectoryResponse uploadResume(Long facultyId, MultipartFile file) throws IOException {
-        FacultyProfile faculty = findFaculty(facultyId);
-        storeResume(faculty, file);
-        faculty.setResumeStatus(STATUS_APPROVED);
-        faculty.setResumeReviewNote(null);
-        facultyProfileRepository.save(faculty);
-        log.info("Admin uploaded an approved resume for faculty profile {} ({})", facultyId, faculty.getUser().getEmail());
-        return map(faculty, true);
-    }
-
     /** Faculty self-upload — always starts as PENDING. */
     @Transactional
     public FacultyDirectoryResponse uploadOwnResume(String email, MultipartFile file) throws IOException {
@@ -141,13 +129,6 @@ public class FacultyDirectoryService {
                 .build());
 
         log.info("Resume for faculty profile {} marked {}", facultyId, faculty.getResumeStatus());
-        return map(faculty, true);
-    }
-
-    @Transactional
-    public FacultyDirectoryResponse removeResume(Long facultyId) {
-        FacultyProfile faculty = findFaculty(facultyId);
-        clearResume(faculty);
         return map(faculty, true);
     }
 

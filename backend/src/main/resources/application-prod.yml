@@ -35,9 +35,9 @@ spring:
       max-request-size: 55MB
 
   mail:
-    host: ${MAIL_HOST:}
+    host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
+    username: ${MAIL_USERNAME:collego.admin@gmail.com}
     password: ${MAIL_PASSWORD:}
     properties:
       mail.smtp.auth: true
@@ -71,7 +71,7 @@ collego:
 
   mail:
     enabled: ${MAIL_ENABLED:false}
-    from: ${MAIL_FROM:no-reply@collego.local}
+    from: ${MAIL_FROM:collego.admin@gmail.com}
 
   frontend-url: ${FRONTEND_URL:https://65-0-244-196.sslip.io}
 

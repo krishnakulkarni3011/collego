@@ -87,6 +87,14 @@ services:
       JWT_SECRET: myVeryLongSecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong2024
       ADMIN_EMAIL: admin@collego.edu
       ADMIN_PASSWORD: Admin@123
+      # Account-creation email (Gmail SMTP). Disabled = logged only.
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-collego.admin@gmail.com}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-collego.admin@gmail.com}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       # Phase 9: AI microservice URL (Docker internal network)
       collego.ai-service.url: http://collego-ai-service:8000
     ports:
