@@ -216,6 +216,21 @@ _breaker = _CircuitBreaker(CIRCUIT_BREAKER_SECS)
 _budget = _DailyBudget(DAILY_CALL_BUDGET)
 
 
+def _retry_after_seconds(response: httpx.Response) -> float:
+    """Best-effort read of how long a 429 asks us to wait."""
+    raw = response.headers.get("retry-after")
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except ValueError:
+            pass
+    match = re.search(r"try again in ([\d.]+)\s*(ms|s)", response.text or "")
+    if match:
+        value = float(match.group(1))
+        return value / 1000.0 if match.group(2) == "ms" else value
+    return 60.0
+
+
 async def _call_openai_compatible(client: httpx.AsyncClient, base_url: str, api_key: str,
                                   model: str, payload: Dict[str, Any],
                                   json_mode: bool) -> Dict[str, Any]:
@@ -314,9 +329,20 @@ async def call_llm_raw(system_prompt: str, messages: List[Dict[str, Any]], *,
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
             if status == 429:
-                # The TPM window is per minute; back off just long enough for it
-                # to refill instead of disabling the feature for five minutes.
-                _breaker.trip("rate limited (429)", 60)
+                # Groq reports a sub-second refill window for TPM limits.
+                # Wait it out once instead of degrading a normal question to
+                # the stub; only open the breaker if the retry also fails.
+                wait = _retry_after_seconds(e.response)
+                if wait <= 12.0:
+                    await asyncio.sleep(wait + 0.25)
+                    try:
+                        result = await _provider_request(client, LLM_BASE_URL, LLM_API_KEY,
+                                                         DEFAULT_MODEL, payload, json_mode)
+                        _breaker.reset()
+                        return result
+                    except Exception:
+                        pass  # fall through to breaker + fallback
+                _breaker.trip("rate limited (429)", 30)
                 fallback = await _try_fallback(client, payload, json_mode)
                 if fallback is not None:
                     return fallback
@@ -439,6 +465,8 @@ Rules you must always follow:
 5. If a value is missing, say it is not available instead of guessing.
 6. Fee and payment data does not exist in this system. Never invent it.
 7. Be concise and friendly. Plain text only, no markdown.
+8. If a question needs several facts, call every tool you need in the same
+   turn instead of calling them one at a time.
 
 Call the provided tools to fetch the asker's own records before answering questions
 about attendance, marks, CGPA, timetable, assignments, notifications, placements or
@@ -480,29 +508,53 @@ async def chat(req: ChatRequest):
         return ChatResponse(reply=_stub_chat_response(lower, req.context), intent=_detect_intent(lower))
 
     messages: List[Dict[str, Any]] = list(history)
-    messages.append({"role": "user", "content": message})
-    for index, item in enumerate(req.toolTrace or []):
-        name = str(item.get("name", "tool")) if isinstance(item, dict) else "tool"
-        content = item.get("content") if isinstance(item, dict) else item
-        # OpenAI-compatible providers (Groq included) require every tool result
-        # to answer an assistant tool_call with the same id. The Spring side
-        # sends a compact trace, so synthesise a matching call here.
-        call_id = f"call_{index}"
+    trace = req.toolTrace or []
+
+    if trace and req.finalRound:
+        # Final answer: flatten the server data into the user turn. Replaying
+        # assistant.tool_calls here makes gpt-oss try to continue the tool
+        # protocol, and Groq rejects that with
+        #   400 "Tool choice is none, but model called a tool".
+        blocks: List[str] = []
+        for item in trace:
+            name = str(item.get("name", "tool")) if isinstance(item, dict) else "tool"
+            content = item.get("content") if isinstance(item, dict) else item
+            blocks.append(
+                f"{name}: " + (content if isinstance(content, str) else json.dumps(content, default=str))
+            )
         messages.append({
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [{
-                "id": call_id,
-                "type": "function",
-                "function": {"name": name, "arguments": "{}"},
-            }],
+            "role": "user",
+            "content": (
+                f"{message}\n\n"
+                "Data already retrieved from the database for this user:\n\n"
+                + "\n\n".join(blocks)
+                + "\n\nAnswer the user's question using only this data. Do not call any tools."
+            ),
         })
-        messages.append({
-            "role": "tool",
-            "tool_call_id": call_id,
-            "name": name,
-            "content": content if isinstance(content, str) else json.dumps(content, default=str),
-        })
+    else:
+        messages.append({"role": "user", "content": message})
+        for index, item in enumerate(trace):
+            name = str(item.get("name", "tool")) if isinstance(item, dict) else "tool"
+            content = item.get("content") if isinstance(item, dict) else item
+            # OpenAI-compatible providers (Groq included) require every tool
+            # result to answer an assistant tool_call with the same id. The
+            # Spring side sends a compact trace, so synthesise a matching call.
+            call_id = f"call_{index}"
+            messages.append({
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{
+                    "id": call_id,
+                    "type": "function",
+                    "function": {"name": name, "arguments": "{}"},
+                }],
+            })
+            messages.append({
+                "role": "tool",
+                "tool_call_id": call_id,
+                "name": name,
+                "content": content if isinstance(content, str) else json.dumps(content, default=str),
+            })
 
     system_prompt = CHAT_SYSTEM_PROMPT + _context_block(req.context) + _scope_block(req.scope)
 

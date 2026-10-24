@@ -323,9 +323,14 @@ IMPLEMENTATION NOTES (deviations and fixes found during the build)
    a tool message with the same tool_call_id. Before this fix Groq
    rejected the second round with HTTP 400, so every tool-using question
    silently fell back to the deterministic stub.
+   On the final round the trace is flattened into the user turn instead
+   of replaying assistant tool_calls. Otherwise gpt-oss tries to call yet
+   another tool and Groq rejects it with
+     400 "Tool choice is none, but model called a tool".
 
 3. Resilience tuned for a shared free tier.
-   - HTTP 429 opens the breaker for 60s (the TPM window is one minute).
+   - HTTP 429 waits for the provider's retry-after (up to 12s) and
+     retries once; if that also fails, the breaker opens for 30s.
    - Network/DNS errors retry once after 0.8s, then open for 30s.
    - HTTP 400/401/404 do NOT open the breaker (they are request bugs).
    - CIRCUIT_BREAKER_SECONDS default is 60 (was 300).
@@ -354,3 +359,7 @@ IMPLEMENTATION NOTES (deviations and fixes found during the build)
 7. The key was not present in this plan file. It was supplied separately
    and stored only in the gitignored local .env and /opt/collego/.env.
    Rotate it in the Groq console if it was shared anywhere else.
+
+8. The model still emits markdown despite the plain-text instruction.
+   Assistant chat replies are passed through a small stripMarkdown
+   helper (bold, inline code, headings, list markers) before display.

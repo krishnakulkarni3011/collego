@@ -58,8 +58,16 @@ DONE
      the student-only tools.
    - AI_MAX_TOOL_ROUNDS=1 keeps a typical exchange under the 8k TPM
      free-tier ceiling.
-   - 429 opens the breaker for 60s; DNS/network errors retry once then
-     open for 30s; 400/401/404 never open the breaker.
+   - The final round flattens tool results into the user turn instead of
+     replaying assistant tool_calls. Without this, gpt-oss tries to call
+     another tool and Groq returns 400 "Tool choice is none, but model
+     called a tool".
+   - On 429 the service waits for the provider's retry-after (up to 12s)
+     and retries once; a second failure opens the breaker for 30s.
+     Observed in practice: back-to-back compound questions either answer
+     immediately or after a 1-10s wait, without degrading to the stub.
+   - DNS/network errors retry once after 0.8s, then open for 30s;
+     400/401/404 never open the breaker.
    - Daily provider budget 900 calls; deterministic stubs remain the
      last-resort fallback.
 
@@ -147,6 +155,10 @@ Browser verification (headless Chrome, production build)
   Sidebar AI entries: ["AI Assistant", "Resume Analyzer"].
   Quick actions render real production values (9.57 SGPA,
   78.21% attendance, risk table, placement feedback).
+  Live chat in the UI:
+    Q: "Show my attendance percentage and my CGPA."
+    A: "Your overall attendance is 78.21%. Your cumulative CGPA is 9.57."
+  Smart-search mode in the UI returns the Attendance route.
   Screenshots:
     C:\Users\krish\AppData\Local\Temp\opencode\prod-ai-round-shots\
 

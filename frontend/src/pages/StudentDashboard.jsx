@@ -834,6 +834,14 @@ function DocumentsTab({ cgpa, showMessage }) {
 const fmtNumber = (value, digits = 2) =>
   typeof value === 'number' ? value.toFixed(digits) : (value ?? '—')
 
+// The model is told to answer in plain text but still slips in bold/heading
+// markers. Chat bubbles render plain text, so strip the common ones.
+const stripMarkdown = (text) => String(text ?? '')
+  .replace(/\*\*(.+?)\*\*/g, '$1')
+  .replace(/`([^`]+)`/g, '$1')
+  .replace(/^#{1,6}\s+/gm, '')
+  .replace(/^\s*[-*]\s+/gm, '• ')
+
 const formatPerformanceInsight = (r) => [
   '📈 Performance prediction',
   '',
@@ -881,7 +889,7 @@ function AiAssistantTab({ overall, cgpa }) {
   const [actionLoading, setActionLoading] = useState('')
   const [mode, setMode] = useState('chat') // 'chat' | 'search'
 
-  const append = (content) => setMessages(prev => [...prev, { role: 'assistant', content }])
+  const append = (content) => setMessages(prev => [...prev, { role: 'assistant', content: stripMarkdown(content) }])
 
   const sendMessage = async (override) => {
     const text = (typeof override === 'string' ? override : input).trim()
