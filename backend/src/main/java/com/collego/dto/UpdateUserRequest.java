@@ -18,4 +18,6 @@ public class UpdateUserRequest {
     private Integer admissionYear;
     private String employeeId;
     private String designation;
+    /** Null = leave unchanged; true = make HoD (replaces the current one); false = remove HoD role. */
+    private Boolean isHod;
 }

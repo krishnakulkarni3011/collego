@@ -31,4 +31,13 @@ public class StudentProfile {
     private String section;
 
     private Integer admissionYear;
+
+    /**
+     * True when this student is the class representative for their
+     * department + academic year + section. Nullable for existing rows;
+     * null is treated as false.
+     */
+    @Builder.Default
+    @Column(name = "is_cr")
+    private Boolean isCr = false;
 }

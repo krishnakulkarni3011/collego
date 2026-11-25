@@ -40,4 +40,12 @@ public class FacultyProfile {
 
     @Column(length = 500)
     private String resumeReviewNote;
+
+    /**
+     * At most one faculty member per department can be Head of Department.
+     * The admin portal enforces this when a HoD is assigned or changed.
+     */
+    @Builder.Default
+    @Column(name = "is_hod")
+    private Boolean isHod = false;
 }

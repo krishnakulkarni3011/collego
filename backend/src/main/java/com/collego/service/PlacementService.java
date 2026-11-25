@@ -661,6 +661,28 @@ public class PlacementService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Upcoming placement drives for the faculty portal. Deliberately returns a
+     * narrow projection: drive title, company, salary/package, drive date,
+     * department and eligibility criteria.
+     */
+    @Transactional(readOnly = true)
+    public List<FacultyPlacementDriveResponse> getUpcomingPlacementDrivesForFaculty() {
+        return placementNoticeRepository
+                .findByIsActiveTrueAndDriveDateGreaterThanEqualOrderByDriveDateAsc(java.time.LocalDate.now())
+                .stream()
+                .map(notice -> FacultyPlacementDriveResponse.builder()
+                        .title(notice.getTitle())
+                        .companyName(notice.getCompanyName())
+                        .packageOffered(notice.getPackageOffered())
+                        .driveDate(notice.getDriveDate())
+                        .departmentName(notice.getDepartment() != null
+                                ? notice.getDepartment().getName() : "All Departments")
+                        .eligibilityCriteria(notice.getEligibilityCriteria())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public PlacementNoticeResponse deactivateNotice(Long noticeId) {
         PlacementNotice notice = placementNoticeRepository.findById(noticeId)

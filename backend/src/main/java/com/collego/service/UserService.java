@@ -73,11 +73,19 @@ public class UserService {
                     .build();
             studentProfileRepository.save(profile);
         } else if (role == Role.FACULTY) {
+            boolean makeHod = Boolean.TRUE.equals(request.getIsHod());
+            if (makeHod && department == null) {
+                throw new BadRequestException("Select a department before assigning the Head of Department role.");
+            }
+            if (makeHod) {
+                demoteCurrentHod(department.getId(), null);
+            }
             FacultyProfile profile = FacultyProfile.builder()
                     .user(user)
                     .department(department)
                     .employeeId(request.getEmployeeId())
                     .designation(request.getDesignation())
+                    .isHod(makeHod)
                     .build();
             facultyProfileRepository.save(profile);
         }
@@ -192,12 +200,26 @@ public class UserService {
         return mapToUserResponse(user, getProfileExtra(user));
     }
 
+    /**
+     * Only one HoD is allowed per department. Called when a new HoD is
+     * assigned; the previous HoD is quietly demoted.
+     */
+    @Transactional
+    public void demoteCurrentHod(Long departmentId, Long exceptFacultyProfileId) {
+        if (departmentId == null) return;
+        for (FacultyProfile current : facultyProfileRepository.findHodsByDepartment(departmentId)) {
+            if (exceptFacultyProfileId != null && exceptFacultyProfileId.equals(current.getId())) continue;
+            current.setIsHod(false);
+            facultyProfileRepository.save(current);
+        }
+    }
+
     // ── helper: carries dept name + student-specific fields ──────────────────
     private record ProfileExtra(Long departmentId, String departmentName, String departmentCode,
                                 String enrollmentNumber, Integer semester, String section,
                                 Integer admissionYear, Long facultyProfileId, String employeeId,
                                 String designation, String resumeFileName, boolean hasResume,
-                                String resumeStatus) {}
+                                String resumeStatus, Boolean isHod) {}
 
     private ProfileExtra getProfileExtra(User user) {
         if (user.getRole() == Role.STUDENT) {
@@ -210,7 +232,7 @@ public class UserService {
                             p.getSemester(),
                             p.getSection(),
                             p.getAdmissionYear(),
-                            null, null, null, null, false, null))
+                            null, null, null, null, false, null, null))
                     .orElse(emptyExtra());
         }
         if (user.getRole() == Role.FACULTY) {
@@ -224,7 +246,8 @@ public class UserService {
                             p.getDesignation(),
                             p.getResumeFileName(),
                             p.getResumePath() != null && !p.getResumePath().isBlank(),
-                            resolveResumeStatus(p)))
+                            resolveResumeStatus(p),
+                            Boolean.TRUE.equals(p.getIsHod())))
                     .orElse(emptyExtra());
         }
         return emptyExtra();
@@ -236,7 +259,7 @@ public class UserService {
     }
 
     private ProfileExtra emptyExtra() {
-        return new ProfileExtra(null, null, null, null, null, null, null, null, null, null, null, false, null);
+        return new ProfileExtra(null, null, null, null, null, null, null, null, null, null, null, false, null, null);
     }
 
     private UserResponse mapToUserResponse(User user, ProfileExtra extra) {
@@ -260,6 +283,7 @@ public class UserService {
                 .resumeFileName(extra.resumeFileName())
                 .hasResume(extra.hasResume())
                 .resumeStatus(extra.resumeStatus())
+                .isHod(extra.isHod())
                 .createdAt(user.getCreatedAt() != null ? user.getCreatedAt() : java.time.LocalDateTime.now())
                 .build();
     }

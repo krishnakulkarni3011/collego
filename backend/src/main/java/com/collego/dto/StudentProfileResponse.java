@@ -18,4 +18,5 @@ public class StudentProfileResponse {
     private Integer currentSemester;
     private String section;
     private Integer admissionYear;
+    private Boolean isCr;
 }

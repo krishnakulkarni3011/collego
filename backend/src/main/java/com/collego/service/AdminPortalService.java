@@ -9,6 +9,7 @@ import com.collego.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +45,7 @@ public class AdminPortalService {
     private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
     private final UserService userService;
+    private final BroadcastAttachmentService broadcastAttachmentService;
 
     /** Phase 8 — S3 bucket name for DB backups (blank = local dev, skip S3 upload) */
     @Value("${collego.aws.s3-backup-bucket:}")
@@ -100,6 +102,23 @@ public class AdminPortalService {
                 if (dept != null) p.setDepartment(dept);
                 if (request.getEmployeeId() != null) p.setEmployeeId(request.getEmployeeId());
                 if (request.getDesignation() != null) p.setDesignation(request.getDesignation());
+                // Moving an existing HoD to another department must not leave two
+                // HoDs behind when the caller does not explicitly send isHod.
+                if (request.getIsHod() == null && Boolean.TRUE.equals(p.getIsHod()) && p.getDepartment() != null) {
+                    userService.demoteCurrentHod(p.getDepartment().getId(), p.getId());
+                }
+                if (request.getIsHod() != null) {
+                    if (request.getIsHod()) {
+                        Department target = dept != null ? dept : p.getDepartment();
+                        if (target == null) {
+                            throw new BadRequestException("Select a department before assigning the Head of Department role.");
+                        }
+                        userService.demoteCurrentHod(target.getId(), p.getId());
+                        p.setIsHod(true);
+                    } else {
+                        p.setIsHod(false);
+                    }
+                }
                 facultyProfileRepository.save(p);
             });
         }
@@ -677,6 +696,11 @@ public class AdminPortalService {
 
     @Transactional
     public BroadcastResponse createBroadcast(String adminEmail, CreateBroadcastRequest request) {
+        return createBroadcast(adminEmail, request, null);
+    }
+
+    @Transactional
+    public BroadcastResponse createBroadcast(String adminEmail, CreateBroadcastRequest request, MultipartFile file) {
         User sender = userRepository.findByEmailIgnoreCase(adminEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Admin account not found"));
 
@@ -751,6 +775,9 @@ public class AdminPortalService {
             throw new BadRequestException("No active recipients match the selected audience.");
         }
 
+        BroadcastAttachmentService.StoredAttachment attachment =
+                file != null && !file.isEmpty() ? broadcastAttachmentService.store(file) : null;
+
         Broadcast broadcast = Broadcast.builder()
                 .sender(sender)
                 .title(request.getTitle().trim())
@@ -761,6 +788,9 @@ public class AdminPortalService {
                 .department(department)
                 .recipient(singleRecipient)
                 .recipientCount(distinctRecipients.size())
+                .attachmentFileName(attachment != null ? attachment.fileName() : null)
+                .attachmentPath(attachment != null ? attachment.path() : null)
+                .attachmentContentType(attachment != null ? attachment.contentType() : null)
                 .build();
         broadcast = broadcastRepository.save(broadcast);
 
@@ -771,6 +801,9 @@ public class AdminPortalService {
                     .message(broadcast.getMessage())
                     .type(type)
                     .category(NotificationCategory.NOTICE)
+                    .attachmentFileName(broadcast.getAttachmentFileName())
+                    .attachmentPath(broadcast.getAttachmentPath())
+                    .attachmentContentType(broadcast.getAttachmentContentType())
                     .build());
         }
 
@@ -833,7 +866,25 @@ public class AdminPortalService {
                 .recipientName(broadcast.getRecipient() != null ? recipientName(broadcast.getRecipient()) : null)
                 .recipientCount(broadcast.getRecipientCount())
                 .createdAt(broadcast.getCreatedAt())
+                .attachmentFileName(broadcast.getAttachmentFileName())
+                .hasAttachment(broadcast.getAttachmentPath() != null && !broadcast.getAttachmentPath().isBlank())
                 .build();
+    }
+
+    /** Admin-side download of the file attached to a broadcast they sent. */
+    @Transactional(readOnly = true)
+    public BroadcastAttachmentService.DownloadedAttachment downloadBroadcastAttachment(
+            String adminEmail, Long broadcastId) {
+        Broadcast broadcast = broadcastRepository.findById(broadcastId)
+                .orElseThrow(() -> new ResourceNotFoundException("Broadcast not found: " + broadcastId));
+        String senderEmail = broadcast.getSender() != null ? broadcast.getSender().getEmail() : null;
+        if (senderEmail == null || !senderEmail.equalsIgnoreCase(adminEmail)) {
+            throw new AccessDeniedException("You can only open attachments from broadcasts you sent.");
+        }
+        return broadcastAttachmentService.download(
+                broadcast.getAttachmentPath(),
+                broadcast.getAttachmentFileName(),
+                broadcast.getAttachmentContentType());
     }
 
     private String recipientName(User user) {

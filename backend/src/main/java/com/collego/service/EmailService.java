@@ -40,7 +40,10 @@ public class EmailService {
     /** Send a plain-text email. Never throws: delivery failures are logged. */
     public void send(String to, String subject, String body) {
         if (!isEnabled()) {
-            log.info("[mail disabled] to={} subject={} body={}", to, subject, body);
+            // Do not log message bodies at INFO: password-reset emails contain
+            // one-time tokens. Local development runs at DEBUG to expose them.
+            log.info("[mail disabled] to={} subject={}", to, subject);
+            log.debug("[mail disabled] body={}", body);
             return;
         }
         try {

@@ -263,6 +263,7 @@ public class FacultyDirectoryService {
                 .resumeStatus(status)
                 .resumeReviewNote(forAdmin ? profile.getResumeReviewNote() : null)
                 .active(user != null && user.isActive())
+                .isHod(Boolean.TRUE.equals(profile.getIsHod()))
                 .build();
     }
 }

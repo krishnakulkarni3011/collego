@@ -35,4 +35,6 @@ public class CreateUserRequest {
     // Faculty fields
     private String employeeId;
     private String designation;
+    /** When true, this faculty member becomes the only HoD of the department. */
+    private Boolean isHod;
 }

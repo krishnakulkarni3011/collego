@@ -69,6 +69,10 @@ collego:
     first-name: System
     last-name: Admin
 
+  security:
+    # One-time password-reset links expire after this many minutes.
+    password-reset-ttl-minutes: ${PASSWORD_RESET_TTL_MINUTES:30}
+
   mail:
     enabled: ${MAIL_ENABLED:false}
     from: ${MAIL_FROM:collego.admin@gmail.com}

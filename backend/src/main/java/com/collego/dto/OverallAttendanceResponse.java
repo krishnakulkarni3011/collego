@@ -12,4 +12,5 @@ public class OverallAttendanceResponse {
     private long totalPresent;
     private double overallPercentage;
     private List<SubjectAttendanceResponse> subjectWise;
+    private List<HolidayResponse> holidays;
 }

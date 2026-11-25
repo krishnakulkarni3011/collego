@@ -2,7 +2,9 @@ package com.collego.repository;
 
 import com.collego.entity.User;
 import com.collego.entity.Role;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +15,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailIgnoreCase(String email);
     boolean existsByEmail(String email);
     Optional<User> findByRefreshToken(String refreshToken);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<User> findByPasswordResetToken(String token);
     List<User> findByRole(Role role);
     boolean existsByRole(Role role);

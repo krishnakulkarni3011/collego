@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
@@ -21,8 +22,10 @@ public class ExportController {
     private final ExportService exportService;
 
     @GetMapping("/students")
-    public ResponseEntity<byte[]> exportStudents() {
-        return csv(exportService.studentsCsv(), "students-" + LocalDate.now() + ".csv");
+    public ResponseEntity<byte[]> exportStudents(
+            @RequestParam(required = false) Long departmentId,
+            @RequestParam(required = false) Integer year) {
+        return csv(exportService.studentsCsv(departmentId, year), "students-" + LocalDate.now() + ".csv");
     }
 
     @GetMapping("/faculty")

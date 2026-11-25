@@ -38,7 +38,9 @@ public class StudentPortalService {
     private final AssignmentSubmissionRepository assignmentSubmissionRepository;
     private final CourseMaterialRepository courseMaterialRepository;
     private final QuestionPaperService questionPaperService;
+    private final ClassTimetableService classTimetableService;
     private final S3StorageService s3StorageService;
+    private final HolidayRepository holidayRepository;
 
     @Value("${collego.aws.s3-bucket-assignments:collego-assignments-prod}")
     private String assignmentBucket;
@@ -48,6 +50,7 @@ public class StudentPortalService {
 
     // ==================== Profile ====================
 
+    @Transactional(readOnly = true)
     public StudentProfileResponse getProfile(String email) {
         StudentProfile student = getStudentByEmail(email);
         User user = student.getUser();
@@ -64,11 +67,13 @@ public class StudentPortalService {
                 .currentSemester(student.getSemester())
                 .section(student.getSection())
                 .admissionYear(student.getAdmissionYear())
+                .isCr(Boolean.TRUE.equals(student.getIsCr()))
                 .build();
     }
 
     // ==================== Attendance ====================
 
+    @Transactional(readOnly = true)
     public List<SubjectAttendanceResponse> getAttendance(String email, Long semesterId) {
         StudentProfile student = getStudentByEmail(email);
         List<Enrollment> enrollments = getEnrollments(student, semesterId);
@@ -93,6 +98,7 @@ public class StudentPortalService {
         }).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public OverallAttendanceResponse getOverallAttendance(String email) {
         StudentProfile student = getStudentByEmail(email);
         List<Enrollment> activeEnrollments = enrollmentRepository.findByStudentIdAndStatus(
@@ -126,11 +132,21 @@ public class StudentPortalService {
 
         double overallPercentage = totalClasses > 0 ? (totalPresent * 100.0) / totalClasses : 0.0;
 
+        List<Long> sectionIds = activeEnrollments.stream()
+                .map(e -> e.getSection().getId())
+                .collect(Collectors.toList());
+        List<HolidayResponse> holidays = sectionIds.isEmpty()
+                ? List.of()
+                : holidayRepository.findBySectionIdInOrderByDateDesc(sectionIds).stream()
+                        .map(HolidayMapper::toResponse)
+                        .collect(Collectors.toList());
+
         return OverallAttendanceResponse.builder()
                 .totalClasses(totalClasses)
                 .totalPresent(totalPresent)
                 .overallPercentage(Math.round(overallPercentage * 100.0) / 100.0)
                 .subjectWise(subjectWise)
+                .holidays(holidays)
                 .build();
     }
 
@@ -320,6 +336,7 @@ public class StudentPortalService {
 
         return StudentTimetableResponse.builder()
                 .weeklySchedule(weeklySchedule)
+                .classTimetable(classTimetableService.getForStudent(email))
                 .build();
     }
 
@@ -395,6 +412,8 @@ public class StudentPortalService {
                         .category(n.getCategory() != null ? n.getCategory().name() : NotificationCategory.NOTICE.name())
                         .read(n.isRead())
                         .createdAt(n.getCreatedAt())
+                        .attachmentFileName(n.getAttachmentFileName())
+                        .hasAttachment(n.getAttachmentPath() != null && !n.getAttachmentPath().isBlank())
                         .build())
                 .collect(Collectors.toList());
     }

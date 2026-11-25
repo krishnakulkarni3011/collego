@@ -30,6 +30,7 @@ public class FacultyPortalService {
     private final SectionRepository sectionRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final AttendanceRepository attendanceRepository;
+    private final HolidayRepository holidayRepository;
     private final InternalMarksRepository internalMarksRepository;
     private final SemesterMarksRepository semesterMarksRepository;
     private final StudentProfileRepository studentProfileRepository;
@@ -94,6 +95,11 @@ public class FacultyPortalService {
 
         // Verify this section belongs to the faculty
         validateFacultyOwnsSection(faculty, section);
+
+        if (holidayRepository.existsBySectionIdAndDate(section.getId(), request.getDate())) {
+            throw new BadRequestException(
+                    "This day is declared as a holiday for this section. Remove the holiday before marking attendance.");
+        }
 
         int markedPresent = 0;
         int markedAbsent = 0;
@@ -175,6 +181,63 @@ public class FacultyPortalService {
             entry.put("percentage", percentage);
             return entry;
         }).collect(Collectors.toList());
+    }
+
+    // ==================== Holidays ====================
+
+    @Transactional
+    public HolidayResponse declareHoliday(String email, HolidayRequest request) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        Section section = sectionRepository.findById(request.getSectionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + request.getSectionId()));
+        validateFacultyOwnsSection(faculty, section);
+
+        // A holiday means the class did not happen: remove any attendance that
+        // was already marked for that day so it is not counted as absent.
+        List<Attendance> existing = attendanceRepository.findBySectionIdAndDate(
+                section.getId(), request.getDate());
+        if (!existing.isEmpty()) {
+            attendanceRepository.deleteAll(existing);
+        }
+
+        Holiday holiday = holidayRepository.findBySectionIdAndDate(section.getId(), request.getDate())
+                .orElseGet(() -> Holiday.builder().section(section).date(request.getDate()).build());
+        holiday.setNote(normaliseHolidayNote(request.getNote()));
+        holiday.setDeclaredBy(faculty.getUser());
+        holiday = holidayRepository.save(holiday);
+
+        log.info("Faculty {} declared holiday for section {} on {}", email, section.getId(), request.getDate());
+        return HolidayMapper.toResponse(holiday);
+    }
+
+    @Transactional(readOnly = true)
+    public List<HolidayResponse> getHolidaysForSection(String email, Long sectionId) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        Section section = sectionRepository.findById(sectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + sectionId));
+        validateFacultyOwnsSection(faculty, section);
+
+        return holidayRepository.findBySectionIdOrderByDateDesc(sectionId).stream()
+                .map(HolidayMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void removeHoliday(String email, Long holidayId) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        Holiday holiday = holidayRepository.findById(holidayId)
+                .orElseThrow(() -> new ResourceNotFoundException("Holiday not found: " + holidayId));
+        validateFacultyOwnsSection(faculty, holiday.getSection());
+
+        holidayRepository.delete(holiday);
+        log.info("Faculty {} removed holiday {} for section {}", email, holidayId, holiday.getSection().getId());
+    }
+
+    private String normaliseHolidayNote(String note) {
+        if (note == null) return null;
+        String trimmed = note.trim();
+        if (trimmed.isEmpty()) return null;
+        return trimmed.length() > 300 ? trimmed.substring(0, 300) : trimmed;
     }
 
     // ==================== Internal Marks ====================
@@ -902,6 +965,8 @@ public class FacultyPortalService {
                         .category(n.getCategory() != null ? n.getCategory().name() : NotificationCategory.NOTICE.name())
                         .read(n.isRead())
                         .createdAt(n.getCreatedAt())
+                        .attachmentFileName(n.getAttachmentFileName())
+                        .hasAttachment(n.getAttachmentPath() != null && !n.getAttachmentPath().isBlank())
                         .build())
                 .collect(Collectors.toList());
     }
@@ -1062,18 +1127,34 @@ public class FacultyPortalService {
             throw new BadRequestException("Course name is required");
         }
 
+        Integer credits = request.getCredits() != null ? request.getCredits() : 4;
+        if (credits < 1 || credits > 12) {
+            throw new BadRequestException("Credits must be between 1 and 12");
+        }
+
         // Faculty type any subject name; reuse an existing course with the same
         // name in their department, otherwise create it on the fly.
-        Course course = courseRepository.findByDepartmentId(department.getId()).stream()
+        Optional<Course> existingCourse = courseRepository.findByDepartmentId(department.getId()).stream()
                 .filter(c -> c.getName().equalsIgnoreCase(courseName))
-                .findFirst()
-                .orElseGet(() -> courseRepository.save(Course.builder()
-                        .name(courseName)
-                        .code(generateCourseCode(department, courseName))
-                        .credits(4)
-                        .department(department)
-                        .description(courseName + " (added by faculty)")
-                        .build()));
+                .findFirst();
+
+        Course course;
+        if (existingCourse.isPresent()) {
+            course = existingCourse.get();
+            // The assigning faculty can correct the credit value for the subject.
+            if (request.getCredits() != null && !Objects.equals(course.getCredits(), credits)) {
+                course.setCredits(credits);
+                course = courseRepository.save(course);
+            }
+        } else {
+            course = courseRepository.save(Course.builder()
+                    .name(courseName)
+                    .code(generateCourseCode(department, courseName))
+                    .credits(credits)
+                    .department(department)
+                    .description(courseName + " (added by faculty)")
+                    .build());
+        }
 
         Semester semester = semesterRepository.findById(request.getSemesterId())
                 .orElseThrow(() -> new ResourceNotFoundException("Semester not found: " + request.getSemesterId()));
@@ -1533,6 +1614,7 @@ public class FacultyPortalService {
                 .courseId(a.getCourse().getId())
                 .courseName(a.getCourse().getName())
                 .courseCode(a.getCourse().getCode())
+                .credits(a.getCourse().getCredits())
                 .semesterId(a.getSemester().getId())
                 .semesterName(a.getSemester().getName())
                 .semesterNumber(a.getSemester().getNumber())

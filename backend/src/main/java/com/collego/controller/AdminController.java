@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -175,10 +176,30 @@ public class AdminController {
                 .body(adminPortalService.createBroadcast(auth.getName(), request));
     }
 
+    /** Broadcast with an optional attachment (multipart/form-data). */
+    @PostMapping(value = "/broadcasts/with-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<BroadcastResponse> createBroadcastWithFile(
+            Authentication auth,
+            @RequestPart("data") @Valid CreateBroadcastRequest request,
+            @RequestPart(value = "file", required = false) MultipartFile file) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(adminPortalService.createBroadcast(auth.getName(), request, file));
+    }
+
     /** Messages sent by the signed-in admin, newest first. */
     @GetMapping("/broadcasts")
     public ResponseEntity<List<BroadcastResponse>> listBroadcasts(Authentication auth) {
         return ResponseEntity.ok(adminPortalService.listBroadcastsBy(auth.getName()));
+    }
+
+    /** View/download the attachment of a broadcast sent by the signed-in admin. */
+    @GetMapping("/broadcasts/{id}/attachment")
+    public ResponseEntity<byte[]> viewBroadcastAttachment(
+            Authentication auth,
+            @PathVariable Long id,
+            @RequestParam(value = "download", defaultValue = "false") boolean download) {
+        return NotificationAttachmentController.fileResponse(
+                adminPortalService.downloadBroadcastAttachment(auth.getName(), id), download);
     }
 
     // ==================== Bulk Import (Phase 5) ====================

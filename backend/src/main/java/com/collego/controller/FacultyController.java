@@ -3,6 +3,8 @@ package com.collego.controller;
 import com.collego.dto.*;
 import com.collego.service.FacultyPortalService;
 import com.collego.service.FacultyDirectoryService;
+import com.collego.service.FacultySectionPdfService;
+import com.collego.service.PlacementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -27,12 +29,32 @@ public class FacultyController {
 
     private final FacultyPortalService facultyPortalService;
     private final FacultyDirectoryService facultyDirectoryService;
+    private final FacultySectionPdfService facultySectionPdfService;
+    private final PlacementService placementService;
 
     // ==================== Sections ====================
 
     @GetMapping("/sections")
     public ResponseEntity<List<FacultySectionResponse>> getAssignedSections(Authentication auth) {
         return ResponseEntity.ok(facultyPortalService.getAssignedSections(auth.getName()));
+    }
+
+    @GetMapping("/sections/{sectionId}/students/pdf")
+    public ResponseEntity<byte[]> downloadSectionStudentsPdf(
+            Authentication auth, @PathVariable Long sectionId) {
+        byte[] pdf = facultySectionPdfService.generateSectionStudentsPdf(auth.getName(), sectionId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"section-" + sectionId + "-students.pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    // ==================== Upcoming Placements ====================
+
+    @GetMapping("/placements/upcoming")
+    public ResponseEntity<List<FacultyPlacementDriveResponse>> getUpcomingPlacements() {
+        return ResponseEntity.ok(placementService.getUpcomingPlacementDrivesForFaculty());
     }
 
     // ==================== Faculty Subject Assignment ====================
@@ -82,6 +104,31 @@ public class FacultyController {
             Authentication auth,
             @PathVariable Long sectionId) {
         return ResponseEntity.ok(facultyPortalService.getAttendanceForSection(auth.getName(), sectionId));
+    }
+
+    // ==================== Holidays ====================
+
+    @PostMapping("/attendance/holidays")
+    public ResponseEntity<HolidayResponse> declareHoliday(
+            Authentication auth,
+            @Valid @RequestBody HolidayRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(facultyPortalService.declareHoliday(auth.getName(), request));
+    }
+
+    @GetMapping("/attendance/holidays/{sectionId}")
+    public ResponseEntity<List<HolidayResponse>> getHolidaysForSection(
+            Authentication auth,
+            @PathVariable Long sectionId) {
+        return ResponseEntity.ok(facultyPortalService.getHolidaysForSection(auth.getName(), sectionId));
+    }
+
+    @DeleteMapping("/attendance/holidays/{holidayId}")
+    public ResponseEntity<Void> removeHoliday(
+            Authentication auth,
+            @PathVariable Long holidayId) {
+        facultyPortalService.removeHoliday(auth.getName(), holidayId);
+        return ResponseEntity.noContent().build();
     }
 
     // ==================== Internal Marks ====================

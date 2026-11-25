@@ -21,4 +21,6 @@ public class BroadcastResponse {
     private String recipientName;
     private int recipientCount;
     private LocalDateTime createdAt;
+    private String attachmentFileName;
+    private boolean hasAttachment;
 }

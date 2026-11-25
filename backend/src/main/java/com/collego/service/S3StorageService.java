@@ -187,9 +187,20 @@ public class S3StorageService {
         if (filename == null) return "application/octet-stream";
         String lower = filename.toLowerCase();
         if (lower.endsWith(".pdf"))  return "application/pdf";
+        if (lower.endsWith(".png"))  return "image/png";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".gif"))  return "image/gif";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".txt"))  return "text/plain";
+        if (lower.endsWith(".csv"))  return "text/csv";
+        if (lower.endsWith(".md"))   return "text/markdown";
+        if (lower.endsWith(".json")) return "application/json";
         if (lower.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
         if (lower.endsWith(".doc"))  return "application/msword";
-        if (lower.endsWith(".ppt") || lower.endsWith(".pptx")) return "application/vnd.ms-powerpoint";
+        if (lower.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        if (lower.endsWith(".xls"))  return "application/vnd.ms-excel";
+        if (lower.endsWith(".pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        if (lower.endsWith(".ppt"))  return "application/vnd.ms-powerpoint";
         if (lower.endsWith(".zip")) return "application/zip";
         return "application/octet-stream";
     }

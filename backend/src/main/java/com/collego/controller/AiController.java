@@ -10,14 +10,17 @@ import com.collego.dto.*;
 import com.collego.entity.*;
 import com.collego.repository.*;
 import com.collego.service.AiService;
+import com.collego.service.ResumeTextExtractor;
 import com.collego.service.StudentPortalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -60,6 +63,7 @@ public class AiController {
     private final AiChatOrchestrator aiChatOrchestrator;
     private final AiRateLimiter aiRateLimiter;
     private final AiStudentInsights aiStudentInsights;
+    private final ResumeTextExtractor resumeTextExtractor;
 
     // Repository for fetching question-paper context to pass to AI
     private final QuestionPaperRepository questionPaperRepository;
@@ -145,6 +149,25 @@ public class AiController {
         }
         String resumeText = body.get("resumeText") == null ? "" : String.valueOf(body.get("resumeText"));
         String targetRole = body.get("targetRole") == null ? null : String.valueOf(body.get("targetRole"));
+        Map<String, Object> profile = aiStudentInsights.studentProfile(auth.getName());
+        return ResponseEntity.ok(aiService.analyzeResume(resumeText, targetRole, profile));
+    }
+
+    /**
+     * Student-facing resume analyzer: accepts a PDF/DOCX/TXT file, extracts
+     * its text server-side and forwards only the text to the AI service.
+     * The uploaded file is never stored.
+     */
+    @PostMapping(value = "/resume-analyze-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    public ResponseEntity<Map<String, Object>> analyzeResumeFile(
+            Authentication auth,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "targetRole", required = false) String targetRole) {
+        if (!aiRateLimiter.tryAcquire(auth.getName())) {
+            return rateLimited();
+        }
+        String resumeText = resumeTextExtractor.extract(file);
         Map<String, Object> profile = aiStudentInsights.studentProfile(auth.getName());
         return ResponseEntity.ok(aiService.analyzeResume(resumeText, targetRole, profile));
     }

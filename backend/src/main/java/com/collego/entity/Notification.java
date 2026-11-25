@@ -41,6 +41,16 @@ public class Notification {
     @Column(nullable = false)
     private boolean isRead = false;
 
+    /** Optional file copied from the originating broadcast. */
+    @Column(length = 500)
+    private String attachmentFileName;
+
+    @Column(length = 1000)
+    private String attachmentPath;
+
+    @Column(length = 150)
+    private String attachmentContentType;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 

@@ -12,6 +12,7 @@ public class FacultySubjectAssignmentResponse {
     private Long courseId;
     private String courseName;
     private String courseCode;
+    private Integer credits;
     private Long semesterId;
     private String semesterName;
     private Integer semesterNumber;

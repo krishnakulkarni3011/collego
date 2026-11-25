@@ -3,6 +3,7 @@ package com.collego.repository;
 import com.collego.entity.FacultyProfile;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +16,9 @@ public interface FacultyProfileRepository extends JpaRepository<FacultyProfile, 
     Optional<FacultyProfile> findByEmployeeId(String employeeId);
     Optional<FacultyProfile> findByUserEmailIgnoreCase(String email);
     List<FacultyProfile> findByDepartmentCode(String code);
+
+    @Query("select f from FacultyProfile f where f.department.id = :departmentId and f.isHod = true")
+    List<FacultyProfile> findHodsByDepartment(@Param("departmentId") Long departmentId);
 
     /**
      * Phase 10: faculty addresses are shown in the public faculty directory, so

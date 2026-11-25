@@ -17,6 +17,8 @@ public interface PlacementNoticeRepository extends JpaRepository<PlacementNotice
 
     List<PlacementNotice> findByIsActiveTrueAndLastDateGreaterThanEqualOrderByLastDateAsc(java.time.LocalDate date);
 
+    List<PlacementNotice> findByIsActiveTrueAndDriveDateGreaterThanEqualOrderByDriveDateAsc(java.time.LocalDate date);
+
     @Query("SELECT p FROM PlacementNotice p WHERE p.isActive = true AND (p.department IS NULL OR p.department.id = :departmentId) ORDER BY p.postedAt DESC")
     List<PlacementNotice> findActiveByDepartmentOrAll(@Param("departmentId") Long departmentId);
 }

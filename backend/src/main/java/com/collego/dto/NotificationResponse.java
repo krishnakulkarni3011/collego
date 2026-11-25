@@ -15,4 +15,6 @@ public class NotificationResponse {
     private String category;
     private boolean read;
     private LocalDateTime createdAt;
+    private String attachmentFileName;
+    private boolean hasAttachment;
 }

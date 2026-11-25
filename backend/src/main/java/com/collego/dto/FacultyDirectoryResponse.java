@@ -26,4 +26,6 @@ public class FacultyDirectoryResponse {
     private String resumeStatus;
     private String resumeReviewNote;
     private boolean active;
+    /** True when this faculty member is the Head of Department. */
+    private Boolean isHod;
 }

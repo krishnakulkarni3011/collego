@@ -53,6 +53,16 @@ public class Broadcast {
     @Column(nullable = false)
     private int recipientCount;
 
+    /** Optional attachment shown to every recipient of this broadcast. */
+    @Column(length = 500)
+    private String attachmentFileName;
+
+    @Column(length = 1000)
+    private String attachmentPath;
+
+    @Column(length = 150)
+    private String attachmentContentType;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
