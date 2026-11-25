@@ -1041,7 +1041,7 @@ async def analyze_resume(req: ResumeAnalyzeRequest):
     )
 
     try:
-        content = await call_llm(system, f"Resume text:\n{req.resumeText[:3000]}", max_tokens=1000)
+        content = await call_llm(system, f"Resume text:\n{req.resumeText[:6000]}", max_tokens=1000)
         parsed = json.loads(content)
         return ResumeAnalyzeResponse(
             atsScore=int(parsed.get("atsScore", 50)),

@@ -1,0 +1,362 @@
+================================================================================
+COLLEGO ERP — PHASE 11: CLOUD LLM INTEGRATION (GROQ) + PER-USER ISOLATION
+Status: plan approved, implementation in progress
+Date: 2026-10-22
+Supersedes: Phase 10 "Local Ollama" design (rolled back in commit 3c5eb32)
+================================================================================
+
+================================================================================
+STATUS: DONE / NOT YET DONE
+================================================================================
+
+DONE
+----
+[x] Ollama, the three local models and the 1.6 GB installer removed
+    (9.6 GB reclaimed; free disk 15.2 GB -> 27.5 GB). Nothing local remains.
+
+[x] Plan document written: Phase11_Cloud_LLM_Plan.txt (this file).
+    Phase10_LLM_Integration_Plan.txt restored with a SUPERSEDED banner and
+    kept as the design history of the isolation layer.
+
+[x] Isolation layer restored from git history (commit f8c6f66 = "Revert
+    'Revert: Phase 10 local LLM integration on Ollama'"), so it is reused
+    rather than rewritten:
+    - backend/src/main/java/com/collego/ai/  (14 classes)
+        AiScope, AiScopeFactory, AiTool, SimpleAiTool, AiToolCatalog,
+        AiToolRegistry, AiOutputGuard, AiAuditLogger, AiRateLimiter,
+        AiRateLimitExceededException, AiHistorySanitizer, AiChatOrchestrator,
+        AiUserSummary, AiRagService
+    - backend/src/test/java/com/collego/ai/  (8 test classes, 54 tests)
+    - AiController + AiService: scope, history sanitising, client context
+      ignored, per-user rate limiting, audit of every call
+    - ai-service: tool-loop contract, H1 history whitelist, stub degradation
+
+[x] Cloud provider layer written in ai-service/main.py:
+    - provider groq (default), base https://api.groq.com/openai/v1,
+      model openai/gpt-oss-120b, key from LLM_API_KEY
+    - one OpenAI-compatible call path (Groq / OpenRouter / OpenAI)
+    - _ProviderUnavailable raised on every failure path so the caller stubs
+    - circuit breaker: 429 or 5xx trips it for 300 s, then half-opens
+    - daily call budget: 8,000 provider requests per UTC day
+    - optional fallback provider (LLM_FALLBACK_*)
+    - JSON-mode retry: if response_format is rejected, retry without it
+    - /health now reports provider, model, key state, daily budget used/limit,
+      breaker state and whether the service is currently serving stubs
+    - /embed returns an empty result (Groq has no embeddings endpoint) so the
+      retriever uses the keyword ranker; an optional EMBED_PROVIDER can be
+      configured later
+
+[x] Verified: python compiles; 21/21 ai-service smoke checks pass — the
+    service boots, serves the deterministic stubs, still blocks the H1 system
+    role injection, and reports the new health fields.
+
+NOT YET DONE
+------------
+[ ] 1. Compose cleanup (docker-compose.yml and docker-compose.prod.yml)
+        - remove the `ollama` service and the `ollama` compose profile
+        - remove the ollama_models volume
+        - remove the extra_hosts host.docker.internal entry
+        - add to the ai-service environment:
+            AI_ENABLED              ${AI_ENABLED:-true}
+            LLM_PROVIDER            ${LLM_PROVIDER:-groq}
+            LLM_BASE_URL            ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+            LLM_API_KEY             ${LLM_API_KEY:-}
+            LLM_MODEL               ${LLM_MODEL:-openai/gpt-oss-120b}
+            LLM_FALLBACK_PROVIDER   ${LLM_FALLBACK_PROVIDER:-}
+            LLM_FALLBACK_API_KEY    ${LLM_FALLBACK_API_KEY:-}
+            AI_DAILY_CALL_BUDGET    ${AI_DAILY_CALL_BUDGET:-8000}
+            CIRCUIT_BREAKER_SECONDS ${CIRCUIT_BREAKER_SECONDS:-300}
+
+[ ] 2. backend/src/main/resources/application.yml
+        - collego.ai.max-tool-rounds: 4 -> 3
+
+[ ] 3. Backend build + the 54 restored tests (mvn test)
+
+[ ] 4. Rebuild and redeploy the stack
+        docker compose build backend ai-service && docker compose up -d
+
+[ ] 5. New ai-service tests
+        - provider URL + Authorization header per provider
+        - 429 -> breaker opens -> the stubs are served
+        - daily budget exhausted -> the stubs are served
+        - response_format rejected -> retried once without it
+        - history role whitelist still enforced
+
+[ ] 6. Live end-to-end run against Groq
+        - cross-student tool call DENIED and audited
+        - faculty may read their own class; an unowned section is DENIED
+        - the output guard blocks a foreign enrolment number or email
+        - the rate limiter answers 429
+        - AI audit rows are written
+        - the stub fallback works when the provider is unreachable
+
+[ ] 7. Commit + push the Phase 11 change
+
+[ ] 8. Prod wiring: LLM_API_KEY as a GitHub Actions secret -> ECS task
+        definition. Never committed.
+
+BLOCKED ON YOU
+--------------
+    A free Groq API key (console.groq.com, no credit card).
+    Only item 6 waits on it; items 1-5 and 7 can be completed without it.
+    To add it yourself: put LLM_API_KEY=... in D:\Collego\.env (git-ignored)
+    and run `docker compose up -d ai-service`. /health then flips
+    servingStubs from true to false.
+
+================================================================================
+0. WHY THIS CHANGE
+--------------------------------------------------------------------------------
+Phase 10 ran the LLM on the workstation through Ollama. It worked, but it cost
+9.6 GB of local disk (3 models + the Ollama runtime with CUDA) on a 16 GB /
+RTX 3060 Laptop machine, and a local 7B on that hardware took 1.6-15 s per
+answer. Ollama has been uninstalled and every model deleted.
+
+Phase 11 keeps the part of Phase 10 that was genuinely valuable — the per-user
+data isolation, the tool-calling layer, the output guard, the audit trail — and
+moves only the inference to a cloud provider's free tier. Nothing is stored
+locally any more, and the answer latency drops to ~1-3 s.
+
+Decisions taken with the project owner:
+  D1. Provider     : Groq (free tier, no credit card required).
+  D2. Scope        : Track B — re-apply the full Phase 10 isolation layer on
+                     top of the cloud provider (not the minimal path).
+  D3. Student PII  : acceptable to reach Groq. Groq does not retain inference
+                     data by default and offers Zero Data Retention. Only the
+                     rows needed for the question are ever sent.
+  D4. "Free"       : best-effort. Free tiers change — Groq retired
+                     llama-3.3-70b-versatile from its free tier on 2026-08-16.
+                     The provider abstraction, fallback provider, circuit
+                     breaker and deterministic stubs mean a tier change
+                     degrades answer quality, never breaks the app.
+  D5. Local models : none. The `ollama` compose service is removed entirely.
+
+
+1. ARCHITECTURE
+--------------------------------------------------------------------------------
+  Browser
+    |  JWT — identity is taken from the token and nowhere else
+    v
+  Spring Boot :8081
+    |  AiScopeFactory      who may see what (deny by default)
+    |  AiToolCatalog       the model asks for data; Spring queries the DB
+    |                      UNDER the caller's scope and returns the result
+    |  AiOutputGuard       blocks secrets, foreign emails and enrolment numbers
+    |  AiRateLimiter       per-user budget
+    |  AiAuditLogger       every call and denial -> audit_logs
+    v
+  ai-service :8000
+    |  provider abstraction: groq | openrouter | openai | gemini
+    |  circuit breaker + daily call budget + optional fallback provider
+    |  LLM_API_KEY lives here and nowhere else
+    v
+  Groq   https://api.groq.com/openai/v1/chat/completions
+         (OpenAI-compatible wire format, Bearer auth)
+
+  Fallback path — no key / 429 / provider down / daily budget spent:
+    ai-service -> deterministic Phase 9 stubs. The UI always answers.
+
+The API key never reaches the browser: browser -> backend -> ai-service ->
+provider. The backend never talks to the provider directly.
+
+
+2. WHAT COMES BACK FROM GIT
+--------------------------------------------------------------------------------
+The Phase 10 isolation layer still exists in history, so it is restored with a
+single command instead of being rewritten:
+
+    git revert 3c5eb32        # revert the revert
+
+Restores:
+  backend/src/main/java/com/collego/ai/
+      AiScope                 immutable per-request scope, deny by default
+      AiScopeFactory          scope built only from the verified JWT identity
+      AiTool / SimpleAiTool   tool contract
+      AiToolCatalog           18 typed data tools
+      AiToolRegistry          role filter, applied when advertising AND executing
+      AiOutputGuard           secrets / foreign email / foreign enrolment number
+      AiAuditLogger           every call + denial into audit_logs
+      AiRateLimiter           per-user sliding window
+      AiResponseCache         90 s per-user cache
+      AiHistorySanitizer      closes hole H1 (client cannot inject a system role)
+      AiChatOrchestrator      the bounded tool loop
+      AiUserSummary           password-free user projection
+      AiRagService            scoped retrieval (keyword ranker without embeddings)
+  backend/src/test/java/com/collego/ai/     8 test classes, 54 tests
+  ai-service/main.py                         provider abstraction, tool loop,
+                                            H1 whitelist, stub degradation
+  backend/src/main/resources/application.yml collego.ai.* configuration
+  docker-compose.yml / .prod.yml             (ollama service -> replaced)
+
+  In parallel: AiController and AiService were updated to build the scope,
+  sanitize the history, ignore any client-supplied context, rate limit and
+  audit every AI call.
+
+
+3. PROVIDER LAYER (ai-service/main.py)
+--------------------------------------------------------------------------------
+3.1 Configuration
+    PROVIDER            groq              (env LLM_PROVIDER)
+    LLM_BASE_URL        https://api.groq.com/openai/v1   (env LLM_BASE_URL)
+    LLM_API_KEY         from the secret store            (env LLM_API_KEY)
+    DEFAULT_MODEL       openai/gpt-oss-120b              (env LLM_MODEL)
+    FALLBACK_*          optional second provider
+    DAILY_CALL_BUDGET   8000                             (env AI_DAILY_CALL_BUDGET)
+    CIRCUIT_BREAKER_SECS 300                             (env CIRCUIT_BREAKER_SECONDS)
+    AI_ENABLED          true                             (env AI_ENABLED)
+
+    base_url is everything up to (not including) /chat/completions, so the same
+    code serves Groq (…/openai/v1), OpenRouter (…/api/v1) and OpenAI (…/v1).
+
+3.2 Model
+    openai/gpt-oss-120b  (primary — strong tool calling and instruction following)
+    qwen/qwen3.6-27b     (fallback)
+    openai/gpt-oss-20b   (fastest, weakest)
+    NOTE: llama-3.3-70b-versatile is no longer on Groq's free tier.
+
+3.3 Failure handling — every path degrades to the stubs
+    no API key .................. _ProviderUnavailable -> stub
+    AI_ENABLED=false ........... _ProviderUnavailable -> stub
+    daily budget exhausted ..... _ProviderUnavailable -> stub
+    circuit breaker open ....... _ProviderUnavailable -> stub
+    HTTP 429 ................... breaker trips (300 s) -> fallback provider
+                                  -> stub
+    HTTP 5xx ................... breaker trips -> fallback provider -> stub
+    connection refused ......... breaker trips -> fallback provider -> stub
+    HTTP 4xx (bad request) .... stub (not the provider's fault, no retry)
+
+3.4 JSON mode
+    Features 2, 5, 6 and 7 ask for JSON. If the provider rejects
+    response_format=json_object (HTTP 400 mentioning response_format), the call
+    is retried once without it and the response is parsed leniently.
+
+3.5 Embeddings
+    Groq has no embeddings endpoint. The /embed endpoint therefore returns an
+    empty result and the Phase 5 RAG uses the keyword ranker that is already
+    implemented (60 s backoff so an absent embedding model costs nothing).
+    An optional EMBED_PROVIDER can be added later without changing the caller.
+
+
+4. QUOTA PROTECTION
+--------------------------------------------------------------------------------
+The free tier is shared by the whole college, so it is protected on four
+levels:
+
+  per user        AiRateLimiter      30 requests / 5 minutes
+  per question    90 s response cache (identical questions cost nothing)
+  per question    tool rounds capped at 3 (max ~4 provider calls per question)
+  per instance    daily call budget  8000 of Groq's 14,400/day
+  per instance    circuit breaker    5 minutes open after a 429 or a 5xx run
+
+  Modelling: 128 users x 20 questions/day x ~3 provider calls = ~7,700 calls,
+  which fits inside the budget with headroom.
+
+  When the budget is spent the log line is explicit — it is never silent.
+
+
+5. BACKEND CONFIGURATION
+--------------------------------------------------------------------------------
+  backend/src/main/resources/application.yml
+      collego.ai.max-tool-rounds : 3      (was 4)
+      collego.ai.rate-limit.max  : 30
+      collego.ai.rate-limit.window-seconds : 300
+      collego.ai.cache.ttl-seconds : 90
+      collego.ai.cache.max-entries : 500
+
+  AiService (Java) is unchanged: it calls the ai-service, never the provider,
+  so no key is needed in the backend and none is exposed to the browser.
+
+
+6. COMPOSE CHANGES
+--------------------------------------------------------------------------------
+  REMOVE  the `ollama` service and the `ollama` compose profile
+  REMOVE  the ollama_models volume
+  REMOVE  the extra_hosts host.docker.internal entry (no longer needed)
+
+  ai-service environment (both files):
+      AI_ENABLED            : ${AI_ENABLED:-true}
+      LLM_PROVIDER          : ${LLM_PROVIDER:-groq}
+      LLM_BASE_URL          : ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      LLM_API_KEY           : ${LLM_API_KEY:-}
+      LLM_MODEL             : ${LLM_MODEL:-openai/gpt-oss-120b}
+      LLM_FALLBACK_PROVIDER : ${LLM_FALLBACK_PROVIDER:-}
+      LLM_FALLBACK_API_KEY  : ${LLM_FALLBACK_API_KEY:-}
+      AI_DAILY_CALL_BUDGET  : ${AI_DAILY_CALL_BUDGET:-8000}
+      CIRCUIT_BREAKER_SECONDS : ${CIRCUIT_BREAKER_SECONDS:-300}
+
+
+7. SECRETS
+--------------------------------------------------------------------------------
+  Local   .env (git-ignored) holds LLM_API_KEY.
+  Prod    LLM_API_KEY is a GitHub Actions secret injected into the ECS task
+          definition / compose environment. It is never committed.
+  If the key is absent or wrong the service still runs — it serves the
+  deterministic stubs.
+
+  The key must never be sent to the browser. The browser only ever calls the
+  backend, which calls the ai-service, which calls the provider.
+
+
+8. TESTS
+--------------------------------------------------------------------------------
+  Backend (restored, provider-agnostic — expected to pass unchanged, 54 tests)
+      AiScopeTest              per-role authorisation, deny by default
+      AiHistorySanitizerTest   H1: a client cannot inject a system role
+      AiOutputGuardTest        secrets, foreign emails, foreign enrolment numbers
+      AiRateLimiterTest        per-caller sliding window
+      AiResponseCacheTest      the cache is per user
+      AiToolRegistryTest       tools are filtered by role, twice
+      AiUserSummaryTest        no credential field can reach the AI
+      AiWiringTest             the real Spring context wires up (H2 profile)
+
+  ai-service (new)
+      provider URL + Authorization header per provider
+      429 -> breaker opens -> the stubs are served
+      daily budget exhausted -> the stubs are served
+      json_object rejected -> retried once without it
+      history role whitelist still enforced
+
+  Live end-to-end (script, re-run against Groq)
+      cross-student tool call DENIED and audited
+      faculty may read their own class; an unowned section is DENIED
+      the output guard blocks a foreign enrolment number or email
+      the rate limiter answers 429
+      AI audit rows are written
+      the stub fallback works when the provider is unreachable
+
+
+9. ROLLOUT
+--------------------------------------------------------------------------------
+  Step 1  provider layer only, no key      -> nothing breaks, stubs everywhere
+  Step 2  add the key                      -> real answers on one account
+  Step 3  re-apply the isolation layer     -> run the live E2E
+  Step 4  prod deploy with the secret      -> smoke test the live site
+
+  Rollback at any point, without a code change:
+      unset LLM_API_KEY  -> the stubs take over
+      or set AI_ENABLED=false
+
+
+10. RISKS
+--------------------------------------------------------------------------------
+  Risk                       | Mitigation
+  -------------------------- | ---------------------------------------------
+  Free tier changes          | abstraction + fallback provider + stubs; the
+                             | app degrades in quality, never fails
+  429 during a class demo    | circuit breaker + cache + stubs; the UI
+                             | still answers
+  Provider outage            | breaker -> stubs
+  Latency                    | Groq serves at 500+ tok/s (~1-3 s per call)
+  Cost                       | $0 inside the quota
+  Key leakage                | key lives only in the ai-service env; never in
+                             | the browser, never in git
+  Student PII at the provider| Groq does not retain inference data (ZDR
+                             | available); only the rows needed per question
+                             | are sent, and the AI never receives a password
+                             | hash, token or refresh token
+
+
+11. OPEN INPUT
+--------------------------------------------------------------------------------
+  A free Groq API key (console.groq.com, no credit card). Everything else can
+  be built and verified without it; only the live provider-backed end-to-end
+  test waits on the key.
