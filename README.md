@@ -123,6 +123,24 @@ Collego/
 |--------|------|-------------|
 | GET | `/api/departments` | List departments |
 
+## Password Reset Email
+
+Password reset links are single-use and expire after 30 minutes by default. To deliver
+them by email, configure SMTP and enable mail delivery:
+
+```env
+MAIL_ENABLED=true
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your-smtp-user
+MAIL_PASSWORD=your-smtp-app-password
+FRONTEND_URL=https://your-frontend-host
+PASSWORD_RESET_TTL_MINUTES=30
+```
+
+When `MAIL_ENABLED` is false, the backend logs the reset link at `DEBUG` level for local
+development and does not log the token at `INFO` level in production.
+
 ## Roles
 - **ADMIN** — Full system access, manages users and departments
 - **FACULTY** — Faculty portal access

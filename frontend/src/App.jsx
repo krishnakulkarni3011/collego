@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login.jsx'
+import ResetPassword from './pages/ResetPassword.jsx'
 import StudentDashboard from './pages/StudentDashboard.jsx'
 import FacultyDashboard from './pages/FacultyDashboard.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
@@ -9,6 +10,7 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route
         path="/student/*"
         element={

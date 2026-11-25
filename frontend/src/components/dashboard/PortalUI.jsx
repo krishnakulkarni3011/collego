@@ -570,7 +570,7 @@ export function PortalTopbar({
 }
 
 // ─── Welcome banner (premium) ──────────────────────────────────────────────────
-export function WelcomeBanner({ greeting, name, subtitle, quote, accent = 'indigo', image = welcomeCampus }) {
+export function WelcomeBanner({ greeting, name, subtitle, quote, accent = 'indigo', image = welcomeCampus, badge = null }) {
   const a = ACCENTS[accent] || ACCENTS.indigo
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   return (
@@ -583,7 +583,13 @@ export function WelcomeBanner({ greeting, name, subtitle, quote, accent = 'indig
       <div className="relative z-10 flex items-center justify-between gap-4 p-7 md:p-8">
         <div className="max-w-full sm:max-w-[60%] xl:max-w-xl">
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight">
-            {greeting}, {name} <span className="text-slate-400">👋</span>
+            {greeting}, {name}
+            {badge && (
+              <span className="ml-2 inline-flex items-center rounded-full bg-white/80 border border-white px-2 py-0.5 text-[10px] font-bold text-violet-600 align-middle">
+                {badge}
+              </span>
+            )}{' '}
+            <span className="text-slate-400">👋</span>
           </h1>
           <p className="text-slate-600 text-sm mt-1.5">{subtitle}</p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3">

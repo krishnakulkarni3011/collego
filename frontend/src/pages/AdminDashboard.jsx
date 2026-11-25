@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -10,6 +10,7 @@ import {
   RefreshCw, Upload, Edit, Power, Filter, Trophy, Zap,
   TrendingUp, XCircle, Wallet, Home, Landmark, Download,
   UsersRound, CalendarDays, ScrollText, Layers, ChevronRight, ArrowLeft, Send,
+  Paperclip, Eye,
 } from 'lucide-react'
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
@@ -17,7 +18,7 @@ import {
 } from 'recharts'
 import { authService } from '../services/authService'
 import api from '../services/api'
-import { downloadFile } from '../lib/download'
+import { downloadFile, previewFile } from '../lib/download'
 import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
 import { ExamsAdminTab } from '../components/dashboard/ExamsAdminTab'
@@ -332,7 +333,7 @@ function DirectoryTab({
   const [yearFilter, setYearFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', role: fixedRole || 'STUDENT', departmentId: '' })
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', role: fixedRole || 'STUDENT', departmentId: '', isHod: false })
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '' })
 
   const YEAR_OPTIONS = [
@@ -368,7 +369,7 @@ function DirectoryTab({
     const ok = await onCreateUser({ ...form, departmentId: form.departmentId || null })
     if (ok) {
       setShowCreate(false)
-      setForm({ firstName: '', lastName: '', email: '', password: '', role: fixedRole || 'STUDENT', departmentId: '' })
+      setForm({ firstName: '', lastName: '', email: '', password: '', role: fixedRole || 'STUDENT', departmentId: '', isHod: false })
     }
   }
 
@@ -452,6 +453,15 @@ function DirectoryTab({
                 {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
+            {form.role === 'FACULTY' && (
+              <label className="col-span-full flex items-start gap-3 rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 cursor-pointer">
+                <input type="checkbox" checked={Boolean(form.isHod)} onChange={e => setForm({ ...form, isHod: e.target.checked })} className="mt-0.5 h-4 w-4 accent-violet-600" />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-800">Head of Department (HoD)</span>
+                  <span className="block text-[11px] text-slate-500 mt-0.5">Only one HoD per department. Assigning a new HoD replaces the current one.</span>
+                </span>
+              </label>
+            )}
             <div className="col-span-full lg:col-span-3">
               <Button type="submit" variant="gradient" size="sm" disabled={loading}>
                 {loading ? <><RefreshCw size={13} className="animate-spin" /> Creating...</> : <><Plus size={13} /> Create User</>}
@@ -589,8 +599,8 @@ function AcademicsTab({
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', enrollmentNumber: '', section: 'A', employeeId: '', designation: '' })
-  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', semester: '', section: '', enrollmentNumber: '', employeeId: '', designation: '' })
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', enrollmentNumber: '', section: 'A', employeeId: '', designation: '', isHod: false })
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', semester: '', section: '', enrollmentNumber: '', employeeId: '', designation: '', isHod: false })
 
   const departmentList = useMemo(() => {
     if (deptReports?.length) return deptReports
@@ -625,14 +635,14 @@ function AcademicsTab({
     setEditing(null)
   }
 
-  const resetForm = () => setForm({ firstName: '', lastName: '', email: '', password: '', enrollmentNumber: '', section: 'A', employeeId: '', designation: '' })
+  const resetForm = () => setForm({ firstName: '', lastName: '', email: '', password: '', enrollmentNumber: '', section: 'A', employeeId: '', designation: '', isHod: false })
 
   const submitCreate = async (e) => {
     e.preventDefault()
     if (!selectedDept) return
     setBusy(true)
     const payload = mode === 'faculty'
-      ? { ...form, role: 'FACULTY', departmentId: selectedDept.departmentId, employeeId: form.employeeId, designation: form.designation }
+      ? { ...form, role: 'FACULTY', departmentId: selectedDept.departmentId, employeeId: form.employeeId, designation: form.designation, isHod: Boolean(form.isHod) }
       : {
           ...form,
           role: 'STUDENT',
@@ -650,7 +660,7 @@ function AcademicsTab({
     setEditForm({
       firstName: u.firstName || '', lastName: u.lastName || '', email: u.email || '',
       semester: u.semester || '', section: u.section || '', enrollmentNumber: u.enrollmentNumber || '',
-      employeeId: u.employeeId || '', designation: u.designation || '',
+      employeeId: u.employeeId || '', designation: u.designation || '', isHod: Boolean(u.isHod),
     })
   }
 
@@ -658,7 +668,7 @@ function AcademicsTab({
     if (!editing) return
     setBusy(true)
     const payload = mode === 'faculty'
-      ? { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email, employeeId: editForm.employeeId, designation: editForm.designation, departmentId: selectedDept.departmentId }
+      ? { firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email, employeeId: editForm.employeeId, designation: editForm.designation, departmentId: selectedDept.departmentId, isHod: Boolean(editForm.isHod) }
       : {
           firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email,
           enrollmentNumber: editForm.enrollmentNumber, semester: editForm.semester ? Number(editForm.semester) : null,
@@ -759,6 +769,13 @@ function AcademicsTab({
           <>
             <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Employee ID</label><input value={form.employeeId} onChange={e => setForm({ ...form, employeeId: e.target.value })} className="collego-input" /></div>
             <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Designation</label><input value={form.designation} onChange={e => setForm({ ...form, designation: e.target.value })} placeholder="e.g., Assistant Professor" className="collego-input" /></div>
+            <label className="col-span-full flex items-start gap-3 rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 cursor-pointer">
+              <input type="checkbox" checked={Boolean(form.isHod)} onChange={e => setForm({ ...form, isHod: e.target.checked })} className="mt-0.5 h-4 w-4 accent-violet-600" />
+              <span>
+                <span className="block text-sm font-semibold text-slate-800">Head of Department (HoD)</span>
+                <span className="block text-[11px] text-slate-500 mt-0.5">Only one faculty member can be HoD per department. Assigning a new HoD automatically replaces the current one.</span>
+              </span>
+            </label>
           </>
         ) : (
           <>
@@ -785,6 +802,10 @@ function AcademicsTab({
           <>
             <input value={editForm.employeeId} onChange={e => setEditForm({ ...editForm, employeeId: e.target.value })} placeholder="Employee ID" className="collego-input" />
             <input value={editForm.designation} onChange={e => setEditForm({ ...editForm, designation: e.target.value })} placeholder="Designation" className="collego-input" />
+            <label className="col-span-full flex items-center gap-3 rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 cursor-pointer">
+              <input type="checkbox" checked={Boolean(editForm.isHod)} onChange={e => setEditForm({ ...editForm, isHod: e.target.checked })} className="h-4 w-4 accent-violet-600" />
+              <span className="text-xs text-slate-600"><span className="font-semibold text-slate-800">Head of Department</span> — can upload class timetables for every section of every year in this department.</span>
+            </label>
           </>
         ) : (
           <>
@@ -821,7 +842,13 @@ function AcademicsTab({
                   <td>
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">{u.firstName?.[0]}{u.lastName?.[0]}</div>
-                      <div><p className="font-medium text-slate-800">{u.firstName} {u.lastName}</p><p className="text-[11px] text-slate-400">{u.email}</p></div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-slate-800">{u.firstName} {u.lastName}</p>
+                          {u.isHod && <Badge variant="purple" className="text-[9px] px-1.5 py-0">HoD</Badge>}
+                        </div>
+                        <p className="text-[11px] text-slate-400">{u.email}</p>
+                      </div>
                     </div>
                   </td>
                   <td className="text-slate-500 text-xs font-mono">{u.employeeId || '—'}</td>
@@ -952,7 +979,9 @@ function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onS
   const [type, setType] = useState('GENERAL')
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
+  const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
+  const fileRef = useRef(null)
 
   const needsYear = audience === 'YEAR_STUDENTS'
   const needsDepartment = audience === 'DEPARTMENT_STUDENTS' || audience === 'DEPARTMENT_FACULTY'
@@ -974,11 +1003,13 @@ function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onS
       targetYear: needsYear ? Number(targetYear) : null,
       departmentId: needsDepartment ? Number(departmentId) : null,
       userId: isSingle ? Number(userId) : null,
-    })
+    }, file)
     setBusy(false)
     if (ok) {
       setTitle('')
       setMessage('')
+      setFile(null)
+      if (fileRef.current) fileRef.current.value = ''
     }
   }
 
@@ -1059,6 +1090,33 @@ function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onS
                 <textarea value={message} onChange={e => setMessage(e.target.value)} rows={5} placeholder="Write the message recipients will see in their portal..." className="collego-input resize-none" required />
               </div>
 
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Attachment (optional)</label>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+                  className="hidden"
+                  onChange={e => setFile(e.target.files?.[0] || null)}
+                />
+                {file ? (
+                  <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5">
+                    <Paperclip size={14} className="text-emerald-600 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-slate-700 truncate">{file.name}</p>
+                      <p className="text-[10px] text-slate-400">{Math.max(1, Math.round(file.size / 1024))} KB</p>
+                    </div>
+                    <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = '' }} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-white transition-colors" title="Remove attachment"><X size={14} /></button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => fileRef.current?.click()}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-3 text-xs font-medium text-slate-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50/50 transition-all">
+                    <Paperclip size={14} /> Attach a file (PDF, image, Office document · max 20 MB)
+                  </button>
+                )}
+                <p className="text-[10px] text-slate-400 mt-1.5">Students and faculty can view or download this file from the notification.</p>
+              </div>
+
               <div className="flex justify-end">
                 <Button type="submit" variant="gradient" size="sm" disabled={busy || !title.trim() || !message.trim()}>
                   {busy ? <><RefreshCw size={13} className="animate-spin" /> Sending...</> : <><Send size={13} /> Send notification</>}
@@ -1084,6 +1142,16 @@ function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onS
                     <p className="text-[10px] text-slate-400 mt-2">
                       To {b.audienceLabel} · {b.recipientCount} recipient{b.recipientCount === 1 ? '' : 's'}
                     </p>
+                    {b.hasAttachment && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+                        <Paperclip size={12} className="text-emerald-600 shrink-0" />
+                        <span className="text-[11px] font-medium text-slate-600 truncate max-w-[200px]">{b.attachmentFileName || 'Attachment'}</span>
+                        <button onClick={() => previewFile(`/api/admin/broadcasts/${b.id}/attachment`, b.attachmentFileName || 'attachment').catch(() => {})}
+                          className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:underline"><Eye size={11} /> View</button>
+                        <button onClick={() => downloadFile(`/api/admin/broadcasts/${b.id}/attachment?download=true`, b.attachmentFileName || 'attachment').catch(() => {})}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:underline"><Download size={11} /> Download</button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -1245,8 +1313,27 @@ function PlacementsTab({ placementStats, notices = [], departments = [], onCreat
   )
 }
 
-function ReportsTab({ deptReports, subjectReports }) {
+function ReportsTab({ deptReports, subjectReports, departments = [] }) {
   const [view, setView] = useState('department')
+  const [exportDepartmentId, setExportDepartmentId] = useState('')
+  const [exportYear, setExportYear] = useState('')
+  const [exportingStudents, setExportingStudents] = useState(false)
+
+  const handleExportStudents = async () => {
+    setExportingStudents(true)
+    try {
+      const params = new URLSearchParams()
+      if (exportDepartmentId) params.append('departmentId', exportDepartmentId)
+      if (exportYear) params.append('year', exportYear)
+      const query = params.toString()
+      await downloadFile(`/api/admin/export/students${query ? `?${query}` : ''}`, 'students.csv')
+    } catch {
+      /* downloadFile surfaces failures through the shared helper */
+    } finally {
+      setExportingStudents(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageTitle
@@ -1257,7 +1344,7 @@ function ReportsTab({ deptReports, subjectReports }) {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => downloadFile('/api/admin/export/students', 'students.csv').catch(() => {})}>
-              <span className="flex gap-1"><Download size={12} /> Students</span>
+              <span className="flex gap-1"><Download size={12} /> All Students</span>
             </Button>
             <Button variant="outline" size="sm" onClick={() => downloadFile('/api/admin/export/faculty', 'faculty.csv').catch(() => {})}>
               <span className="flex gap-1"><Download size={12} /> Faculty</span>
@@ -1273,6 +1360,50 @@ function ReportsTab({ deptReports, subjectReports }) {
           </div>
         }
       />
+
+      <div className="glass-card border border-white/60 p-5">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              <Users size={15} className="text-indigo-600" /> Student details by department & year
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Download enrollment number, name, email, phone, department, semester, year, section and CR status.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+            <select
+              value={exportDepartmentId}
+              onChange={e => setExportDepartmentId(e.target.value)}
+              className="collego-input !w-auto min-w-[180px]"
+              aria-label="Filter student export by department"
+            >
+              <option value="">All Departments</option>
+              {(departments || []).map(d => (
+                <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+              ))}
+            </select>
+            <select
+              value={exportYear}
+              onChange={e => setExportYear(e.target.value)}
+              className="collego-input !w-auto min-w-[130px]"
+              aria-label="Filter student export by year"
+            >
+              <option value="">All Years</option>
+              <option value="1">I Year</option>
+              <option value="2">II Year</option>
+              <option value="3">III Year</option>
+              <option value="4">Final Year</option>
+            </select>
+            <Button variant="gradient" size="sm" onClick={handleExportStudents} disabled={exportingStudents}>
+              {exportingStudents
+                ? <><RefreshCw size={12} className="animate-spin" /> Preparing...</>
+                : <><Download size={12} /> Download Students</>}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <div className="glass-card overflow-hidden border border-white/60">
         <div className="overflow-x-auto">
           {view === 'department' ? (
@@ -1503,9 +1634,16 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleSendBroadcast = async (payload) => {
+  const handleSendBroadcast = async (payload, file) => {
     try {
-      await api.post('/api/admin/broadcasts', payload)
+      if (file) {
+        const fd = new FormData()
+        fd.append('data', new Blob([JSON.stringify(payload)], { type: 'application/json' }))
+        fd.append('file', file)
+        await api.post('/api/admin/broadcasts/with-file', fd)
+      } else {
+        await api.post('/api/admin/broadcasts', payload)
+      }
       showMsg('Message sent successfully')
       const res = await api.get('/api/admin/broadcasts')
       setBroadcasts(Array.isArray(res.data) ? res.data : [])
@@ -1578,7 +1716,7 @@ export default function AdminDashboard() {
       case 'examinations': return <ExamsAdminTab showMsg={showMsg} />
       case 'placements': return <PlacementsTab placementStats={placementStats} notices={placementNotices} departments={departments} onCreatePlacement={onCreatePlacement} onDeactivatePlacement={onDeactivatePlacement} />
       case 'broadcasts': return <BroadcastCenterTab broadcasts={broadcasts} users={users} departments={departments} onSend={handleSendBroadcast} />
-      case 'reports': return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} />
+      case 'reports': return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} departments={departments} />
       case 'announcements': return <NoticesTab broadcasts={broadcasts} insights={insights} />
       case 'settings': return <SettingsTab showMsg={showMsg} accent="indigo" />
       case 'help': return <HelpTab accent="indigo" />

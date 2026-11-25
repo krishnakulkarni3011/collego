@@ -85,10 +85,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [forgotStep, setForgotStep] = useState('email')
-  const [forgotEmail, setForgotEmail] = useState('')
-  const [resetToken, setResetToken] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [forgotIdentifier, setForgotIdentifier] = useState('')
   const navigate = useNavigate()
 
   const activeRole = ROLES.find(r => r.id === selectedRole)
@@ -129,29 +126,22 @@ export default function Login() {
     }
   }
 
+  const openForgotPassword = () => {
+    setError('')
+    setForgotStep('email')
+    if (username.trim()) setForgotIdentifier(username.trim())
+    setStep('forgot')
+  }
+
   const handleForgotPassword = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      await authService.forgotPassword(forgotEmail)
+      await authService.forgotPassword(forgotIdentifier.trim())
       setForgotStep('success')
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to send reset link')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleResetPassword = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      await authService.resetPassword(resetToken, newPassword)
-      setForgotStep('success')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reset password')
     } finally {
       setLoading(false)
     }
@@ -279,10 +269,10 @@ export default function Login() {
                   </motion.div>
                 )}
 
-                {/* STEP 2: Credentials */}
-                {step === 'credentials' && (
+                {/* STEP 2: Credentials / Forgot password */}
+                {(step === 'credentials' || step === 'forgot') && (
                   <motion.div
-                    key="credentials"
+                    key={step}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
@@ -307,6 +297,8 @@ export default function Login() {
                       )}
                     </div>
 
+                    {step === 'credentials' && (
+                      <>
                     <div className="mb-7">
                       <h2 className="text-2xl xl:text-3xl font-extrabold text-slate-900 mb-1">Sign in</h2>
                       <p className="text-slate-400 text-sm">Enter your credentials to access your portal</p>
@@ -383,7 +375,7 @@ export default function Login() {
                       <div className="flex items-center justify-between mt-3">
                         <button
                           type="button"
-                          onClick={() => setStep('forgot')}
+                          onClick={openForgotPassword}
                           className="text-xs text-indigo-600 hover:text-indigo-700 font-medium hover:underline"
                         >
                           Forgot password?
@@ -415,34 +407,55 @@ export default function Login() {
                         )}
                       </div>
                     </form>
+                      </>
+                    )}
 
                     {step === 'forgot' && forgotStep === 'email' && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="mt-6 glass-card p-6 border border-white/60"
+                        className="glass-card p-6 border border-white/60"
                       >
                         <div className="flex items-center justify-between mb-4">
-                          <button onClick={() => setStep('credentials')} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => { setStep('credentials'); setError('') }}
+                            className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
+                          >
                             <ChevronLeft size={14} /> Back
                           </button>
                           <h3 className="text-sm font-semibold text-slate-800">Forgot Password</h3>
                         </div>
-                        <p className="text-sm text-slate-500 mb-5">Enter your email and we'll send you a reset link.</p>
+                        <p className="text-sm text-slate-500 mb-5">
+                          Enter your registered email or, for students, your USN. We'll send the reset link to the email on your account.
+                        </p>
+                        {error && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-4"
+                          >
+                            <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                            <p>{error}</p>
+                          </motion.div>
+                        )}
                         <form onSubmit={handleForgotPassword} className="space-y-3">
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
+                            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                              {activeRole?.id === 'STUDENT' ? 'USN or Email Address' : 'Email Address'}
+                            </label>
                             <input
-                              type="email"
-                              value={forgotEmail}
-                              onChange={e => setForgotEmail(e.target.value)}
-                              placeholder="you@college.edu"
+                              type="text"
+                              value={forgotIdentifier}
+                              onChange={e => setForgotIdentifier(e.target.value)}
+                              placeholder={activeRole?.id === 'STUDENT' ? 'USN (e.g., 2BA23CS001) or email' : 'you@college.edu'}
                               className="collego-input"
                               required
                               autoFocus
+                              autoComplete="username"
                             />
                           </div>
-                          <Button variant="gradient" type="submit" className="w-full py-3" disabled={loading || !forgotEmail.trim()}>
+                          <Button variant="gradient" type="submit" className="w-full py-3" disabled={loading || !forgotIdentifier.trim()}>
                             {loading ? (
                               <span className="flex items-center justify-center gap-2"><RefreshCw size={14} className="animate-spin" /> Sending...</span>
                             ) : (
@@ -453,80 +466,21 @@ export default function Login() {
                       </motion.div>
                     )}
 
-                    {step === 'forgot' && forgotStep === 'reset' && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-6 glass-card p-6 border border-white/60"
-                      >
-                        <div className="flex items-center justify-between mb-4">
-                          <button onClick={() => setForgotStep('email')} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1">
-                            <ChevronLeft size={14} /> Back
-                          </button>
-                          <h3 className="text-sm font-semibold text-slate-800">Reset Password</h3>
-                        </div>
-                        <p className="text-sm text-slate-500 mb-5">Enter your new password below.</p>
-                        <form onSubmit={handleResetPassword} className="space-y-3">
-                          <div>
-                            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Reset Token</label>
-                            <input
-                              type="text"
-                              value={resetToken}
-                              onChange={e => setResetToken(e.target.value)}
-                              placeholder="Token from reset email"
-                              className="collego-input"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">New Password</label>
-                            <input
-                              type="password"
-                              value={newPassword}
-                              onChange={e => setNewPassword(e.target.value)}
-                              placeholder="New password"
-                              className="collego-input"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Confirm Password</label>
-                            <input
-                              type="password"
-                              value={confirmPassword}
-                              onChange={e => setConfirmPassword(e.target.value)}
-                              placeholder="Confirm new password"
-                              className="collego-input"
-                              required
-                            />
-                          </div>
-                          {newPassword !== confirmPassword && newPassword && confirmPassword && (
-                            <p className="text-xs text-red-500">Passwords do not match</p>
-                          )}
-                          <Button variant="gradient" type="submit" className="w-full py-3" disabled={loading || !newPassword || !confirmPassword || newPassword !== confirmPassword}>
-                            {loading ? (
-                              <span className="flex items-center justify-center gap-2"><RefreshCw size={14} className="animate-spin" /> Resetting...</span>
-                            ) : (
-                              <span className="flex items-center justify-center gap-2"><Lock size={14} /> Reset Password</span>
-                            )}
-                          </Button>
-                        </form>
-                      </motion.div>
-                    )}
-
                     {step === 'forgot' && forgotStep === 'success' && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="mt-6 glass-card p-6 border border-white/60 text-center"
+                        className="glass-card p-6 border border-white/60 text-center"
                       >
                         <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
                           <CheckCircle2 size={24} className="text-emerald-600" />
                         </div>
-                        <h3 className="text-sm font-semibold text-slate-800 mb-2">Password Reset</h3>
-                        <p className="text-sm text-slate-500 mb-4">{forgotStep === 'success' && resetToken ? 'Your password has been reset successfully.' : 'A reset link has been sent to your email.'}</p>
+                        <h3 className="text-sm font-semibold text-slate-800 mb-2">Check your email</h3>
+                        <p className="text-sm text-slate-500 mb-4">
+                          If an account exists for that email or USN, a reset link has been sent to the email on record. The link expires in 30 minutes and can be used only once.
+                        </p>
                         <button
-                          onClick={() => { setStep('credentials'); setForgotStep('email'); setResetToken(''); setNewPassword(''); setConfirmPassword(''); setForgotEmail('') }}
+                          onClick={() => { setStep('credentials'); setForgotStep('email'); setForgotIdentifier(''); setError('') }}
                           className="w-full py-3 rounded-xl text-xs text-indigo-600 font-medium hover:bg-indigo-50 transition-colors border border-slate-300/80 hover:border-indigo-300"
                         >
                           Back to Sign In

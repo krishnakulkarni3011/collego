@@ -6,14 +6,15 @@ import {
   Megaphone, ChevronRight, GraduationCap, Users, BookMarked,
   BarChart3, FolderOpen, Plus, CheckCircle2, X, Send,
   ArrowLeft, Clock, Upload, Download, RefreshCw, Zap, Layers, Award,
-  BookUser, Target, Settings, HelpCircle, CalendarDays
+  BookUser, Settings, HelpCircle, CalendarDays, Eye, Paperclip, Trash2,
+  Crown, CalendarOff, Briefcase
 } from 'lucide-react'
 import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
 import { authService } from '../services/authService'
 import api from '../services/api'
-import { downloadFile } from '../lib/download'
+import { downloadFile, fileObjectUrl, previewFile } from '../lib/download'
 import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
 import { InvigilationsTab } from '../components/dashboard/InvigilationsTab'
@@ -76,6 +77,7 @@ const GLOBAL_NAV = [
   { id: 'subjectAssignments', label: 'My Subject Assignments', icon: BookUser },
   { id: 'questionPapers', label: 'Question Papers', icon: FileText },
   { id: 'careerProfile', label: 'Career Profile', icon: Users },
+  { id: 'placements', label: 'Upcoming Placements', icon: Briefcase },
   { id: 'invigilations', label: 'Invigilation Duties', icon: CalendarDays },
   { id: 'notices', label: 'Notices', icon: Megaphone },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -89,6 +91,7 @@ const NAV_CATEGORY = {
 
 const SECTION_TABS = [
   { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+  { id: 'studentDetails', label: 'Student Details', icon: Users },
   { id: 'internalMarks', label: 'Internal Marks', icon: BookMarked },
   { id: 'semesterMarks', label: 'Semester Marks', icon: GraduationCap },
   { id: 'studentPerformance', label: 'Student Performance', icon: Users },
@@ -210,6 +213,7 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
 function SectionHeader({ section, activeTab, onTabChange, onBack }) {
   const headerImage = {
     attendance: uiImages.classroom,
+    studentDetails: uiImages.groupStudy,
     internalMarks: uiImages.graduation,
     semesterMarks: uiImages.graduation,
     studentPerformance: uiImages.groupStudy,
@@ -255,7 +259,10 @@ function SectionHeader({ section, activeTab, onTabChange, onBack }) {
 }
 
 // ─── Attendance Tab ──────────────────────────────────────────────────────────
-function AttendanceTab({ attendanceDate, setAttendanceDate, attendanceRecords, toggleAttendance, onSubmit, loading }) {
+function AttendanceTab({
+  attendanceDate, setAttendanceDate, attendanceRecords, toggleAttendance, onSubmit, loading,
+  holiday, holidays = [], holidayBusy, onDeclareHoliday, onRemoveHoliday,
+}) {
   const present = attendanceRecords.filter(r => r.status === 'PRESENT').length
   const absent = attendanceRecords.length - present
   const pct = attendanceRecords.length > 0 ? Math.round((present / attendanceRecords.length) * 100) : 0
@@ -264,12 +271,19 @@ function AttendanceTab({ attendanceDate, setAttendanceDate, attendanceRecords, t
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <input type="date" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} className="collego-input !w-auto" />
-        <Button variant="success" size="sm" onClick={() => attendanceRecords.forEach((_, i) => toggleAttendance(i, 'PRESENT'))} className="px-4">
-          <CheckCircle2 size={13} /> All Present
-        </Button>
-        <Button variant="destructive" size="sm" onClick={() => attendanceRecords.forEach((_, i) => toggleAttendance(i, 'ABSENT'))} className="px-4">
-          <X size={13} /> All Absent
-        </Button>
+        {!holiday && (
+          <>
+            <Button variant="success" size="sm" onClick={() => attendanceRecords.forEach((_, i) => toggleAttendance(i, 'PRESENT'))} className="px-4">
+              <CheckCircle2 size={13} /> All Present
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => attendanceRecords.forEach((_, i) => toggleAttendance(i, 'ABSENT'))} className="px-4">
+              <X size={13} /> All Absent
+            </Button>
+            <Button variant="outline" size="sm" onClick={onDeclareHoliday} disabled={holidayBusy} className="px-4">
+              {holidayBusy ? <RefreshCw size={13} className="animate-spin" /> : <CalendarOff size={13} />} Declare Holiday
+            </Button>
+          </>
+        )}
         <div className="ml-auto flex items-center gap-3 text-xs">
           <span className="text-emerald-600 font-bold">{present} Present</span>
           <span className="text-red-500 font-bold">{absent} Absent</span>
@@ -277,60 +291,211 @@ function AttendanceTab({ attendanceDate, setAttendanceDate, attendanceRecords, t
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { v: present, l: 'Present', c: 'text-emerald-600' },
-          { v: absent, l: 'Absent', c: 'text-red-500' },
-          { v: `${pct}%`, l: 'Attendance', c: pct >= 75 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-red-500' },
-        ].map(s => (
-          <div key={s.l} className="glass-card p-4 text-center border border-white/60">
-            <p className={cn('text-2xl font-bold', s.c)}>{s.v}</p>
-            <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">{s.l}</p>
+      {holiday ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-5 flex flex-wrap items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+            <CalendarOff size={22} />
           </div>
-        ))}
-      </div>
-
-      <div className="glass-card overflow-hidden border border-white/60">
-        <div className="overflow-x-auto">
-          <table className="collego-table">
-            <thead><tr><th>#</th><th>Enrollment</th><th>Student Name</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
-            <tbody>
-              {attendanceRecords.map((r, i) => (
-                <tr key={r.studentId} className="hover:bg-white/30 transition-colors">
-                  <td className="text-slate-400">{i + 1}</td>
-                  <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{r.enrollmentNumber}</code></td>
-                  <td className="text-slate-800 font-medium">{r.studentName}</td>
-                  <td style={{ textAlign: 'center' }}>
-                    <button
-                      onClick={() => toggleAttendance(i)}
-                      className={cn(
-                        'px-4 py-1.5 rounded-xl text-xs font-bold transition-all border',
-                        r.status === 'PRESENT'
-                          ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
-                          : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
-                      )}
-                    >
-                      {r.status === 'PRESENT' ? '✓ Present' : '✗ Absent'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {attendanceRecords.length === 0 && <tr><td colSpan={4} className="text-center text-slate-400 py-14">No students enrolled in this section.</td></tr>}
-            </tbody>
-          </table>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-amber-900">Holiday declared for {fmtDate(attendanceDate)}</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Attendance is not counted for this day.
+              {holiday.note ? ` ${holiday.note}` : ''}
+              {holiday.declaredBy ? ` · Declared by ${holiday.declaredBy}` : ''}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => onRemoveHoliday(holiday.id)} disabled={holidayBusy}>
+            <Trash2 size={12} /> Remove Holiday
+          </Button>
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { v: present, l: 'Present', c: 'text-emerald-600' },
+              { v: absent, l: 'Absent', c: 'text-red-500' },
+              { v: `${pct}%`, l: 'Attendance', c: pct >= 75 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-red-500' },
+            ].map(s => (
+              <div key={s.l} className="glass-card p-4 text-center border border-white/60">
+                <p className={cn('text-2xl font-bold', s.c)}>{s.v}</p>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">{s.l}</p>
+              </div>
+            ))}
+          </div>
 
-      {attendanceRecords.length > 0 && (
-        <Button variant="gradient" onClick={onSubmit} disabled={loading} className="px-6">
-          {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><CheckCircle2 size={14} /> Save Attendance</>}
-        </Button>
+          <div className="glass-card overflow-hidden border border-white/60">
+            <div className="overflow-x-auto">
+              <table className="collego-table">
+                <thead><tr><th>#</th><th>Enrollment</th><th>Student Name</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
+                <tbody>
+                  {attendanceRecords.map((r, i) => (
+                    <tr key={r.studentId} className="hover:bg-white/30 transition-colors">
+                      <td className="text-slate-400">{i + 1}</td>
+                      <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{r.enrollmentNumber}</code></td>
+                      <td className="text-slate-800 font-medium">{r.studentName}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          onClick={() => toggleAttendance(i)}
+                          className={cn(
+                            'px-4 py-1.5 rounded-xl text-xs font-bold transition-all border',
+                            r.status === 'PRESENT'
+                              ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                              : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
+                          )}
+                        >
+                          {r.status === 'PRESENT' ? '✓ Present' : '✗ Absent'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {attendanceRecords.length === 0 && <tr><td colSpan={4} className="text-center text-slate-400 py-14">No students enrolled in this section.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {attendanceRecords.length > 0 && (
+            <Button variant="gradient" onClick={onSubmit} disabled={loading} className="px-6">
+              {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><CheckCircle2 size={14} /> Save Attendance</>}
+            </Button>
+          )}
+        </>
+      )}
+
+      {holidays.length > 0 && (
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="px-5 py-4 border-b border-white/50 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              <CalendarOff size={14} className="text-amber-500" /> Declared Holidays
+            </h3>
+            <span className="text-[10px] text-slate-400">{holidays.length} total</span>
+          </div>
+          <div className="divide-y divide-white/30">
+            {holidays.slice(0, 10).map(h => (
+              <div key={h.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800">{fmtDate(h.date)}</p>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {h.note || 'Declared as a holiday'}{h.declaredBy ? ` · ${h.declaredBy}` : ''}
+                  </p>
+                </div>
+                <button onClick={() => onRemoveHoliday(h.id)} disabled={holidayBusy}
+                  className="text-[11px] font-semibold text-red-500 hover:underline disabled:opacity-50">Remove</button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
 // ─── Internal Marks Tab ──────────────────────────────────────────────────────
+function StudentDetailsTab({ section, onDownload, loading }) {
+  return (
+    <div className="space-y-6">
+      <div className="glass-card p-6 border border-white/60 flex flex-col sm:flex-row sm:items-center gap-5">
+        <div className="w-14 h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+          <Users size={24} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-bold text-slate-900">Student details — {section.courseName}</h3>
+          <p className="text-sm text-slate-500 mt-1">
+            Download the PDF roster for Section {section.sectionName} ({section.semesterName}, {section.enrolledStudents} students).
+          </p>
+        </div>
+        <Button variant="gradient" onClick={() => onDownload(section)} disabled={loading} className="shrink-0">
+          {loading
+            ? <><RefreshCw size={14} className="animate-spin" /> Preparing...</>
+            : <><Download size={14} /> Download PDF</>}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="glass-card p-5 border border-white/60">
+          <h4 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+            <ClipboardList size={14} className="text-violet-600" /> Included in the PDF
+          </h4>
+          <ul className="space-y-2 text-xs text-slate-500">
+            {['Enrollment number and student name', 'Email address and phone number', 'Department, semester and academic year', 'Section, admission year and CR status'].map(item => (
+              <li key={item} className="flex items-start gap-2">
+                <CheckCircle2 size={12} className="text-emerald-500 mt-0.5 shrink-0" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="glass-card p-5 border border-white/60">
+          <h4 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+            <BookOpen size={14} className="text-violet-600" /> Section summary
+          </h4>
+          <div className="space-y-2 text-xs text-slate-500">
+            <p><span className="font-semibold text-slate-700">Course:</span> {section.courseName} ({section.courseCode})</p>
+            <p><span className="font-semibold text-slate-700">Section:</span> {section.sectionName}</p>
+            <p><span className="font-semibold text-slate-700">Semester:</span> {section.semesterName}</p>
+            <p><span className="font-semibold text-slate-700">Students:</span> {section.enrolledStudents}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function UpcomingPlacementsTab({ placements, loading, onRefresh }) {
+  return (
+    <div className="space-y-6">
+      <PageTitle
+        icon={Briefcase}
+        title="Upcoming Placements"
+        subtitle="Active placement drives shared by the placement cell."
+        accent="violet"
+        image={uiImages.graduation}
+        imageAlt="Graduation celebration"
+        actions={
+          <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
+            {loading ? <RefreshCw size={12} className="animate-spin" /> : <RefreshCw size={12} />} Refresh
+          </Button>
+        }
+      />
+
+      <div className="glass-card overflow-hidden border border-white/60">
+        <div className="overflow-x-auto">
+          <table className="collego-table">
+            <thead>
+              <tr>
+                <th>Drive Title</th>
+                <th>Company</th>
+                <th>Salary / Package</th>
+                <th>Drive Date</th>
+                <th>Department</th>
+                <th>Eligibility Criteria</th>
+              </tr>
+            </thead>
+            <tbody>
+              {placements.map((drive, index) => (
+                <tr key={`${drive.companyName}-${drive.driveDate}-${index}`} className="hover:bg-white/30 transition-colors">
+                  <td className="font-medium text-slate-800">{drive.title || '—'}</td>
+                  <td className="text-slate-700">{drive.companyName || '—'}</td>
+                  <td className="text-slate-700">{drive.packageOffered || '—'}</td>
+                  <td className="text-slate-700 whitespace-nowrap">{drive.driveDate ? fmtDate(drive.driveDate) : '—'}</td>
+                  <td><Badge variant="info">{drive.departmentName || 'All Departments'}</Badge></td>
+                  <td className="text-slate-600 max-w-[300px] whitespace-normal">{drive.eligibilityCriteria || '—'}</td>
+                </tr>
+              ))}
+              {!loading && placements.length === 0 && (
+                <tr><td colSpan={6} className="text-center text-slate-400 py-14">No upcoming placement drives.</td></tr>
+              )}
+              {loading && (
+                <tr><td colSpan={6} className="text-center text-slate-400 py-14">Loading upcoming placements...</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function InternalMarksTab({ examName, setExamName, maxMarks, setMaxMarks, marksEntries, setMarksEntries, onSubmit, sectionMarks, loading }) {
   return (
     <div className="space-y-6">
@@ -997,9 +1162,30 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, tar
 // ─── Notices Tab ─────────────────────────────────────────────────────────────
 function NoticesTab({ title, setTitle, message, setMessage, type, setType, targetYear, setTargetYear, departmentName, onSubmit, sentNotices, loading, inbox = [] }) {
   const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'EXAM']
+  const [attachmentError, setAttachmentError] = useState('')
+
+  const openAttachment = async (n) => {
+    setAttachmentError('')
+    try {
+      await previewFile(`/api/notifications/${n.id}/attachment`, n.attachmentFileName || 'attachment')
+    } catch (err) {
+      setAttachmentError(err.response?.data?.message || 'Could not open the attachment.')
+    }
+  }
+
+  const saveAttachment = async (n) => {
+    setAttachmentError('')
+    try {
+      await downloadFile(`/api/notifications/${n.id}/attachment?download=true`, n.attachmentFileName || 'attachment')
+    } catch (err) {
+      setAttachmentError(err.response?.data?.message || 'Could not download the attachment.')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageTitle icon={Megaphone} title="Notices" subtitle="Send announcements to students in a selected year of your department and read messages sent to you." accent="amber" image={uiImages.placementTalk} imageAlt="Placement talk" />
+      {attachmentError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-600">{attachmentError}</div>}
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2"><Megaphone size={14} className="text-amber-500" /> Department Notice</h3>
         <p className="text-xs text-slate-500 mb-5">
@@ -1032,9 +1218,17 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, targe
             {inbox.map(n => (
               <div key={n.id} className="px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-800">{n.title}</p>
                     <p className="text-xs text-slate-500 mt-1">{n.message}</p>
+                    {n.hasAttachment && (
+                      <div className="mt-2.5 inline-flex flex-wrap items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2">
+                        <Paperclip size={12} className="text-amber-600 shrink-0" />
+                        <span className="text-[11px] font-medium text-slate-600 truncate max-w-[220px]">{n.attachmentFileName || 'Attachment'}</span>
+                        <button onClick={() => openAttachment(n)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:underline"><Eye size={11} /> View</button>
+                        <button onClick={() => saveAttachment(n)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:underline"><Download size={11} /> Download</button>
+                      </div>
+                    )}
                   </div>
                   <p className="text-[10px] text-slate-400 shrink-0">{timeAgo(n.createdAt)}</p>
                 </div>
@@ -1070,7 +1264,7 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, targe
 }
 
 // ─── Subject Assignments Tab ─────────────────────────────────────────────────────
-function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove, selectedSemesterId, setSelectedSemesterId, courseName, setCourseName }) {
+function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove, selectedSemesterId, setSelectedSemesterId, courseName, setCourseName, credits, setCredits }) {
   const selectedSemester = semesters.find(s => String(s.id) === String(selectedSemesterId))
   const selectedYear = semesterYear(selectedSemester?.number)
 
@@ -1082,7 +1276,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
 
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={14} className="text-violet-500" /> Assign New Subject</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Name (type any course)</label>
             <input
@@ -1091,6 +1285,20 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
               placeholder="e.g., UI/UX Design, Prompt Engineering, Machine Learning, etc."
               className="collego-input"
             />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Number of Credits</label>
+            <input
+              type="number"
+              min="1"
+              max="12"
+              step="1"
+              value={credits}
+              onChange={e => setCredits(e.target.value)}
+              placeholder="e.g., 4"
+              className="collego-input"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">Credit value saved on the subject (1–12).</p>
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Semester</label>
@@ -1129,7 +1337,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
           </div>
         </div>
 
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onAssign} disabled={loading || !courseName.trim() || !selectedSemesterId}>
+        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onAssign} disabled={loading || !courseName.trim() || !selectedSemesterId || !Number(credits)}>
           {loading ? <><RefreshCw size={14} className="animate-spin" /> Assigning...</> : <><Plus size={13} /> Assign Subject &amp; Load Students</>}
         </Button>
       </div>
@@ -1142,7 +1350,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
               <div key={a.id} className="px-5 py-4 hover:bg-white/30 transition-colors flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800 truncate">{a.courseName}</p>
-                  <p className="text-xs text-slate-400 mt-1">{a.courseCode}</p>
+                  <p className="text-xs text-slate-400 mt-1">{a.courseCode} · {a.credits ?? 4} credits</p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <Badge variant="secondary">{a.yearLabel || targetYearLabel(a.year || semesterYear(a.semesterNumber))}</Badge>
@@ -1168,6 +1376,330 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
   )
 }
 
+// ─── HoD Class Representatives ───────────────────────────────────────────────
+function HodClassRepresentativesTab({ showMsg }) {
+  const [students, setStudents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [busyId, setBusyId] = useState(null)
+  const [year, setYear] = useState('')
+  const [section, setSection] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await api.get('/api/faculty/hod/cr/students')
+      setStudents(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not load students.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const years = [...new Set(students.map(s => s.year).filter(Boolean))].sort((a, b) => a - b)
+  const sectionOptions = [...new Set(students
+    .filter(s => !year || String(s.year) === String(year))
+    .map(s => s.section)
+    .filter(Boolean))].sort()
+  const filtered = students.filter(s =>
+    (!year || String(s.year) === String(year)) && (!section || s.section === section))
+  const currentCrs = filtered.filter(s => s.isCr)
+
+  const assign = async (student) => {
+    setBusyId(student.studentId)
+    try {
+      await api.put(`/api/faculty/hod/cr/${student.studentId}`)
+      showMsg(`${student.name} is now the CR for ${student.yearLabel} · Section ${student.section}`)
+      await load()
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Could not choose CR', 'error')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const remove = async (student) => {
+    if (!window.confirm(`Remove ${student.name} as class representative?`)) return
+    setBusyId(student.studentId)
+    try {
+      await api.delete(`/api/faculty/hod/cr/${student.studentId}`)
+      showMsg('Class representative removed')
+      await load()
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Could not remove CR', 'error')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={Crown} title="Class Representatives" accent="violet"
+        subtitle="Choose one CR for each year and section in your department." />
+
+      <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4 flex items-start gap-3">
+        <Crown size={18} className="text-violet-500 mt-0.5 shrink-0" />
+        <p className="text-xs text-violet-800 leading-relaxed">
+          A class can have one CR. Choosing a new CR automatically replaces the previous CR for that year and section.
+          The selected student will see the CR badge in their portal.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <select value={year} onChange={e => { setYear(e.target.value); setSection('') }} className="collego-input !w-auto">
+          <option value="">All Years</option>
+          {years.map(y => <option key={y} value={y}>{targetYearLabel(y)}</option>)}
+        </select>
+        <select value={section} onChange={e => setSection(e.target.value)} className="collego-input !w-auto">
+          <option value="">All Sections</option>
+          {sectionOptions.map(s => <option key={s} value={s}>Section {s}</option>)}
+        </select>
+        <div className="ml-auto flex items-center gap-4 text-xs">
+          <span className="text-slate-400">{filtered.length} students</span>
+          <span className="font-semibold text-violet-600">
+            {currentCrs.length > 0 ? `CR: ${currentCrs.map(c => c.name).join(', ')}` : 'No CR selected'}
+          </span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20"><Spinner /></div>
+      ) : error ? (
+        <div className="glass-card p-6 border border-red-200 bg-red-50/60 text-sm text-red-600">{error}</div>
+      ) : filtered.length === 0 ? (
+        <div className="glass-card border border-white/60">
+          <EmptyState icon={Crown} title="No students found" accent="violet"
+            description="Students in your department will appear here once they have a semester and section assigned." />
+        </div>
+      ) : (
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="overflow-x-auto">
+            <table className="collego-table">
+              <thead><tr><th>Year</th><th>Section</th><th>Student</th><th>Enrollment</th><th style={{ textAlign: 'center' }}>CR</th><th style={{ textAlign: 'right' }}>Action</th></tr></thead>
+              <tbody>
+                {filtered.map(s => (
+                  <tr key={s.studentId} className="hover:bg-white/30 transition-colors">
+                    <td><Badge variant="secondary">{s.yearLabel || targetYearLabel(s.year)}</Badge></td>
+                    <td className="text-slate-600 font-medium">Section {s.section || '—'}</td>
+                    <td className="text-slate-800 font-medium">{s.name}</td>
+                    <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.enrollmentNumber || '—'}</code></td>
+                    <td style={{ textAlign: 'center' }}>
+                      {s.isCr ? <Badge variant="purple">CR</Badge> : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {s.isCr ? (
+                        <Button variant="outline" size="sm" onClick={() => remove(s)} disabled={busyId === s.studentId}>
+                          <X size={12} /> Remove CR
+                        </Button>
+                      ) : (
+                        <Button variant="gradient" size="sm" onClick={() => assign(s)} disabled={busyId === s.studentId}>
+                          {busyId === s.studentId
+                            ? <RefreshCw size={12} className="animate-spin" />
+                            : <Crown size={12} />} Make CR
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── HoD Class Timetables ────────────────────────────────────────────────────
+function HodTimetablesTab({ showMsg }) {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [busyKey, setBusyKey] = useState('')
+  const [pending, setPending] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const fileRef = useRef(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await api.get('/api/faculty/hod/timetables')
+      setRows(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not load class timetables.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => () => { if (preview?.url) URL.revokeObjectURL(preview.url) }, [preview])
+
+  const chooseFile = (row) => {
+    setPending(row)
+    if (fileRef.current) {
+      fileRef.current.value = ''
+      fileRef.current.click()
+    }
+  }
+
+  const handleFile = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    const row = pending
+    setPending(null)
+    if (!file || !row) return
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      showMsg('Upload the timetable as a PDF', 'error')
+      return
+    }
+    const key = `${row.year}-${row.sectionName}`
+    setBusyKey(key)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      await api.post(`/api/faculty/hod/timetables?year=${row.year}&section=${encodeURIComponent(row.sectionName)}`, fd)
+      if (preview?.id === row.id) {
+        URL.revokeObjectURL(preview.url)
+        setPreview(null)
+      }
+      showMsg(`Timetable uploaded for ${row.yearLabel} · Section ${row.sectionName}`)
+      await load()
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Timetable upload failed', 'error')
+    } finally {
+      setBusyKey('')
+    }
+  }
+
+  const openPreview = async (row) => {
+    if (preview?.id === row.id) {
+      URL.revokeObjectURL(preview.url)
+      setPreview(null)
+      return
+    }
+    try {
+      const file = await fileObjectUrl(`/api/faculty/hod/timetables/${row.id}/file`)
+      if (preview?.url) URL.revokeObjectURL(preview.url)
+      setPreview({ id: row.id, url: file.url, title: `${row.yearLabel} · Section ${row.sectionName}` })
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Could not preview the timetable', 'error')
+    }
+  }
+
+  const downloadRow = async (row) => {
+    try {
+      await downloadFile(`/api/faculty/hod/timetables/${row.id}/file?download=true`, row.fileName || 'class-timetable.pdf')
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Download failed', 'error')
+    }
+  }
+
+  const removeRow = async (row) => {
+    if (!window.confirm(`Remove the timetable for ${row.yearLabel} · Section ${row.sectionName}?`)) return
+    setBusyKey(`${row.year}-${row.sectionName}`)
+    try {
+      await api.delete(`/api/faculty/hod/timetables/${row.id}`)
+      showMsg('Timetable removed')
+      if (preview?.id === row.id) { URL.revokeObjectURL(preview.url); setPreview(null) }
+      await load()
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Could not remove the timetable', 'error')
+    } finally {
+      setBusyKey('')
+    }
+  }
+
+  const years = [1, 2, 3, 4].map(year => ({
+    year,
+    label: targetYearLabel(year),
+    rows: rows.filter(row => row.year === year),
+  }))
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={CalendarDays} title="Class Timetables" subtitle="As Head of Department, upload the timetable for each section of each year in your department. Students in the matching class see it in their Timetable tab." accent="violet"
+        image={uiImages.campus} imageAlt="College campus"
+        actions={<Badge variant="purple">HoD Access</Badge>} />
+
+      <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleFile} />
+
+      <div className="rounded-2xl border border-violet-100 bg-violet-50/60 px-4 py-3 flex items-start gap-3">
+        <CalendarDays size={16} className="text-violet-500 mt-0.5 shrink-0" />
+        <p className="text-xs text-violet-700 leading-relaxed">
+          Upload a PDF for each section. Re-uploading replaces the previous file. Students only see the timetable for their own department, year and section.
+        </p>
+      </div>
+
+      {error && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-600">{error}</div>}
+      {loading ? (
+        <div className="flex items-center justify-center py-16"><Spinner color="violet" /></div>
+      ) : (
+        <div className="space-y-6">
+          {years.map(group => (
+            <div key={group.year} className="glass-card overflow-hidden border border-white/60">
+              <div className="px-5 py-4 border-b border-white/50 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-800">{group.label}</h3>
+                <span className="text-[10px] text-slate-400">{group.rows.filter(r => r.hasFile).length}/{group.rows.length} sections uploaded</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 p-4">
+                {group.rows.map(row => {
+                  const key = `${row.year}-${row.sectionName}`
+                  const busy = busyKey === key
+                  return (
+                    <div key={key} className="rounded-2xl border border-white/70 bg-white/70 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600 shrink-0">
+                            <Layers size={15} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-800">Section {row.sectionName}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{row.hasFile ? `${row.fileName} · ${fmtDate(row.uploadedAt)}` : 'No timetable uploaded'}</p>
+                          </div>
+                        </div>
+                        <Badge variant={row.hasFile ? 'success' : 'secondary'} className="text-[9px] px-2 py-0.5 shrink-0">{row.hasFile ? 'Uploaded' : 'Pending'}</Badge>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Button variant={row.hasFile ? 'outline' : 'gradient'} size="sm" onClick={() => chooseFile(row)} disabled={busy} className="px-3">
+                          {busy ? <><RefreshCw size={12} className="animate-spin" /> Uploading...</> : <><Upload size={12} /> {row.hasFile ? 'Replace PDF' : 'Upload PDF'}</>}
+                        </Button>
+                        {row.hasFile && (
+                          <>
+                            <button onClick={() => openPreview(row)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-600 hover:underline"><Eye size={12} /> {preview?.id === row.id ? 'Hide' : 'Preview'}</button>
+                            <button onClick={() => downloadRow(row)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-600 hover:underline"><Download size={12} /> Download</button>
+                            <button onClick={() => removeRow(row)} className="ml-auto p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors" title="Remove timetable"><Trash2 size={13} /></button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                {group.rows.length === 0 && <p className="text-xs text-slate-400 p-2">No sections found for this year.</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {preview && (
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="px-5 py-3 border-b border-white/50 flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-800">Preview · {preview.title}</p>
+            <button onClick={() => { URL.revokeObjectURL(preview.url); setPreview(null) }} className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white transition-colors" title="Close preview"><X size={15} /></button>
+          </div>
+          <iframe src={preview.url} title="Class timetable preview" className="w-full h-[70vh] bg-white" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Faculty Dashboard ──────────────────────────────────────────────────
 export default function FacultyDashboard() {
   const navigate = useNavigate()
@@ -1185,6 +1717,8 @@ export default function FacultyDashboard() {
   // Attendance
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0])
   const [attendanceRecords, setAttendanceRecords] = useState([])
+  const [attendanceHolidays, setAttendanceHolidays] = useState([])
+  const [holidayBusy, setHolidayBusy] = useState(false)
 
   // Marks
   const [examName, setExamName] = useState('IA-1')
@@ -1232,6 +1766,9 @@ export default function FacultyDashboard() {
   const [myQuestionPapers, setMyQuestionPapers] = useState([])
   const [careerProfile, setCareerProfile] = useState(null)
   const [careerLoading, setCareerLoading] = useState(false)
+  const [upcomingPlacements, setUpcomingPlacements] = useState([])
+  const [placementsLoading, setPlacementsLoading] = useState(false)
+  const [studentDetailsLoading, setStudentDetailsLoading] = useState(false)
   const [unreadCounts, setUnreadCounts] = useState({})
   const [notifications, setNotifications] = useState([])
 
@@ -1244,6 +1781,7 @@ export default function FacultyDashboard() {
   const [availableSemesters, setAvailableSemesters] = useState([])
   const [selectedSemesterId, setSelectedSemesterId] = useState('')
   const [newCourseName, setNewCourseName] = useState('')
+  const [newCourseCredits, setNewCourseCredits] = useState('4')
   const [subjectAssignmentsLoading, setSubjectAssignmentsLoading] = useState(false)
 
   const sidebarWidth = collapsed ? 76 : 248
@@ -1301,6 +1839,7 @@ export default function FacultyDashboard() {
     setActiveTab(tabId)
     if (tabId === 'questionPapers') loadMyQPs()
     if (tabId === 'careerProfile') loadCareerProfile()
+    if (tabId === 'placements') loadUpcomingPlacements()
     if (tabId === 'notices' || tabId === 'invigilations') markNavRead(tabId)
   }
 
@@ -1311,6 +1850,18 @@ export default function FacultyDashboard() {
       setCareerProfile(res.data)
     } catch { showMsg('Failed to load your career profile', 'error') }
     finally { setCareerLoading(false) }
+  }
+
+  const loadUpcomingPlacements = async () => {
+    setPlacementsLoading(true)
+    try {
+      const res = await api.get('/api/faculty/placements/upcoming')
+      setUpcomingPlacements(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to load upcoming placements', 'error')
+    } finally {
+      setPlacementsLoading(false)
+    }
   }
 
   // The top-right profile shows the signed-in faculty member's name and
@@ -1366,7 +1917,9 @@ export default function FacultyDashboard() {
     setSectionAssignments([])
     setSectionMaterials([])
     setStudentPerformance([])
+    setAttendanceHolidays([])
     loadEnrolledStudents(section.sectionId)
+    loadHolidays(section.sectionId)
   }
 
   const loadEnrolledStudents = async (sectionId) => {
@@ -1377,6 +1930,49 @@ export default function FacultyDashboard() {
       setMarksEntries(students.map(s => ({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, obtainedMarks: '' })))
       setSemMarksEntries(students.map(s => ({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, obtainedMarks: '' })))
     } catch { showMsg('Failed to load student data', 'error') }
+  }
+
+  const loadHolidays = async (sectionId) => {
+    try {
+      const res = await api.get(`/api/faculty/attendance/holidays/${sectionId}`)
+      setAttendanceHolidays(Array.isArray(res.data) ? res.data : [])
+    } catch { setAttendanceHolidays([]) }
+  }
+
+  const handleDeclareHoliday = async () => {
+    if (!selectedSection) return
+    const note = window.prompt(
+      `Declare ${fmtDate(attendanceDate)} as a holiday for this class?\n\nOptional note/reason:`, '')
+    if (note === null) return
+    setHolidayBusy(true)
+    try {
+      await api.post('/api/faculty/attendance/holidays', {
+        sectionId: selectedSection.sectionId,
+        date: attendanceDate,
+        note: note.trim() || null,
+      })
+      showMsg('Holiday declared. Attendance for that day is not counted.')
+      await loadHolidays(selectedSection.sectionId)
+      await loadEnrolledStudents(selectedSection.sectionId)
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Could not declare holiday', 'error')
+    } finally {
+      setHolidayBusy(false)
+    }
+  }
+
+  const handleRemoveHoliday = async (holidayId) => {
+    if (!window.confirm('Remove this holiday? You can then mark attendance for that day.')) return
+    setHolidayBusy(true)
+    try {
+      await api.delete(`/api/faculty/attendance/holidays/${holidayId}`)
+      showMsg('Holiday removed')
+      if (selectedSection) await loadHolidays(selectedSection.sectionId)
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Could not remove holiday', 'error')
+    } finally {
+      setHolidayBusy(false)
+    }
   }
 
   const handleTabChange = (tabId) => {
@@ -1617,6 +2213,19 @@ export default function FacultyDashboard() {
     }
   }, [showMsg])
 
+  const handleDownloadStudentDetails = async (section) => {
+    if (!section) return
+    setStudentDetailsLoading(true)
+    try {
+      const fileName = `student-details-${section.courseCode || 'section'}-${section.sectionName || section.sectionId}.pdf`
+      await downloadFile(`/api/faculty/sections/${section.sectionId}/students/pdf`, fileName)
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to download student details', 'error')
+    } finally {
+      setStudentDetailsLoading(false)
+    }
+  }
+
 
   const loadMaterials = async () => {
     setTabLoading(true)
@@ -1692,13 +2301,19 @@ export default function FacultyDashboard() {
 
   const handleAssignSubject = async () => {
     if (!newCourseName.trim() || !selectedSemesterId) return
+    const credits = Number(newCourseCredits)
+    if (!Number.isInteger(credits) || credits < 1 || credits > 12) {
+      showMsg('Enter a valid number of credits (1–12)', 'error')
+      return
+    }
     setSubjectAssignmentsLoading(true)
     try {
-      const res = await api.post('/api/faculty/subject-assignments', { courseName: newCourseName.trim(), semesterId: parseInt(selectedSemesterId) })
+      const res = await api.post('/api/faculty/subject-assignments', { courseName: newCourseName.trim(), semesterId: parseInt(selectedSemesterId), credits })
       const studentCount = res.data?.studentCount ?? 0
       const yearLabel = res.data?.yearLabel || targetYearLabel(res.data?.year)
       const sectionCount = res.data?.sectionCount ?? 0
       setNewCourseName('')
+      setNewCourseCredits('4')
       setSelectedSemesterId('')
       await Promise.all([loadMySubjectAssignments(), fetchSections()])
       showMsg(studentCount > 0
@@ -1727,9 +2342,18 @@ export default function FacultyDashboard() {
     }
   }, [activeTab])
 
+  const globalNavItems = [
+    ...GLOBAL_NAV,
+    ...(careerProfile?.isHod
+      ? [
+          { id: 'classRepresentatives', label: 'Class Representatives', icon: Crown },
+          { id: 'hodTimetables', label: 'Class Timetables', icon: CalendarDays },
+        ]
+      : []),
+  ]
   const navSections = [
     {
-      items: GLOBAL_NAV.map(item => ({
+      items: globalNavItems.map(item => ({
         ...item,
         badge: NAV_CATEGORY[item.id] ? (unreadCounts[NAV_CATEGORY[item.id]] || 0) : 0,
       })),
@@ -1754,9 +2378,12 @@ export default function FacultyDashboard() {
     if (!selectedSection) {
       switch (activeTab) {
         case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
-        case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} />
+        case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} credits={newCourseCredits} setCredits={setNewCourseCredits} />
         case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} targetYear={qpTargetYear} setTargetYear={setQpTargetYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
         case 'careerProfile': return <CareerProfileTab profile={careerProfile} loading={careerLoading} onUpload={handleUploadCareerResume} onRemove={handleRemoveCareerResume} onDownload={handleDownload} />
+        case 'placements': return <UpcomingPlacementsTab placements={upcomingPlacements} loading={placementsLoading} onRefresh={loadUpcomingPlacements} />
+        case 'classRepresentatives': return <HodClassRepresentativesTab showMsg={showMsg} />
+        case 'hodTimetables': return <HodTimetablesTab showMsg={showMsg} />
         case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} targetYear={noticeTargetYear} setTargetYear={setNoticeTargetYear} departmentName={facultyDepartmentName} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} inbox={notifications} />
         case 'settings': return <SettingsTab showMsg={showMsg} accent="violet" />
         case 'help': return <HelpTab accent="violet" />
@@ -1766,7 +2393,20 @@ export default function FacultyDashboard() {
     }
 
     switch (activeTab) {
-      case 'attendance': return <AttendanceTab attendanceDate={attendanceDate} setAttendanceDate={setAttendanceDate} attendanceRecords={attendanceRecords} toggleAttendance={toggleAttendance} onSubmit={handleMarkAttendance} loading={loading} />
+      case 'studentDetails': return <StudentDetailsTab section={selectedSection} onDownload={handleDownloadStudentDetails} loading={studentDetailsLoading} />
+      case 'attendance': return <AttendanceTab
+        attendanceDate={attendanceDate}
+        setAttendanceDate={setAttendanceDate}
+        attendanceRecords={attendanceRecords}
+        toggleAttendance={toggleAttendance}
+        onSubmit={handleMarkAttendance}
+        loading={loading}
+        holiday={attendanceHolidays.find(h => h.date === attendanceDate) || null}
+        holidays={attendanceHolidays}
+        holidayBusy={holidayBusy}
+        onDeclareHoliday={handleDeclareHoliday}
+        onRemoveHoliday={handleRemoveHoliday}
+      />
       case 'internalMarks': return <InternalMarksTab examName={examName} setExamName={setExamName} maxMarks={maxMarks} setMaxMarks={setMaxMarks} marksEntries={marksEntries} setMarksEntries={setMarksEntries} onSubmit={handleUploadInternalMarks} sectionMarks={sectionMarks} loading={loading} />
       case 'semesterMarks': return <SemesterMarksTab semMaxMarks={semMaxMarks} setSemMaxMarks={setSemMaxMarks} semMarksEntries={semMarksEntries} setSemMarksEntries={setSemMarksEntries} onSubmit={handleUploadSemesterMarks} sectionMarks={semesterMarks} loading={loading} />
       case 'studentPerformance': return <StudentPerformanceTab data={studentPerformance} loading={tabLoading} />

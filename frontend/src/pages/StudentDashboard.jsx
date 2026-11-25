@@ -7,7 +7,8 @@ import {
   TrendingUp, Download, Send, FileText,
   GraduationCap, CheckCircle2, Bot,
   Layers, Award, Wallet, ScrollText, Search, AlertTriangle, RefreshCw,
-  BookOpen, FolderOpen, Upload, Clock, Paperclip, Settings, HelpCircle, Users,
+  BookOpen, FolderOpen, Upload, Clock, Paperclip, Settings, HelpCircle, Users, Eye, X,
+  CalendarOff,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -15,7 +16,7 @@ import {
 } from 'recharts'
 import { authService } from '../services/authService'
 import api from '../services/api'
-import { downloadFile } from '../lib/download'
+import { downloadFile, fileObjectUrl, previewFile } from '../lib/download'
 import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
 import { FacultyDirectoryTab } from '../components/dashboard/FacultyDirectoryTab'
@@ -133,7 +134,8 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
       <WelcomeBanner
         greeting={greeting}
         name={profile?.firstName || 'Student'}
-        subtitle={`${profile?.enrollmentNumber || ''} · ${profile?.departmentName || ''} · Semester ${profile?.currentSemester || ''} · Section ${profile?.section || ''}`}
+        badge={profile?.isCr ? 'CR' : null}
+        subtitle={`${profile?.enrollmentNumber || ''} · ${profile?.departmentName || ''} · Semester ${profile?.currentSemester || ''} · Section ${profile?.section || ''}${profile?.isCr ? ' · Class Representative' : ''}`}
         quote="Every class attended is a step closer to your goal"
         accent="emerald"
         image={welcomeStudent}
@@ -311,41 +313,67 @@ function AttendanceTab({ overall, subjects, semesters, onSemesterChange, loading
       {loading ? (
         <div className="flex items-center justify-center py-16"><Spinner color="emerald" /></div>
       ) : (
-        <div className="glass-card overflow-hidden border border-white/60">
-          <div className="overflow-x-auto">
-            <table className="collego-table">
-              <thead>
-                <tr>
-                  <th>Subject</th><th>Code</th>
-                  <th style={{ textAlign: 'center' }}>Total</th>
-                  <th style={{ textAlign: 'center' }}>Present</th>
-                  <th style={{ textAlign: 'center' }}>Absent</th>
-                  <th style={{ textAlign: 'center' }}>%</th>
-                  <th>Progress</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subjects.map(s => (
-                  <tr key={s.sectionId} className="hover:bg-white/30 transition-colors">
-                    <td className="text-slate-800 font-medium">{s.courseName}</td>
-                    <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.courseCode}</code></td>
-                    <td style={{ textAlign: 'center' }}>{s.totalClasses}</td>
-                    <td style={{ textAlign: 'center', color: '#059669', fontWeight: 600 }}>{s.present}</td>
-                    <td style={{ textAlign: 'center', color: '#dc2626', fontWeight: 600 }}>{s.absent}</td>
-                    <td style={{ textAlign: 'center' }}><AttBadge pct={Math.round(s.percentage || 0)} /></td>
-                    <td className="w-32">
-                      <div className="progress-bar">
-                        <div className={cn('progress-bar-fill', s.percentage >= 75 ? 'bg-emerald-500' : s.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500')} style={{ width: `${Math.min(s.percentage || 0, 100)}%` }} />
-                      </div>
-                    </td>
+        <div className="space-y-6">
+          <div className="glass-card overflow-hidden border border-white/60">
+            <div className="overflow-x-auto">
+              <table className="collego-table">
+                <thead>
+                  <tr>
+                    <th>Subject</th><th>Code</th>
+                    <th style={{ textAlign: 'center' }}>Total</th>
+                    <th style={{ textAlign: 'center' }}>Present</th>
+                    <th style={{ textAlign: 'center' }}>Absent</th>
+                    <th style={{ textAlign: 'center' }}>%</th>
+                    <th>Progress</th>
                   </tr>
-                ))}
-                {subjects.length === 0 && (
-                  <tr><td colSpan={7} className="text-center text-slate-400 py-14">No attendance data found.</td></tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {subjects.map(s => (
+                    <tr key={s.sectionId} className="hover:bg-white/30 transition-colors">
+                      <td className="text-slate-800 font-medium">{s.courseName}</td>
+                      <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.courseCode}</code></td>
+                      <td style={{ textAlign: 'center' }}>{s.totalClasses}</td>
+                      <td style={{ textAlign: 'center', color: '#059669', fontWeight: 600 }}>{s.present}</td>
+                      <td style={{ textAlign: 'center', color: '#dc2626', fontWeight: 600 }}>{s.absent}</td>
+                      <td style={{ textAlign: 'center' }}><AttBadge pct={Math.round(s.percentage || 0)} /></td>
+                      <td className="w-32">
+                        <div className="progress-bar">
+                          <div className={cn('progress-bar-fill', s.percentage >= 75 ? 'bg-emerald-500' : s.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500')} style={{ width: `${Math.min(s.percentage || 0, 100)}%` }} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {subjects.length === 0 && (
+                    <tr><td colSpan={7} className="text-center text-slate-400 py-14">No attendance data found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {overall?.holidays?.length > 0 && (
+            <div className="glass-card overflow-hidden border border-white/60">
+              <div className="px-5 py-4 border-b border-white/50 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                  <CalendarOff size={14} className="text-amber-500" /> Declared Holidays
+                </h3>
+                <span className="text-[10px] text-slate-400">{overall.holidays.length} total</span>
+              </div>
+              <div className="divide-y divide-white/30">
+                {overall.holidays.slice(0, 8).map(h => (
+                  <div key={h.id} className="px-5 py-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-800">
+                        {fmtDate(h.date)} · {h.courseCode || h.courseName}
+                      </p>
+                      <p className="text-[11px] text-slate-500">{h.note || 'Declared as a holiday'}</p>
+                    </div>
+                    <Badge variant="warning">Holiday</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -431,12 +459,72 @@ function MarksTab({ internalMarks, cgpa }) {
 // ─── Timetable ───────────────────────────────────────────────────────────────
 function TimetableTab({ timetable, loading }) {
   const days = timetable?.weeklySchedule ? DAY_ORDER.filter(d => timetable.weeklySchedule[d]?.length > 0) : []
+  const classTimetable = timetable?.classTimetable
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState('')
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+  }, [previewUrl])
+
+  const togglePreview = async () => {
+    if (previewUrl) { setPreviewUrl(''); return }
+    setPreviewLoading(true)
+    setPreviewError('')
+    try {
+      const file = await fileObjectUrl('/api/student/timetable/class/file')
+      setPreviewUrl(file.url)
+    } catch (err) {
+      setPreviewError(err.response?.data?.message || 'Could not load the timetable preview.')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const downloadClassTimetable = async () => {
+    try {
+      await downloadFile('/api/student/timetable/class/file?download=true', classTimetable?.fileName || 'class-timetable.pdf')
+    } catch (err) {
+      setPreviewError(err.response?.data?.message || 'Download failed.')
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <PageTitle icon={Calendar} title="Timetable" subtitle="Your weekly class schedule." accent="blue" image={uiImages.classroom} imageAlt="Classroom lecture" />
+      <PageTitle icon={Calendar} title="Timetable" subtitle="Your weekly class schedule and the class timetable uploaded by your HoD." accent="blue" image={uiImages.classroom} imageAlt="Classroom lecture" />
+      {!loading && classTimetable?.hasFile && (
+        <div className="glass-card overflow-hidden border border-white/60">
+          <div className="p-5 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 shrink-0">
+                <Calendar size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-800">Class Timetable · {classTimetable.yearLabel} · Section {classTimetable.sectionName}</p>
+                <p className="text-xs text-slate-500 truncate">{classTimetable.fileName || 'class-timetable.pdf'} · uploaded {fmtDate(classTimetable.uploadedAt)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={togglePreview} disabled={previewLoading} className="px-4">
+                {previewLoading ? <><RefreshCw size={13} className="animate-spin" /> Loading...</> : <><Eye size={13} /> {previewUrl ? 'Hide preview' : 'Preview'}</>}
+              </Button>
+              <Button variant="gradient" size="sm" onClick={downloadClassTimetable} className="px-4">
+                <Download size={13} /> Download
+              </Button>
+            </div>
+          </div>
+          {previewError && <p className="px-5 pb-4 text-xs text-red-500">{previewError}</p>}
+          {previewUrl && (
+            <div className="px-5 pb-5">
+              <iframe src={previewUrl} title="Class timetable preview" className="w-full h-[70vh] rounded-xl border border-white/60 bg-white" />
+            </div>
+          )}
+        </div>
+      )}
       {loading ? (
         <div className="flex items-center justify-center py-16"><Spinner color="blue" /></div>
-      ) : days.length === 0 ? (
+      ) : days.length === 0 && !classTimetable?.hasFile ? (
         <div className="glass-card p-12 border border-white/60"><EmptyState icon={Calendar} title="No timetable" accent="blue" description="No timetable data found for active enrollments." /></div>
       ) : (
         <div className="space-y-4">
@@ -734,9 +822,30 @@ function PlacementsTab({ notices, onDownload }) {
 const NOTIF_TYPES = { ACADEMIC: { v: 'info', label: 'Academic' }, PLACEMENT: { v: 'purple', label: 'Placement' }, EXAM: { v: 'destructive', label: 'Exam' }, GENERAL: { v: 'secondary', label: 'General' } }
 
 function NotificationsTab({ notifications, onMarkRead }) {
+  const [attachmentError, setAttachmentError] = useState('')
+
+  const openAttachment = async (n) => {
+    setAttachmentError('')
+    try {
+      await previewFile(`/api/notifications/${n.id}/attachment`, n.attachmentFileName || 'attachment')
+    } catch (err) {
+      setAttachmentError(err.response?.data?.message || 'Could not open the attachment.')
+    }
+  }
+
+  const saveAttachment = async (n) => {
+    setAttachmentError('')
+    try {
+      await downloadFile(`/api/notifications/${n.id}/attachment?download=true`, n.attachmentFileName || 'attachment')
+    } catch (err) {
+      setAttachmentError(err.response?.data?.message || 'Could not download the attachment.')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageTitle icon={Bell} title="Notifications" subtitle="Announcements and updates from your college." accent="blue" image={uiImages.campusReading} imageAlt="Student reading on campus" />
+      {attachmentError && <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-600">{attachmentError}</div>}
       <div className="space-y-3">
         {(notifications || []).map(n => {
           const cfg = NOTIF_TYPES[n.type] || NOTIF_TYPES.GENERAL
@@ -753,6 +862,14 @@ function NotificationsTab({ notifications, onMarkRead }) {
                 </div>
                 <p className="text-sm font-semibold text-slate-800">{n.title}</p>
                 <p className="text-sm text-slate-500 mt-0.5">{n.message}</p>
+                {n.hasAttachment && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2">
+                    <Paperclip size={13} className="text-indigo-500 shrink-0" />
+                    <span className="text-xs font-medium text-slate-600 truncate max-w-[240px]">{n.attachmentFileName || 'Attachment'}</span>
+                    <button onClick={() => openAttachment(n)} className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:underline"><Eye size={12} /> View</button>
+                    <button onClick={() => saveAttachment(n)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:underline"><Download size={12} /> Download</button>
+                  </div>
+                )}
               </div>
               {!n.read && <Button variant="outline" size="sm" onClick={() => onMarkRead(n.id)} className="shrink-0 px-3">Mark read</Button>}
             </motion.div>
@@ -1017,52 +1134,195 @@ function AiAssistantTab({ overall, cgpa }) {
 }
 
 // ─── AI Resume Analyzer ──────────────────────────────────────────────────────
+const formatBytes = (bytes) => {
+  if (!bytes) return '0 KB'
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function AiResumeAnalyzerTab() {
-  const [resumeText, setResumeText] = useState('')
+  const [file, setFile] = useState(null)
   const [targetRole, setTargetRole] = useState('')
   const [result, setResult] = useState(null)
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const fileRef = useRef(null)
+
+  const chooseFile = (selected) => {
+    if (!selected) return
+    setFile(selected)
+    setResult(null)
+    setError('')
+  }
+
+  const clearFile = () => {
+    setFile(null)
+    setResult(null)
+    setError('')
+    if (fileRef.current) fileRef.current.value = ''
+  }
 
   const analyze = async () => {
-    if (!resumeText.trim()) return
+    if (!file) return
     setLoading(true)
+    setError('')
     try {
-      const res = await api.post('/api/ai/resume-analyze', { resumeText, targetRole })
-      setResult(res.data)
-    } catch { setResult(null) }
-    finally { setLoading(false) }
+      const fd = new FormData()
+      fd.append('file', file)
+      if (targetRole.trim()) fd.append('targetRole', targetRole.trim())
+      const res = await api.post('/api/ai/resume-analyze-file', fd)
+      if (res.data?.error) {
+        setError(res.data.message || 'The AI service is temporarily unavailable. Please try again.')
+        setResult(null)
+      } else {
+        setResult(res.data)
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not analyze this resume. Please try again.')
+      setResult(null)
+    } finally {
+      setLoading(false)
+    }
   }
+
+  const score = Number(result?.atsScore ?? 0)
+  const scoreTone = score >= 80
+    ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', bar: 'from-emerald-500 to-teal-500' }
+    : score >= 60
+      ? { text: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', bar: 'from-blue-500 to-cyan-500' }
+      : score >= 40
+        ? { text: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', bar: 'from-amber-500 to-orange-500' }
+        : { text: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100', bar: 'from-red-500 to-rose-500' }
+
+  const list = (value) => (Array.isArray(value) ? value : [])
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={FileText} title="AI Resume Analyzer" subtitle="ATS-friendly resume analysis with feedback and improvement suggestions." accent="violet"
+      <PageTitle icon={FileText} title="AI Resume Analyzer" subtitle="Upload your resume to get an ATS score and specific, actionable feedback." accent="violet"
         actions={<Badge variant="purple">AI Powered</Badge>} />
+
       <div className="glass-card p-6 border border-white/60">
         <div className="space-y-4">
           <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Resume Text</label>
-            <textarea value={resumeText} onChange={e => setResumeText(e.target.value)} rows={6} placeholder="Paste your resume text here..." className="collego-input resize-none" />
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Resume File</label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              className="hidden"
+              onChange={e => chooseFile(e.target.files?.[0])}
+            />
+            {file ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50/60 px-4 py-3">
+                <div className="w-10 h-10 rounded-xl bg-white border border-violet-100 flex items-center justify-center text-violet-600 shrink-0">
+                  <FileText size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{file.name}</p>
+                  <p className="text-[11px] text-slate-500">{formatBytes(file.size)} · ready to analyse</p>
+                </div>
+                <button onClick={clearFile} className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-white transition-colors" title="Remove file">
+                  <X size={15} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="w-full rounded-2xl border-2 border-dashed border-violet-200 bg-violet-50/40 px-6 py-8 text-center hover:border-violet-300 hover:bg-violet-50/70 transition-all group"
+              >
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-white border border-violet-100 flex items-center justify-center text-violet-500 group-hover:scale-105 transition-transform">
+                  <Upload size={20} />
+                </div>
+                <p className="mt-3 text-sm font-semibold text-slate-800">Upload your resume</p>
+                <p className="mt-1 text-xs text-slate-500">PDF, DOCX, TXT or MD · maximum 10 MB</p>
+              </button>
+            )}
           </div>
+
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Target Role (optional)</label>
             <input value={targetRole} onChange={e => setTargetRole(e.target.value)} placeholder="e.g., Software Engineer" className="collego-input" />
           </div>
-          <Button variant="gradient" onClick={analyze} disabled={loading || !resumeText.trim()} className="w-auto px-6">
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-600">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <Button variant="gradient" onClick={analyze} disabled={loading || !file} className="w-auto px-6">
             {loading ? (
-              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Analyzing...</span>
+              <span className="flex gap-1"><RefreshCw size={14} className="animate-spin" /> Reading &amp; analyzing...</span>
             ) : (
               <span className="flex gap-1"><Sparkles size={14} /> Analyze Resume</span>
             )}
           </Button>
         </div>
       </div>
+
       {result && (
-        <div className="glass-card p-6 border border-white/60">
-          <h3 className="text-sm font-semibold text-slate-800 mb-4">Analysis Result</h3>
-          <div className="space-y-3">
-            <p className="text-sm text-slate-700">{typeof result === 'string' ? result : JSON.stringify(result)}</p>
+        <div className="space-y-4">
+          <div className={cn('glass-card p-6 border', scoreTone.border)}>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className={cn('w-28 h-28 rounded-full flex flex-col items-center justify-center border-4', scoreTone.border, scoreTone.bg)}>
+                <span className={cn('text-3xl font-bold leading-none', scoreTone.text)}>{score}</span>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-1">ATS Score</span>
+              </div>
+              <div className="flex-1 min-w-[220px]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={score >= 80 ? 'success' : score >= 60 ? 'info' : score >= 40 ? 'warning' : 'destructive'}>
+                    {result.readinessLevel || 'Analysis complete'}
+                  </Badge>
+                  <span className="text-xs text-slate-400">out of 100</span>
+                </div>
+                <p className="mt-2 text-sm text-slate-700 leading-relaxed">{result.summary || 'Your resume has been analysed.'}</p>
+                <div className="mt-3 h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div className={cn('h-full rounded-full bg-gradient-to-r', scoreTone.bar)} style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ResumeInsightList title="Strengths" items={list(result.strengths)} icon={CheckCircle2} tone="emerald" />
+            <ResumeInsightList title="Weaknesses" items={list(result.weaknesses)} icon={AlertTriangle} tone="red" />
+            <ResumeInsightList title="Missing Skills" items={list(result.missingSkills)} icon={Target} tone="amber" />
+            <ResumeInsightList title="Suggestions" items={list(result.suggestions)} icon={Sparkles} tone="indigo" />
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+function ResumeInsightList({ title, items, icon: Icon, tone }) {
+  const tones = {
+    emerald: 'border-emerald-100 bg-emerald-50/60 text-emerald-600',
+    red: 'border-red-100 bg-red-50/60 text-red-600',
+    amber: 'border-amber-100 bg-amber-50/60 text-amber-600',
+    indigo: 'border-indigo-100 bg-indigo-50/60 text-indigo-600',
+  }
+  return (
+    <div className="glass-card p-5 border border-white/60">
+      <div className="flex items-center gap-2 mb-3">
+        <div className={cn('w-8 h-8 rounded-xl border flex items-center justify-center', tones[tone])}>
+          <Icon size={14} />
+        </div>
+        <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+      </div>
+      {items.length ? (
+        <ul className="space-y-2">
+          {items.map((item, index) => (
+            <li key={index} className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed">
+              <span className={cn('mt-1.5 w-1.5 h-1.5 rounded-full shrink-0', tone === 'red' ? 'bg-red-400' : tone === 'amber' ? 'bg-amber-400' : tone === 'emerald' ? 'bg-emerald-400' : 'bg-indigo-400')} />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-slate-400">Nothing flagged here.</p>
       )}
     </div>
   )
@@ -1245,7 +1505,13 @@ export default function StudentDashboard() {
       />
       <PortalTopbar
         sidebarWidth={sidebarWidth} accent="emerald"
-        user={{ name: `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || 'Student', role: profile?.departmentName ? `Student · ${profile.departmentName}` : 'Student', email: profile?.email }}
+        user={{
+          name: `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || 'Student',
+          role: profile?.isCr
+            ? `Class Representative · ${profile?.departmentName || 'Student'}`
+            : (profile?.departmentName ? `Student · ${profile.departmentName}` : 'Student'),
+          email: profile?.email,
+        }}
         notificationCount={unreadCount}
         notifications={(notifications || []).map(n => ({ id: n.id, title: n.title, message: n.message }))}
         onLogout={() => { authService.clearTokens(); navigate('/login') }}
