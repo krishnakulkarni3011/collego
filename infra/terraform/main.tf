@@ -38,8 +38,7 @@ module "vpc" {
   public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
   private_subnets = ["10.0.11.0/24", "10.0.12.0/24"]
 
-  enable_nat_gateway = true
-  single_nat_gateway = true
+  enable_nat_gateway = false
 
   tags = local.common_tags
 }
@@ -56,7 +55,7 @@ resource "aws_security_group" "ec2" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip_cidr]  # restrict SSH to your IP
+    cidr_blocks = [var.my_ip_cidr] # restrict SSH to your IP
   }
   ingress {
     from_port   = 80
@@ -129,6 +128,10 @@ resource "aws_instance" "app" {
   }))
 
   tags = merge(local.common_tags, { Name = "collego-app-server" })
+
+  lifecycle {
+    ignore_changes = [ami, user_data]
+  }
 }
 
 resource "aws_eip" "app" {
@@ -145,14 +148,13 @@ resource "aws_db_subnet_group" "main" {
 }
 
 resource "aws_db_instance" "postgres" {
-  identifier              = "collego-postgres"
-  engine                  = "postgres"
-  engine_version          = "16.12"
-  instance_class          = var.rds_instance_class
-  allocated_storage       = 20
-  max_allocated_storage   = 100
-  storage_type            = "gp3"
-  storage_encrypted       = true
+  identifier        = "collego-postgres"
+  engine            = "postgres"
+  engine_version    = "16.12"
+  instance_class    = var.rds_instance_class
+  allocated_storage = 20
+  storage_type      = "gp3"
+  storage_encrypted = true
 
   db_name  = var.db_name
   username = var.db_username
@@ -162,11 +164,12 @@ resource "aws_db_instance" "postgres" {
   vpc_security_group_ids = [aws_security_group.rds.id]
 
   backup_retention_period = 1
+  apply_immediately       = true
   backup_window           = "03:00-04:00"
   maintenance_window      = "sun:04:00-sun:05:00"
 
-  deletion_protection       = false
-  skip_final_snapshot       = true
+  deletion_protection = false
+  skip_final_snapshot = true
 
   monitoring_interval = 0
 
@@ -291,8 +294,8 @@ resource "aws_iam_policy" "ec2_policy" {
     Statement = [
       # S3 access — only to collego buckets
       {
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
         Resource = [
           "arn:aws:s3:::collego-*-${var.environment}",
           "arn:aws:s3:::collego-*-${var.environment}/*"
@@ -300,8 +303,8 @@ resource "aws_iam_policy" "ec2_policy" {
       },
       # ECR — pull images
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "ecr:GetAuthorizationToken",
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
@@ -356,7 +359,7 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring" {
 resource "aws_cloudwatch_log_group" "services" {
   for_each          = toset(["/collego/backend", "/collego/frontend", "/collego/ai-service", "/collego/nginx"])
   name              = each.key
-  retention_in_days = 30
+  retention_in_days = 7
   tags              = local.common_tags
 }
 
@@ -403,7 +406,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_storage" {
   namespace           = "AWS/RDS"
   period              = 300
   statistic           = "Average"
-  threshold           = 2147483648  # 2 GB in bytes
+  threshold           = 2147483648 # 2 GB in bytes
   alarm_description   = "RDS free storage < 2 GB"
   dimensions          = { DBInstanceIdentifier = aws_db_instance.postgres.identifier }
   alarm_actions       = [aws_sns_topic.alerts.arn]
@@ -449,102 +452,166 @@ resource "aws_sns_topic_subscription" "email_alerts" {
   endpoint  = var.alert_email
 }
 
-# ─── EventBridge — Automated DB Backup (cron) ────────────────────────────────
-resource "aws_cloudwatch_event_rule" "db_backup" {
-  name                = "collego-db-backup-cron"
-  description         = "Trigger DB backup Lambda every day at 02:00 UTC"
-  schedule_expression = "cron(0 2 * * ? *)"
-  tags                = local.common_tags
+resource "aws_budgets_budget" "monthly" {
+  name              = "collego-monthly-budget"
+  budget_type       = "COST"
+  limit_amount      = "43"
+  limit_unit        = "USD"
+  time_unit         = "MONTHLY"
+  time_period_start = "2026-12-01_00:00"
+
+  cost_types {
+    include_credit             = false
+    include_discount           = true
+    include_other_subscription = true
+    include_recurring          = true
+    include_refund             = false
+    include_subscription       = true
+    include_support            = true
+    include_tax                = false
+    include_upfront            = true
+    use_blended                = false
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 50
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = [var.alert_email]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 80
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = [var.alert_email]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 100
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = [var.alert_email]
+  }
+
 }
 
-resource "aws_cloudwatch_event_target" "db_backup" {
-  rule      = aws_cloudwatch_event_rule.db_backup.name
-  target_id = "CollegoDBBackupLambda"
-  arn       = aws_lambda_function.db_backup.arn
-}
+# Automated backups are handled by RDS automated backups and a weekly
+# pg_dump cron on the EC2 host. This avoids the NAT Gateway and VPC Lambda cost.
 
-resource "aws_lambda_permission" "allow_eventbridge" {
-  statement_id  = "AllowEventBridgeInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.db_backup.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.db_backup.arn
-}
+# ─── Nightly power schedule (IST) ─────────────────────────────────────────────
+# Stops EC2/RDS at 01:00 IST and starts them again at 07:00/07:15 IST.
+# EventBridge Scheduler universal targets call the AWS APIs directly, so this
+# does not need a Lambda function or a NAT Gateway.
 
-# ─── Lambda — DB Backup ───────────────────────────────────────────────────────
-resource "aws_iam_role" "lambda_backup" {
-  name = "collego-lambda-backup-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-    }]
-  })
-}
+data "aws_iam_policy_document" "scheduler_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
 
-resource "aws_iam_role_policy" "lambda_backup_policy" {
-  name = "collego-lambda-backup-policy"
-  role = aws_iam_role.lambda_backup.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
-        Resource = "arn:aws:logs:*:*:*"
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["s3:PutObject", "s3:ListBucket"]
-        Resource = [
-          "arn:aws:s3:::collego-db-backups-${var.environment}",
-          "arn:aws:s3:::collego-db-backups-${var.environment}/*"
-        ]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["rds:CreateDBSnapshot", "rds:DescribeDBSnapshots", "rds:AddTagsToResource"]
-        Resource = "*"
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["ec2:CreateNetworkInterface", "ec2:DescribeNetworkInterfaces", "ec2:DeleteNetworkInterface"]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-# Lambda function (zip uploaded separately or via CI)
-data "archive_file" "lambda_backup_zip" {
-  type        = "zip"
-  source_file = "${path.module}/../lambda/db_backup.py"
-  output_path = "${path.module}/../lambda/db_backup.zip"
-}
-
-resource "aws_lambda_function" "db_backup" {
-  filename         = data.archive_file.lambda_backup_zip.output_path
-  source_code_hash = data.archive_file.lambda_backup_zip.output_base64sha256
-  function_name    = "collego-db-backup"
-  role             = aws_iam_role.lambda_backup.arn
-  handler          = "db_backup.handler"
-  runtime          = "python3.11"
-  timeout          = 300
-  memory_size      = 256
-
-  environment {
-    variables = {
-      DB_INSTANCE_ID = aws_db_instance.postgres.identifier
-      S3_BUCKET      = "collego-db-backups-${var.environment}"
+    principals {
+      type        = "Service"
+      identifiers = ["scheduler.amazonaws.com"]
     }
   }
+}
 
-  vpc_config {
-    subnet_ids         = module.vpc.private_subnets
-    security_group_ids = [aws_security_group.ec2.id]
+resource "aws_iam_role" "scheduler" {
+  name               = "collego-power-scheduler-role"
+  assume_role_policy = data.aws_iam_policy_document.scheduler_assume_role.json
+  tags               = local.common_tags
+}
+
+data "aws_iam_policy_document" "scheduler_permissions" {
+  statement {
+    effect    = "Allow"
+    actions   = ["ec2:StartInstances", "ec2:StopInstances"]
+    resources = [aws_instance.app.arn]
   }
 
-  tags = local.common_tags
+  statement {
+    effect    = "Allow"
+    actions   = ["rds:StartDBInstance", "rds:StopDBInstance"]
+    resources = [aws_db_instance.postgres.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "scheduler" {
+  name   = "collego-power-scheduler-policy"
+  role   = aws_iam_role.scheduler.id
+  policy = data.aws_iam_policy_document.scheduler_permissions.json
+}
+
+resource "aws_scheduler_schedule" "stop_ec2" {
+  name                         = "collego-stop-ec2"
+  description                  = "Stop Collego EC2 at 01:00 IST"
+  schedule_expression          = "cron(0 1 * * ? *)"
+  schedule_expression_timezone = "Asia/Kolkata"
+  state                        = "ENABLED"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"
+    role_arn = aws_iam_role.scheduler.arn
+    input    = jsonencode({ InstanceIds = [aws_instance.app.id] })
+  }
+}
+
+resource "aws_scheduler_schedule" "stop_rds" {
+  name                         = "collego-stop-rds"
+  description                  = "Stop Collego RDS at 01:05 IST"
+  schedule_expression          = "cron(5 1 * * ? *)"
+  schedule_expression_timezone = "Asia/Kolkata"
+  state                        = "ENABLED"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:rds:stopDBInstance"
+    role_arn = aws_iam_role.scheduler.arn
+    input    = jsonencode({ DbInstanceIdentifier = aws_db_instance.postgres.identifier })
+  }
+}
+
+resource "aws_scheduler_schedule" "start_rds" {
+  name                         = "collego-start-rds"
+  description                  = "Start Collego RDS at 07:00 IST"
+  schedule_expression          = "cron(0 7 * * ? *)"
+  schedule_expression_timezone = "Asia/Kolkata"
+  state                        = "ENABLED"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:rds:startDBInstance"
+    role_arn = aws_iam_role.scheduler.arn
+    input    = jsonencode({ DbInstanceIdentifier = aws_db_instance.postgres.identifier })
+  }
+}
+
+resource "aws_scheduler_schedule" "start_ec2" {
+  name                         = "collego-start-ec2"
+  description                  = "Start Collego EC2 at 07:15 IST"
+  schedule_expression          = "cron(15 7 * * ? *)"
+  schedule_expression_timezone = "Asia/Kolkata"
+  state                        = "ENABLED"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:ec2:startInstances"
+    role_arn = aws_iam_role.scheduler.arn
+    input    = jsonencode({ InstanceIds = [aws_instance.app.id] })
+  }
 }

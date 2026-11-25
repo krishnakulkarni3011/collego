@@ -28,8 +28,3 @@ output "sns_alert_topic_arn" {
   description = "SNS topic ARN for CloudWatch alarms"
   value       = aws_sns_topic.alerts.arn
 }
-
-output "lambda_backup_arn" {
-  description = "ARN of the DB backup Lambda function"
-  value       = aws_lambda_function.db_backup.arn
-}
