@@ -7,7 +7,7 @@ import {
   BarChart3, Settings, HelpCircle, Plus, GraduationCap,
   Megaphone, FileText, CheckCircle2,
   Clock, MapPin, Activity, BookMarked, Briefcase, X,
-  RefreshCw, Upload, Edit, Power, Filter, Trophy, Zap,
+  RefreshCw, Upload, Edit, Power, Filter, Trophy,
   TrendingUp, XCircle, Wallet, Home, Landmark, Download,
   UsersRound, CalendarDays, ScrollText, Layers, ChevronRight, ArrowLeft, Send,
   Paperclip, Eye,
@@ -24,6 +24,7 @@ import { HelpTab } from '../components/dashboard/HelpTab'
 import { ExamsAdminTab } from '../components/dashboard/ExamsAdminTab'
 import { PromotionTab } from '../components/dashboard/PromotionTab'
 import { GraduatedStudentsTab } from '../components/dashboard/GraduatedStudentsTab'
+import { confirmAction } from '../components/common/ConfirmDialog.jsx'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -64,11 +65,6 @@ const NAV_SECTIONS = [
     title: 'Administration',
     items: [
       { id: 'announcements', label: 'Notices & Events', icon: Megaphone },
-    ],
-  },
-  {
-    title: 'Administration',
-    items: [
       { id: 'reports', label: 'Reports', icon: BarChart3 },
       { id: 'promotion', label: 'Semester Promotion', icon: GraduationCap },
       { id: 'graduatedStudents', label: 'Graduated Students', icon: GraduationCap },
@@ -133,35 +129,6 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
 
       {/* Charts row */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        <Panel title="Attendance Overview" icon={BarChart3} accent="indigo" className="xl:col-span-5"
-          action={
-            <select
-              onChange={(e) => onSemesterChange(e.target.value || null)}
-              className="collego-input !w-auto text-xs py-2 pr-7"
-              defaultValue=""
-            >
-              <option value="">All semesters</option>
-              {(semesters || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          }
-        >
-          {attendanceChartData.length === 0 ? (
-            <EmptyState icon={BarChart3} title="No attendance data" description="Attendance will appear once records are marked." accent="indigo" />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={attendanceChartData} barSize={28} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip unit="%" />} cursor={{ fill: 'rgba(99,102,241,0.05)' }} />
-                <Bar dataKey="attendance" name="Attendance" radius={[8, 8, 0, 0]} fill="#4f46e5">
-                  {attendanceChartData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Panel>
-
         <Panel title="Student Distribution" icon={Activity} accent="violet" className="xl:col-span-3">
           {deptDistribution.length === 0 ? (
             <EmptyState icon={Activity} title="No students yet" description="Department distribution will appear here." accent="violet" />
@@ -233,7 +200,7 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
 
       {/* Notices / performers / quick actions */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        <Panel title="Recent Notices" icon={Megaphone} accent="amber" className="xl:col-span-4"
+        <Panel title="Recent Notices" icon={Megaphone} accent="amber" className="xl:col-span-12"
           action={<button onClick={() => onTabChange('announcements')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors">View All</button>}
         >
           {recentNotices.length === 0 ? (
@@ -262,56 +229,7 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
           )}
         </Panel>
 
-        <Panel title="Top Performers" icon={Trophy} accent="amber" className="xl:col-span-4"
-          action={<span className="text-[10px] text-slate-400 font-medium">Ranked by attendance</span>}
-        >
-          {topPerformers.length === 0 ? (
-            <EmptyState icon={Trophy} title="No performance data" description="Rankings build up as attendance is recorded." accent="amber" />
-          ) : (
-            <div className="space-y-2">
-              {topPerformers.map((p, i) => (
-                <motion.div key={p.studentId} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                  className="performer-item relative overflow-hidden group">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 font-bold text-[10px]"
-                    style={{ background: `${RANK_COLORS[i]}1f`, color: RANK_COLORS[i], border: `1px solid ${RANK_COLORS[i]}40` }}>
-                    {i + 1}
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shrink-0">
-                    <span className="text-[11px] font-bold text-white">{p.studentName?.[0]}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-800 truncate">{p.studentName}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{p.departmentName}{p.semester ? ` · Sem ${p.semester}` : ''}</p>
-                  </div>
-                  <div className="flex flex-col items-end shrink-0">
-                    <span className="text-sm font-bold text-emerald-600">{fmtNum(p.attendancePercentage, 0)}%</span>
-                    <div className="w-14 progress-bar mt-1" style={{ width: `${Math.min(p.attendancePercentage, 100)}%` }}>
-                      <div className="progress-bar-fill bg-emerald-500" />
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </Panel>
-
-        <Panel title="Quick Actions" icon={Zap} accent="amber" className="xl:col-span-4">
-          <div className="grid grid-cols-4 gap-3">
-            {quickActions.map((qa) => {
-              const Icon = qa.icon
-              return (
-                <button key={qa.label} onClick={() => onTabChange(qa.tab)} className="quick-action group relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                  <span className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0 relative z-10', qa.grad, 'shadow-lg')}>
-                    <Icon size={16} className="text-white" />
-                  </span>
-                  <span className="text-[10px] font-medium text-slate-600 group-hover:text-slate-900 text-center leading-tight">{qa.label}</span>
-                </button>
-              )
-            })}
-          </div>
-        </Panel>
-      </div>
+        </div>
 
       <ImageStrip
         title="Campus at a Glance"
@@ -596,6 +514,7 @@ function studentYear(user) {
 function AcademicsTab({
   users, departments, overview, semesters, deptReports,
   onCreateUser, onEditUser, onToggleActive, onReviewResume,
+  onCsvImport, importResult, onCreateDepartment,
 }) {
   const [selectedDept, setSelectedDept] = useState(null)
   const [mode, setMode] = useState(null)
@@ -605,6 +524,9 @@ function AcademicsTab({
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', enrollmentNumber: '', section: 'A', employeeId: '', designation: '', isHod: false })
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', semester: '', section: '', enrollmentNumber: '', employeeId: '', designation: '', isHod: false })
+  const [showDeptCreate, setShowDeptCreate] = useState(false)
+  const [deptForm, setDeptForm] = useState({ name: '', code: '', description: '' })
+  const [deptBusy, setDeptBusy] = useState(false)
 
   const departmentList = useMemo(() => {
     if (deptReports?.length) return deptReports
@@ -699,7 +621,8 @@ function AcademicsTab({
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {stats.map((s, i) => <StatCard key={s.label} index={i} label={s.label} value={s.value} icon={s.icon} accent={s.accent} glow />)}
       </div>
-      <Panel title="Departments" icon={Building2} accent="blue">
+      <Panel title="Departments" icon={Building2} accent="blue"
+        action={<Button variant="gradient" size="sm" onClick={() => setShowDeptCreate(v => !v)}><Plus size={14} /> {showDeptCreate ? 'Cancel' : 'Add New Department'}</Button>}>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {departmentList.map(d => (
             <button key={d.departmentId} onClick={() => openDepartment(d)}
@@ -717,6 +640,30 @@ function AcademicsTab({
           {departmentList.length === 0 && <EmptyState icon={Building2} title="No departments" accent="blue" />}
         </div>
       </Panel>
+
+      {showDeptCreate && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 border border-white/60">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2"><Plus size={15} className="text-indigo-500" /> Add New Department</h3>
+          <form onSubmit={async (e) => {
+            e.preventDefault()
+            if (!deptForm.name.trim() || !deptForm.code.trim()) return
+            setDeptBusy(true)
+            const ok = await onCreateDepartment({ name: deptForm.name.trim(), code: deptForm.code.trim().toUpperCase(), description: deptForm.description.trim() })
+            setDeptBusy(false)
+            if (ok) { setDeptForm({ name: '', code: '', description: '' }); setShowDeptCreate(false) }
+          }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Department Name</label><input value={deptForm.name} onChange={e => setDeptForm({ ...deptForm, name: e.target.value })} placeholder="e.g. Computer Science" className="collego-input" required /></div>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Code</label><input value={deptForm.code} onChange={e => setDeptForm({ ...deptForm, code: e.target.value.toUpperCase() })} placeholder="e.g. CSE" className="collego-input" required /></div>
+            <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Description</label><input value={deptForm.description} onChange={e => setDeptForm({ ...deptForm, description: e.target.value })} placeholder="Optional" className="collego-input" /></div>
+            <div className="sm:col-span-3 flex gap-3">
+              <Button type="submit" variant="gradient" size="sm" disabled={deptBusy}>{deptBusy ? <><RefreshCw size={14} className="animate-spin" /> Adding...</> : <><Plus size={14} /> Add Department</>}</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowDeptCreate(false)}>Cancel</Button>
+            </div>
+          </form>
+          <p className="text-[10px] text-slate-400 mt-3">The new department will have its own Students and Faculty sections ready for manual or CSV additions.</p>
+        </motion.div>
+      )}
+
       <div className="glass-card p-5 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2"><CalendarDays size={14} className="text-violet-500" /> Semesters</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
@@ -833,7 +780,13 @@ function AcademicsTab({
     <>
       <PageTitle icon={Users} title={`${selectedDept.departmentName} Faculty`} subtitle="Add, edit or remove faculty and review career-profile resumes."
         image={uiImages.classroom} imageAlt="Classroom lecture"
-        actions={<Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Faculty'}</Button>} />
+        actions={<>
+          <label className="flex items-center gap-2 bg-white border border-white/60 text-slate-500 text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+            <Upload size={14} /> Import CSV
+            <input type="file" accept=".csv" onChange={e => e.target.files?.[0] && onCsvImport?.(e.target.files[0])} className="hidden" />
+          </label>
+          <Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Faculty'}</Button>
+        </>} />
       {showCreate && renderCreateForm()}
       {editing && renderEditForm()}
       <div className="glass-card overflow-hidden border border-white/60">
@@ -904,7 +857,13 @@ function AcademicsTab({
     <>
       <PageTitle icon={GraduationCap} title={`${selectedDept.departmentName} Students`} subtitle="Choose a year and manage the students enrolled in it."
         image={uiImages.studentServices} imageAlt="Student services desk"
-        actions={<Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Student'}</Button>} />
+        actions={<>
+          <label className="flex items-center gap-2 bg-white border border-white/60 text-slate-500 text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+            <Upload size={14} /> Import CSV
+            <input type="file" accept=".csv" onChange={e => e.target.files?.[0] && onCsvImport?.(e.target.files[0])} className="hidden" />
+          </label>
+          <Button variant="gradient" size="sm" onClick={() => setShowCreate(v => !v)}><Plus size={14} /> {showCreate ? 'Cancel' : 'Add Student'}</Button>
+        </>} />
       <div className="flex flex-wrap gap-2">
         {YEAR_OPTIONS.map(y => (
           <button key={y.value} onClick={() => { setYear(y.value); setShowCreate(false); setEditing(null) }}
@@ -1170,12 +1129,15 @@ function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onS
   )
 }
 
-function PlacementsTab({ placementStats, notices = [], departments = [], onCreatePlacement, onDeactivatePlacement }) {
+function PlacementsTab({ placementStats, notices = [], departments = [], users = [], onCreatePlacement, onDeactivatePlacement, onCreatePlacedStudents }) {
   const s = placementStats
   const deptData = s?.departmentBreakdown || []
   const [showCreate, setShowCreate] = useState(false)
   const [busy, setBusy] = useState(false)
   const [file, setFile] = useState(null)
+  const [placedBusy, setPlacedBusy] = useState(false)
+  const [placedStudents, setPlacedStudents] = useState([])
+  const [placedForm, setPlacedForm] = useState({ studentIds: [], companyName: '', salary: '', role: '', departmentId: '' })
   const [form, setForm] = useState({
     title: '', companyName: '', driveDate: '', lastDate: '', packageOffered: '',
     description: '', eligibilityCriteria: '', departmentId: '',
@@ -1183,6 +1145,13 @@ function PlacementsTab({ placementStats, notices = [], departments = [], onCreat
 
   const today = new Date().toISOString().split('T')[0]
   const upcoming = (notices || []).filter(n => n.active && (!n.driveDate || n.driveDate >= today))
+  const studentOptions = (users || []).filter(u => u.role === 'STUDENT' && u.active)
+
+  useEffect(() => {
+    api.get('/api/placement/placed-students')
+      .then(res => setPlacedStudents(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setPlacedStudents([]))
+  }, [])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -1193,6 +1162,19 @@ function PlacementsTab({ placementStats, notices = [], departments = [], onCreat
       setForm({ title: '', companyName: '', driveDate: '', lastDate: '', packageOffered: '', description: '', eligibilityCriteria: '', departmentId: '' })
       setFile(null)
       setShowCreate(false)
+    }
+  }
+
+  const submitPlaced = async () => {
+    if (!placedForm.studentIds.length || !placedForm.companyName.trim()) return
+    setPlacedBusy(true)
+    const ok = await onCreatePlacedStudents(placedForm)
+    setPlacedBusy(false)
+    if (ok) {
+      setPlacedForm({ studentIds: [], companyName: '', salary: '', role: '', departmentId: '' })
+      api.get('/api/placement/placed-students')
+        .then(res => setPlacedStudents(Array.isArray(res.data) ? res.data : []))
+        .catch(() => {})
     }
   }
 
@@ -1297,19 +1279,45 @@ function PlacementsTab({ placementStats, notices = [], departments = [], onCreat
             </div>
           )}
         </Panel>
-        <Panel title="Top Recruiters" icon={Award} accent="amber">
-          <div className="space-y-2">
-            {(s?.topCompanies || []).map((c, i) => (
-              <div key={c.companyId} className="flex items-center gap-3 p-3.5 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-colors">
-                <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-bold shrink-0 shadow-sm shadow-amber-500/10">{i + 1}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{c.companyName}</p>
-                  <p className="text-[10px] text-slate-400">Highest {c.highestPackage || '—'}</p>
-                </div>
-                <span className="text-sm font-bold text-slate-700">{c.offersExtended}</span>
+        <Panel title="Placed Students" icon={Trophy} accent="amber">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Students (multiple)</label>
+                <select multiple value={placedForm.studentIds.map(String)}
+                  onChange={e => setPlacedForm({ ...placedForm, studentIds: Array.from(e.target.selectedOptions).map(o => Number(o.value)) })}
+                  className="collego-input !h-32">
+                  {studentOptions.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName} - {u.usn || u.enrollmentNumber || u.email}</option>)}
+                </select>
               </div>
-            ))}
-            {(!s?.topCompanies || s.topCompanies.length === 0) && <EmptyState icon={Award} title="No recruiters yet" accent="amber" />}
+              <div className="grid grid-cols-1 gap-3">
+                <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Company Name</label><input value={placedForm.companyName} onChange={e => setPlacedForm({ ...placedForm, companyName: e.target.value })} placeholder="Company" className="collego-input" /></div>
+                <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Salary</label><input value={placedForm.salary} onChange={e => setPlacedForm({ ...placedForm, salary: e.target.value })} placeholder="e.g. 8 LPA" className="collego-input" /></div>
+                <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Role</label><input value={placedForm.role} onChange={e => setPlacedForm({ ...placedForm, role: e.target.value })} placeholder="e.g. Software Engineer" className="collego-input" /></div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Department (optional)</label>
+                  <select value={placedForm.departmentId} onChange={e => setPlacedForm({ ...placedForm, departmentId: e.target.value })} className="collego-input">
+                    <option value="">Use student department</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+                <Button variant="gradient" size="sm" onClick={submitPlaced} disabled={placedBusy || !placedForm.companyName.trim() || !placedForm.studentIds.length}>
+                  {placedBusy ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><Plus size={14} /> Add Placed Students</>}
+                </Button>
+              </div>
+            </div>
+            <div className="divide-y divide-white/60 rounded-xl border border-white/60 bg-white/50 max-h-72 overflow-y-auto">
+              {placedStudents.length === 0 ? (
+                <p className="p-4 text-xs text-slate-400">No placed students recorded yet.</p>
+              ) : placedStudents.map(p => (
+                <div key={p.id} className="flex items-center justify-between gap-3 p-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-800 truncate">{p.name} <span className="text-slate-400 font-normal">({p.usn})</span></p>
+                    <p className="text-[10px] text-slate-400">{p.companyName} - {p.role || 'Role N/A'} - {p.salary || 'Salary N/A'} - {p.department || 'N/A'}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </Panel>
       </div>
@@ -1613,6 +1621,19 @@ export default function AdminDashboard() {
     }
   }
 
+  const onCreateDepartment = async (payload) => {
+    try {
+      await api.post('/api/admin/departments', payload)
+      showMsg(`Department '${payload.name}' added with empty Students and Faculty sections`)
+      loadUsers()
+      loadAll()
+      return true
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to add department', 'error')
+      return false
+    }
+  }
+
   const onEditUser = async (id, payload) => {
     try {
       await api.put(`/api/admin/users/${id}`, payload)
@@ -1627,6 +1648,11 @@ export default function AdminDashboard() {
   }
 
   const onToggleActive = async (user) => {
+    if (user.active && !await confirmAction({
+      title: 'Deactivate this account?',
+      message: `${user.firstName} ${user.lastName} will no longer be able to sign in. Their records remain stored.`,
+      confirmLabel: 'Deactivate',
+    })) return
     const url = `/api/admin/users/${user.id}/${user.active ? 'deactivate' : 'activate'}`
     try {
       await api.put(url)
@@ -1688,7 +1714,26 @@ export default function AdminDashboard() {
     }
   }
 
+  const onCreatePlacedStudents = async (payload) => {
+    try {
+      await api.post('/api/placement/placed-students', {
+        studentIds: payload.studentIds,
+        companyName: payload.companyName,
+        salary: payload.salary || null,
+        role: payload.role || null,
+        departmentId: payload.departmentId ? Number(payload.departmentId) : null,
+      })
+      showMsg(`${payload.studentIds.length} student(s) recorded as placed at ${payload.companyName}`)
+      await loadAll()
+      return true
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to record placements', 'error')
+      return false
+    }
+  }
+
   const onDeactivatePlacement = async (id) => {
+    if (!await confirmAction({ title: 'Remove this placement drive?', message: 'The drive will be removed from upcoming listings.', confirmLabel: 'Remove' })) return
     try {
       await api.put(`/api/placement/notices/${id}/deactivate`)
       showMsg('Placement drive removed')
@@ -1699,6 +1744,11 @@ export default function AdminDashboard() {
   }
 
   const onCsvImport = async (file) => {
+    if (!await confirmAction({
+      title: 'Import users from CSV?',
+      message: `This will create user accounts from '${file.name}'. This action cannot be undone automatically.`,
+      confirmLabel: 'Import',
+    })) return
     const fd = new FormData(); fd.append('file', file)
     setLoading(true)
     try {
@@ -1716,9 +1766,9 @@ export default function AdminDashboard() {
   const renderTab = () => {
     switch (activeTab) {
       case 'overview': return <OverviewTab overview={overview} deptReports={deptReports} attendanceSummary={attendanceSummary} placementStats={placementStats} insights={insights} semesters={semesters} onTabChange={setActiveTab} onSemesterChange={handleSemesterChange} />
-      case 'academics': return <AcademicsTab users={users} departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onReviewResume={onReviewResume} />
+      case 'academics': return <AcademicsTab users={users} departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onReviewResume={onReviewResume} onCsvImport={onCsvImport} importResult={importResult} onCreateDepartment={onCreateDepartment} />
       case 'examinations': return <ExamsAdminTab showMsg={showMsg} />
-      case 'placements': return <PlacementsTab placementStats={placementStats} notices={placementNotices} departments={departments} onCreatePlacement={onCreatePlacement} onDeactivatePlacement={onDeactivatePlacement} />
+      case 'placements': return <PlacementsTab placementStats={placementStats} notices={placementNotices} departments={departments} users={users} onCreatePlacement={onCreatePlacement} onDeactivatePlacement={onDeactivatePlacement} onCreatePlacedStudents={onCreatePlacedStudents} />
       case 'broadcasts': return <BroadcastCenterTab broadcasts={broadcasts} users={users} departments={departments} onSend={handleSendBroadcast} />
       case 'reports': return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} departments={departments} />
       case 'promotion': return <PromotionTab semesters={semesters} showMsg={showMsg} />
