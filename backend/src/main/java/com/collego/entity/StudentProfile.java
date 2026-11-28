@@ -3,6 +3,8 @@ package com.collego.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "student_profiles")
 @Getter
@@ -33,6 +35,13 @@ public class StudentProfile {
     private String division;
 
     private Integer admissionYear;
+
+    /** ACTIVE, PROMOTED, HELD_BACK or GRADUATED. Null is treated as ACTIVE. */
+    @Column(name = "promotion_status")
+    private String promotionStatus;
+
+    @Column(name = "graduated_at")
+    private LocalDateTime graduatedAt;
 
     /**
      * True when this student is the class representative for their

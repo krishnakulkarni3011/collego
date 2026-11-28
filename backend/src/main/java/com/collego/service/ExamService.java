@@ -47,10 +47,15 @@ public class ExamService {
     private final CourseRepository courseRepository;
     private final SectionRepository sectionRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final AttendanceRepository attendanceRepository;
+    private final SemesterMarksRepository semesterMarksRepository;
     private final StudentProfileRepository studentProfileRepository;
     private final FacultyProfileRepository facultyProfileRepository;
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
+    private final PromotionBatchRepository promotionBatchRepository;
+    private final PromotionRecordRepository promotionRecordRepository;
+    private final GraduatedStudentService graduatedStudentService;
     private final EmailService emailService;
 
     // ==================== Exams (admin) ====================
@@ -441,7 +446,224 @@ public class ExamService {
         return mapRevaluation(entity);
     }
 
-    // ==================== Promotion ====================
+    // ==================== Batch Promotion ====================
+
+    @Transactional(readOnly = true)
+    public List<PromotionStudentResponse> previewPromotionBatch(Long fromId, Long toId) {
+        Semester from = validatePromotionPair(fromId, toId);
+        String defaultOutcome = from.getNumber() == 8 ? "GRADUATE" : "PROMOTE";
+        return studentsInSemester(from.getNumber()).stream()
+                .filter(s -> !"GRADUATED".equalsIgnoreCase(s.getPromotionStatus()))
+                .map(s -> PromotionStudentResponse.builder()
+                        .studentId(s.getId())
+                        .name(s.getUser() != null
+                                ? (s.getUser().getFirstName() + " " + s.getUser().getLastName()).trim()
+                                : s.getEnrollmentNumber())
+                        .usn(s.getEnrollmentNumber())
+                        .departmentName(s.getDepartment() != null ? s.getDepartment().getName() : "N/A")
+                        .section(s.getSection())
+                        .attendancePercentage(attendancePercentage(s))
+                        .backlogCount(backlogCount(s))
+                        .defaultOutcome(defaultOutcome)
+                        .build())
+                .sorted(Comparator.comparing(PromotionStudentResponse::getDepartmentName,
+                        Comparator.nullsLast(String::compareTo))
+                        .thenComparing(PromotionStudentResponse::getUsn,
+                                Comparator.nullsLast(String::compareTo)))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public PromotionResultResponse executePromotion(PromotionRequest request) {
+        Semester from = validatePromotionPair(request.getFromSemesterId(), request.getToSemesterId());
+        Semester to = semesterRepository.findById(request.getToSemesterId())
+                .orElseThrow(() -> new ResourceNotFoundException("Target semester not found"));
+        String academicYear = request.getAcademicYear() != null && !request.getAcademicYear().isBlank()
+                ? request.getAcademicYear().trim()
+                : (from.getNumber() == 8 ? from.getAcademicYear() : to.getAcademicYear());
+
+        if (promotionBatchRepository.existsByFromSemesterAndAcademicYear(from.getNumber(), academicYear)) {
+            throw new BadRequestException("A promotion batch already exists for semester "
+                    + from.getNumber() + " and academic year " + academicYear);
+        }
+
+        Set<Long> heldBackIds = request.getHeldBackStudentIds() == null
+                ? Collections.emptySet()
+                : new HashSet<>(request.getHeldBackStudentIds());
+        Map<Long, String> notes = request.getNotes() == null ? Collections.emptyMap() : request.getNotes();
+        List<StudentProfile> students = studentsInSemester(from.getNumber()).stream()
+                .filter(s -> !"GRADUATED".equalsIgnoreCase(s.getPromotionStatus()))
+                .collect(Collectors.toList());
+        List<Section> targetSections = sectionRepository.findBySemesterId(to.getId());
+
+        PromotionBatch batch = promotionBatchRepository.save(PromotionBatch.builder()
+                .fromSemester(from.getNumber())
+                .toSemester(to.getNumber())
+                .academicYear(academicYear)
+                .totalStudents(students.size())
+                .build());
+
+        int promoted = 0;
+        int heldBack = 0;
+        int graduated = 0;
+        int skipped = 0;
+
+        for (StudentProfile student : students) {
+            String note = notes.get(student.getId());
+            if (heldBackIds.contains(student.getId())) {
+                student.setPromotionStatus("HELD_BACK");
+                studentProfileRepository.save(student);
+                promotionRecordRepository.save(PromotionRecord.builder()
+                        .batch(batch).student(student).outcome("HELD_BACK")
+                        .fromSemester(from.getNumber()).toSemester(from.getNumber()).note(note).build());
+                notifyStudent(student, "Promotion result",
+                        "You have been held back in semester " + from.getNumber()
+                                + (note != null && !note.isBlank() ? ". Reason: " + note : "."));
+                heldBack++;
+                continue;
+            }
+
+            if (from.getNumber() == 8) {
+                closeActiveEnrollments(student);
+                student.setPromotionStatus("GRADUATED");
+                student.setGraduatedAt(LocalDateTime.now());
+                studentProfileRepository.save(student);
+                graduatedStudentService.recordGraduation(student, academicYear);
+                promotionRecordRepository.save(PromotionRecord.builder()
+                        .batch(batch).student(student).outcome("GRADUATED")
+                        .fromSemester(8).toSemester(8).note(note).build());
+                notifyStudent(student, "Congratulations - Graduated",
+                        "You have graduated from " + (student.getDepartment() != null
+                                ? student.getDepartment().getName() : "your department") + ".");
+                graduated++;
+                continue;
+            }
+
+            // Promote: close current enrollments and enroll into target-semester sections.
+            closeActiveEnrollments(student);
+            List<Section> sections = targetSections.stream()
+                    .filter(sec -> sec.getCourse() != null && sec.getCourse().getDepartment() != null
+                            && student.getDepartment() != null
+                            && sec.getCourse().getDepartment().getId().equals(student.getDepartment().getId()))
+                    .collect(Collectors.toList());
+            Map<Long, Section> byCourse = new LinkedHashMap<>();
+            for (Section section : sections) {
+                Section current = byCourse.get(section.getCourse().getId());
+                if (current == null || (section.getName() != null
+                        && section.getName().equalsIgnoreCase(student.getSection()))) {
+                    byCourse.put(section.getCourse().getId(), section);
+                }
+            }
+            for (Section section : byCourse.values()) {
+                if (!enrollmentRepository.existsByStudentIdAndSectionId(student.getId(), section.getId())) {
+                    enrollmentRepository.save(Enrollment.builder()
+                            .student(student).section(section).status(EnrollmentStatus.ACTIVE).build());
+                }
+            }
+            if (byCourse.isEmpty()) {
+                skipped++;
+            }
+            student.setSemester(to.getNumber());
+            student.setPromotionStatus("PROMOTED");
+            studentProfileRepository.save(student);
+            promotionRecordRepository.save(PromotionRecord.builder()
+                    .batch(batch).student(student).outcome("PROMOTED")
+                    .fromSemester(from.getNumber()).toSemester(to.getNumber()).note(note).build());
+            notifyStudent(student, "Semester promoted",
+                    "You have been promoted to semester " + to.getNumber() + ".");
+            promoted++;
+        }
+
+        batch.setPromoted(promoted);
+        batch.setHeldBack(heldBack);
+        batch.setGraduated(graduated);
+        promotionBatchRepository.save(batch);
+
+        return PromotionResultResponse.builder()
+                .batchId(batch.getId())
+                .fromSemester(from.getName())
+                .toSemester(to.getName())
+                .totalStudents(students.size())
+                .promoted(promoted)
+                .heldBack(heldBack)
+                .graduated(graduated)
+                .skipped(skipped)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PromotionBatchResponse> promotionHistory() {
+        return promotionBatchRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(b -> PromotionBatchResponse.builder()
+                        .id(b.getId())
+                        .fromSemester(b.getFromSemester())
+                        .toSemester(b.getToSemester())
+                        .academicYear(b.getAcademicYear())
+                        .status(b.getStatus())
+                        .totalStudents(b.getTotalStudents())
+                        .promoted(b.getPromoted())
+                        .heldBack(b.getHeldBack())
+                        .graduated(b.getGraduated())
+                        .createdBy(b.getCreatedBy())
+                        .createdAt(b.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    private Semester validatePromotionPair(Long fromId, Long toId) {
+        Semester from = semesterRepository.findById(fromId)
+                .orElseThrow(() -> new ResourceNotFoundException("Source semester not found"));
+        Semester to = semesterRepository.findById(toId)
+                .orElseThrow(() -> new ResourceNotFoundException("Target semester not found"));
+        if (from.getNumber() == 8) {
+            if (to.getNumber() != 8) {
+                throw new BadRequestException("Semester 8 students are graduated, not promoted to another semester.");
+            }
+        } else if (to.getNumber() != from.getNumber() + 1) {
+            throw new BadRequestException("The target semester must be exactly one semester after the source.");
+        }
+        return from;
+    }
+
+    private void closeActiveEnrollments(StudentProfile student) {
+        for (Enrollment enrollment : enrollmentRepository.findByStudentIdAndStatus(
+                student.getId(), EnrollmentStatus.ACTIVE)) {
+            enrollment.setStatus(EnrollmentStatus.COMPLETED);
+            enrollmentRepository.save(enrollment);
+        }
+    }
+
+    private void notifyStudent(StudentProfile student, String title, String message) {
+        if (student.getUser() == null) return;
+        notificationRepository.save(Notification.builder()
+                .user(student.getUser())
+                .title(title)
+                .message(message)
+                .type(NotificationType.ACADEMIC)
+                .category(NotificationCategory.NOTICE)
+                .build());
+    }
+
+    private double attendancePercentage(StudentProfile student) {
+        long total = 0;
+        long present = 0;
+        for (Enrollment enrollment : enrollmentRepository.findByStudentId(student.getId())) {
+            Long sectionId = enrollment.getSection() != null ? enrollment.getSection().getId() : null;
+            if (sectionId == null) continue;
+            total += attendanceRepository.countByStudentIdAndSectionId(student.getId(), sectionId);
+            present += attendanceRepository.countByStudentIdAndSectionIdAndStatus(
+                    student.getId(), sectionId, AttendanceStatus.PRESENT);
+        }
+        return total > 0 ? Math.round((present * 10000.0) / total) / 100.0 : 0.0;
+    }
+
+    private int backlogCount(StudentProfile student) {
+        return (int) semesterMarksRepository.findByStudentId(student.getId()).stream()
+                .filter(m -> m.getGrade() == null || "F".equalsIgnoreCase(m.getGrade()))
+                .count();
+    }
+
+    // ==================== Promotion (legacy) ====================
 
     public Map<String, Object> previewPromotion(Long fromSemesterId, Long toSemesterId) {
         Semester from = getSemester(fromSemesterId);

@@ -102,4 +102,22 @@ public class ExamAdminController {
             @RequestParam Long toSemesterId) {
         return ResponseEntity.ok(examService.promoteStudents(fromSemesterId, toSemesterId));
     }
+
+    @GetMapping("/promotion/preview-batch")
+    public ResponseEntity<List<PromotionStudentResponse>> previewBatch(
+            @RequestParam Long fromSemesterId,
+            @RequestParam Long toSemesterId) {
+        return ResponseEntity.ok(examService.previewPromotionBatch(fromSemesterId, toSemesterId));
+    }
+
+    @PostMapping("/promotion/run")
+    public ResponseEntity<PromotionResultResponse> runPromotion(
+            @Valid @RequestBody PromotionRequest request) {
+        return ResponseEntity.ok(examService.executePromotion(request));
+    }
+
+    @GetMapping("/promotion/history")
+    public ResponseEntity<List<PromotionBatchResponse>> promotionHistory() {
+        return ResponseEntity.ok(examService.promotionHistory());
+    }
 }
