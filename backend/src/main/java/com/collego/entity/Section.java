@@ -38,6 +38,11 @@ public class Section {
     @Column(nullable = false)
     private Integer maxCapacity = 60;
 
+    /** Hidden internal sections (e.g. open elective) are not shown as teaching sections. */
+    @Builder.Default
+    @Column(name = "is_hidden", nullable = false)
+    private boolean hidden = false;
+
     private String maleClassRep;
 
     private String femaleClassRep;
