@@ -105,6 +105,12 @@ public class CampusEventService {
         eventRepository.save(event);
     }
 
+    public String getPosterContentType(Long id) {
+        CampusEvent event = eventRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found: " + id));
+        return event.getPosterContentType() != null ? event.getPosterContentType() : "image/png";
+    }
+
     public byte[] downloadPoster(Long id) throws IOException {
         CampusEvent event = eventRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Event not found: " + id));
@@ -121,6 +127,7 @@ public class CampusEventService {
                 .description(event.getDescription())
                 .eventDate(event.getEventDate())
                 .posterName(event.getPosterName())
+                .posterContentType(event.getPosterContentType())
                 .posterUrl("/api/events/" + event.getId() + "/poster")
                 .active(event.isActive())
                 .createdAt(event.getCreatedAt())

@@ -56,7 +56,7 @@ public class CampusEventController {
     public ResponseEntity<byte[]> poster(@PathVariable Long id) throws IOException {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentType(MediaType.parseMediaType(eventService.getPosterContentType(id)))
                 .body(eventService.downloadPoster(id));
     }
 }

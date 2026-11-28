@@ -15,6 +15,7 @@ public class CampusEventResponse {
     private String description;
     private LocalDate eventDate;
     private String posterName;
+    private String posterContentType;
     private String posterUrl;
     private boolean active;
     private LocalDateTime createdAt;
