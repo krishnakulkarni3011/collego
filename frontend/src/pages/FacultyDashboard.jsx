@@ -7,7 +7,7 @@ import {
   BarChart3, FolderOpen, Plus, CheckCircle2, X, Send,
   ArrowLeft, Clock, Upload, Download, RefreshCw, Zap, Layers, Award,
   BookUser, Settings, HelpCircle, CalendarDays, Eye, Paperclip, Trash2,
-  Crown, CalendarOff, Briefcase
+  Crown, CalendarOff, Briefcase, ListTodo
 } from 'lucide-react'
 import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -80,6 +80,7 @@ const GLOBAL_NAV = [
   { id: 'placements', label: 'Upcoming Placements', icon: Briefcase },
   { id: 'invigilations', label: 'Invigilation Duties', icon: CalendarDays },
   { id: 'notices', label: 'Notices', icon: Megaphone },
+  { id: 'reminders', label: 'My Reminders', icon: ListTodo },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'help', label: 'Help & Support', icon: HelpCircle },
 ]
@@ -98,7 +99,6 @@ const SECTION_TABS = [
   { id: 'assignments', label: 'Assignments', icon: BookOpen },
   { id: 'assignmentMarks', label: 'Assignment Marks', icon: ClipboardList },
   { id: 'materials', label: 'Materials', icon: FolderOpen },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
 ]
 
 // ─── Overview ────────────────────────────────────────────────────────────────
@@ -170,14 +170,11 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
         )}
       </Panel>
 
-      <Panel title="Available Features" icon={Zap} accent="amber" hover>
+      <Panel title="My Reminders" icon={ListTodo} accent="emerald" hover>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
-            { icon: ClipboardCheck, label: 'Mark Attendance', desc: 'Bulk per-session entry', accent: 'emerald' },
-            { icon: BookMarked, label: 'Internal Marks', desc: 'IA-1, IA-2, IA-3 upload', accent: 'violet' },
-            { icon: GraduationCap, label: 'Semester Marks', desc: 'Auto grade calculation', accent: 'blue' },
-            { icon: Users, label: 'Student Performance', desc: 'Combined view per student', accent: 'emerald' },
-            { icon: BookOpen, label: 'Assignments', desc: 'Create & track assignments', accent: 'amber' },
+            { icon: CheckCircle2, label: 'Mark task complete', desc: 'Tick off a personal or assigned task', accent: 'emerald' },
+            { icon: Clock, label: 'Upcoming deadlines', desc: 'View assignment/assessment due dates', accent: 'amber' },
           ].map(f => {
             const Icon = f.icon
             const a = ACCENTS[f.accent]
@@ -219,8 +216,7 @@ function SectionHeader({ section, activeTab, onTabChange, onBack }) {
     studentPerformance: uiImages.groupStudy,
     assignments: uiImages.groupStudy,
     materials: uiImages.library,
-    analytics: uiImages.onlineLearning,
-  }[activeTab]
+    }[activeTab]
 
   return (
     <div className="mb-6">
@@ -1264,9 +1260,37 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, targe
 }
 
 // ─── Subject Assignments Tab ─────────────────────────────────────────────────────
-function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove, selectedSemesterId, setSelectedSemesterId, courseName, setCourseName, credits, setCredits }) {
+function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove, selectedSemesterId, setSelectedSemesterId, courseName, setCourseName, credits, setCredits, divisionFilter, setDivisionFilter, loadFromAllDepartments, setLoadFromAllDepartments, onOpenElective, openElectiveLoading }) {
   const selectedSemester = semesters.find(s => String(s.id) === String(selectedSemesterId))
   const selectedYear = semesterYear(selectedSemester?.number)
+  const [oeCourseName, setOeCourseName] = useState('')
+  const [oeCredits, setOeCredits] = useState('4')
+  const [oeSemesterId, setOeSemesterId] = useState('')
+  const [oeStudents, setOeStudents] = useState([])
+  const [oeSelected, setOeSelected] = useState([])
+  const [oeLoadingStudents, setOeLoadingStudents] = useState(false)
+  const [oeQuery, setOeQuery] = useState('')
+
+  useEffect(() => {
+    if (!oeStudents.length) {
+      setOeLoadingStudents(true)
+      api.get('/api/faculty/all-students')
+        .then(res => setOeStudents(Array.isArray(res.data) ? res.data : []))
+        .catch(() => setOeStudents([]))
+        .finally(() => setOeLoadingStudents(false))
+    }
+  }, [oeStudents.length])
+
+  const filteredOeStudents = oeStudents.filter(s => {
+    if (!oeQuery.trim()) return true
+    const q = oeQuery.toLowerCase()
+    return (s.name || '').toLowerCase().includes(q)
+      || (s.enrollmentNumber || '').toLowerCase().includes(q)
+      || (s.departmentName || '').toLowerCase().includes(q)
+  })
+
+  const toggleOeStudent = (id) => setOeSelected(prev =>
+    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
   return (
     <div className="space-y-6">
@@ -1276,7 +1300,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
 
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={14} className="text-violet-500" /> Assign New Subject</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Name (type any course)</label>
             <input
@@ -1299,6 +1323,32 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
               className="collego-input"
             />
             <p className="text-[10px] text-slate-400 mt-1">Credit value saved on the subject (1–12).</p>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Division</label>
+            <select value={divisionFilter} onChange={e => setDivisionFilter(e.target.value)} className="collego-input">
+              <option value="">All Divisions</option>
+              {'A B C D E'.split(' ').map(div => <option key={div} value={div}>{div}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Load From</label>
+            <label className="flex items-center gap-2 mb-1">
+              <input
+                type="radio"
+                checked={!loadFromAllDepartments}
+                onChange={() => setLoadFromAllDepartments(false)}
+                className="rounded w-4 h-4 cursor-pointer"
+              /> Department
+            </label>
+            <label className="flex items-center gap-2 mb-1">
+              <input
+                type="radio"
+                checked={loadFromAllDepartments}
+                onChange={() => setLoadFromAllDepartments(true)}
+                className="rounded w-4 h-4 cursor-pointer"
+              /> All Departments
+            </label>
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Semester</label>
@@ -1372,6 +1422,61 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
           <p className="text-xs text-slate-400">Assign yourself to courses using the form above</p>
         </div>
       )}
+
+      {/* Open Elective / Backlog cross-department student picker */}
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-1 flex items-center gap-2">
+          <Layers size={15} className="text-violet-500" /> Open Elective Subject
+        </h3>
+        <p className="text-[11px] text-slate-400 mb-5">
+          Add an elective subject and hand-pick students from any department — useful for backlog and open-elective batches.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Subject Name</label>
+            <input value={oeCourseName} onChange={e => setOeCourseName(e.target.value)} placeholder="e.g. Open Elective — Cyber Security" className="collego-input" />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Credits</label>
+            <input type="number" min="1" max="12" value={oeCredits} onChange={e => setOeCredits(e.target.value)} className="collego-input" />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Semester</label>
+            <select value={oeSemesterId} onChange={e => setOeSemesterId(e.target.value)} className="collego-input">
+              <option value="">Select semester</option>
+              {semesters.map(s => <option key={s.id} value={s.id}>{s.name} ({s.academicYear})</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
+            Students across departments <Badge variant="secondary" className="ml-2">{oeSelected.length} selected</Badge>
+          </label>
+          <input value={oeQuery} onChange={e => setOeQuery(e.target.value)} placeholder="Search by name, USN or department..." className="collego-input mb-3" />
+          <div className="max-h-64 overflow-y-auto rounded-xl border border-white/60 bg-white/50 divide-y divide-white/50">
+            {oeLoadingStudents ? (
+              <div className="p-6 text-center text-xs text-slate-400"><RefreshCw size={14} className="animate-spin mx-auto mb-2" /> Loading students...</div>
+            ) : filteredOeStudents.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400">No students found.</div>
+            ) : filteredOeStudents.map(s => (
+              <label key={s.studentId} className="flex items-center gap-3 px-3 py-2 hover:bg-white/70 cursor-pointer">
+                <input type="checkbox" checked={oeSelected.includes(s.studentId)} onChange={() => toggleOeStudent(s.studentId)} className="rounded w-4 h-4 cursor-pointer" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-slate-700 truncate">{s.name}</p>
+                  <p className="text-[10px] text-slate-400">{s.enrollmentNumber} · {s.departmentName} · {s.section ? `Sec ${s.section}` : `Year ${s.year || '—'}`}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <Button variant="gradient" size="sm" className="mt-4 px-5"
+          disabled={openElectiveLoading || !oeCourseName.trim() || !oeSemesterId || !Number(oeCredits) || oeSelected.length === 0}
+          onClick={() => onOpenElective({ courseName: oeCourseName.trim(), semesterId: parseInt(oeSemesterId), credits: Number(oeCredits), studentIds: oeSelected })}>
+          {openElectiveLoading ? <><RefreshCw size={14} className="animate-spin" /> Creating...</> : <><Plus size={13} /> Create Open Elective &amp; Add Students</>}
+        </Button>
+      </div>
     </div>
   )
 }
@@ -1700,6 +1805,75 @@ function HodTimetablesTab({ showMsg }) {
   )
 }
 
+// ─── Personal Reminders ──────────────────────────────────────────────────────
+function RemindersTab({ facultyReminders = [], loading, onCreate, onToggle, onDelete }) {
+  const [title, setTitle] = useState('')
+  const [busy, setBusy] = useState(false)
+  const pending = facultyReminders.filter(r => !r.completed).length
+
+  const submit = async (e) => {
+    e.preventDefault()
+    const value = title.trim()
+    if (!value || busy) return
+    setBusy(true)
+    try {
+      await onCreate(value)
+      setTitle('')
+    } catch { /* toast is shown by the parent */ } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={ListTodo} title="My Reminders" subtitle="Personal tasks and reminders. Tick them off once completed." accent="emerald"
+        actions={facultyReminders.length > 0 ? <Badge variant={pending ? 'warning' : 'success'}>{pending ? `${pending} pending` : 'All done'}</Badge> : undefined} />
+
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
+          <Plus size={15} className="text-emerald-500" /> Add a reminder
+        </h3>
+        <form onSubmit={submit} className="flex flex-col sm:flex-row gap-3">
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Submit q-paper by Friday" maxLength={200} className="collego-input flex-1" />
+          <Button type="submit" variant="gradient" disabled={!title.trim() || busy}>
+            {busy ? <><RefreshCw size={14} className="animate-spin" /> Adding...</> : <><Plus size={14} /> Add Reminder</>}
+          </Button>
+        </form>
+      </div>
+
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
+          <ListTodo size={15} className="text-emerald-500" /> To be completed
+        </h3>
+        {loading ? (
+          <div className="flex items-center justify-center py-10"><Spinner color="emerald" /></div>
+        ) : facultyReminders.length === 0 ? (
+          <EmptyState icon={ListTodo} title="No reminders yet" accent="emerald" description="Add your first personal task above." />
+        ) : (
+          <div className="divide-y divide-white/60">
+            {facultyReminders.map(r => (
+              <div key={r.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <button type="button" onClick={() => onToggle(r.id)} aria-label={r.completed ? 'Mark as pending' : 'Mark as completed'}
+                  className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
+                    r.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-emerald-500')}>
+                  {r.completed && <CheckCircle2 size={14} />}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className={cn('text-sm', r.completed ? 'line-through text-slate-400' : 'text-slate-700')}>{r.title}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Added {fmtDate(r.createdAt)}{r.completedAt ? ` · Completed ${fmtDate(r.completedAt)}` : ''}</p>
+                </div>
+                <button type="button" onClick={() => onDelete(r.id)} aria-label="Delete reminder" className="text-slate-300 hover:text-red-500 transition-colors p-1">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Faculty Dashboard ──────────────────────────────────────────────────
 export default function FacultyDashboard() {
   const navigate = useNavigate()
@@ -1782,11 +1956,50 @@ export default function FacultyDashboard() {
   const [selectedSemesterId, setSelectedSemesterId] = useState('')
   const [newCourseName, setNewCourseName] = useState('')
   const [newCourseCredits, setNewCourseCredits] = useState('4')
+  const [divisionFilter, setDivisionFilter] = useState('')
+  const [loadFromAllDepartments, setLoadFromAllDepartments] = useState(false)
   const [subjectAssignmentsLoading, setSubjectAssignmentsLoading] = useState(false)
+
+  // Personal Reminders
+  const [facultyReminders, setFacultyReminders] = useState([])
+  const [facultyRemindersLoading, setFacultyRemindersLoading] = useState(true)
 
   const sidebarWidth = collapsed ? 76 : 248
   const facultyDepartmentName = sections.find(s => s.departmentName)?.departmentName || 'your department'
   const showMsg = useCallback((text, type = 'success') => setMessage({ text, type }), [])
+
+  const remindersKey = `collego-faculty-reminders-${email || 'faculty'}`
+  const loadFacultyReminders = useCallback(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(remindersKey) || '[]')
+      setFacultyReminders(Array.isArray(stored) ? stored : [])
+    } catch { setFacultyReminders([]) }
+    finally { setFacultyRemindersLoading(false) }
+  }, [remindersKey])
+
+  useEffect(() => { loadFacultyReminders() }, [loadFacultyReminders])
+
+  const persistFacultyReminders = useCallback((list) => {
+    setFacultyReminders(list)
+    try { localStorage.setItem(remindersKey, JSON.stringify(list)) } catch { /* ignore */ }
+  }, [remindersKey])
+
+  const handleCreateReminder = useCallback((title) => {
+    const reminder = { id: Date.now(), title, completed: false, createdAt: new Date().toISOString(), completedAt: null }
+    persistFacultyReminders([reminder, ...facultyReminders])
+    showMsg('Reminder added')
+  }, [facultyReminders, persistFacultyReminders, showMsg])
+
+  const handleToggleReminder = useCallback((id) => {
+    persistFacultyReminders(facultyReminders.map(r => r.id === id
+      ? { ...r, completed: !r.completed, completedAt: !r.completed ? new Date().toISOString() : null }
+      : r))
+  }, [facultyReminders, persistFacultyReminders])
+
+  const handleDeleteReminder = useCallback((id) => {
+    persistFacultyReminders(facultyReminders.filter(r => r.id !== id))
+    showMsg('Reminder deleted')
+  }, [facultyReminders, persistFacultyReminders, showMsg])
 
   const fetchSections = useCallback(async () => {
     setLoading(true)
@@ -2308,7 +2521,7 @@ export default function FacultyDashboard() {
     }
     setSubjectAssignmentsLoading(true)
     try {
-      const res = await api.post('/api/faculty/subject-assignments', { courseName: newCourseName.trim(), semesterId: parseInt(selectedSemesterId), credits })
+      const res = await api.post('/api/faculty/subject-assignments', { courseName: newCourseName.trim(), semesterId: parseInt(selectedSemesterId), credits, divisionFilter, loadFromAllDepartments })
       const studentCount = res.data?.studentCount ?? 0
       const yearLabel = res.data?.yearLabel || targetYearLabel(res.data?.year)
       const sectionCount = res.data?.sectionCount ?? 0
@@ -2318,7 +2531,9 @@ export default function FacultyDashboard() {
       await Promise.all([loadMySubjectAssignments(), fetchSections()])
       showMsg(studentCount > 0
         ? `Subject assigned — ${studentCount} ${yearLabel} students loaded into ${sectionCount} section${sectionCount === 1 ? '' : 's'}. Open the subject under My Sections to manage them.`
-        : `Subject assigned, but no ${yearLabel} students were found in your department yet.`)
+        : loadFromAllDepartments
+          ? `Subject assigned from all departments — no students found across all departments.`
+          : `Subject assigned, but no ${yearLabel} students were found in your department yet.`)
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to assign subject', 'error') }
     finally { setSubjectAssignmentsLoading(false) }
   }
@@ -2332,6 +2547,18 @@ export default function FacultyDashboard() {
       fetchSections()
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to remove assignment', 'error') }
     finally { setSubjectAssignmentsLoading(false) }
+  }
+
+  const handleOpenElective = async (payload) => {
+    setSubjectAssignmentsLoading(true)
+    try {
+      const res = await api.post('/api/faculty/open-elective', payload)
+      const count = res.data?.studentCount ?? 0
+      showMsg(`Open elective created — ${count} cross-department student${count === 1 ? '' : 's'} added.`)
+      await Promise.all([loadMySubjectAssignments(), fetchSections()])
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to create open elective', 'error')
+    } finally { setSubjectAssignmentsLoading(false) }
   }
 
   useEffect(() => {
@@ -2378,7 +2605,7 @@ export default function FacultyDashboard() {
     if (!selectedSection) {
       switch (activeTab) {
         case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
-        case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} credits={newCourseCredits} setCredits={setNewCourseCredits} />
+        case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} credits={newCourseCredits} setCredits={setNewCourseCredits} divisionFilter={divisionFilter} setDivisionFilter={setDivisionFilter} loadFromAllDepartments={loadFromAllDepartments} setLoadFromAllDepartments={setLoadFromAllDepartments} onOpenElective={handleOpenElective} openElectiveLoading={subjectAssignmentsLoading} />
         case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} targetYear={qpTargetYear} setTargetYear={setQpTargetYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
         case 'careerProfile': return <CareerProfileTab profile={careerProfile} loading={careerLoading} onUpload={handleUploadCareerResume} onRemove={handleRemoveCareerResume} onDownload={handleDownload} />
         case 'placements': return <UpcomingPlacementsTab placements={upcomingPlacements} loading={placementsLoading} onRefresh={loadUpcomingPlacements} />
@@ -2387,6 +2614,7 @@ export default function FacultyDashboard() {
         case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} targetYear={noticeTargetYear} setTargetYear={setNoticeTargetYear} departmentName={facultyDepartmentName} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} inbox={notifications} />
         case 'settings': return <SettingsTab showMsg={showMsg} accent="violet" />
         case 'help': return <HelpTab accent="violet" />
+case 'reminders': return <RemindersTab facultyReminders={facultyReminders} loading={facultyRemindersLoading} onCreate={handleCreateReminder} onToggle={handleToggleReminder} onDelete={handleDeleteReminder} />
         case 'invigilations': return <InvigilationsTab showMsg={showMsg} />
         default: return null
       }
@@ -2413,7 +2641,6 @@ export default function FacultyDashboard() {
       case 'assignments': return <AssignmentsTab title={assignmentTitle} setTitle={setAssignmentTitle} desc={assignmentDesc} setDesc={setAssignmentDesc} dueDate={assignmentDueDate} setDueDate={setAssignmentDueDate} maxMarks={assignmentMaxMarks} setMaxMarks={setAssignmentMaxMarks} targetYear={assignmentTargetYear} setTargetYear={setAssignmentTargetYear} onSubmit={handleCreateAssignment} assignments={sectionAssignments} loading={loading} onDownload={handleDownload} showMsg={showMsg} />
       case 'assignmentMarks': return <AssignmentMarksTab assignments={sectionAssignments} selectedAssignmentId={assignmentMarksAssignmentId} setSelectedAssignmentId={handleAssignmentMarksSelect} entries={assignmentMarksEntries} setEntries={setAssignmentMarksEntries} onSubmit={handleUploadAssignmentMarks} sectionMarks={assignmentMarksRecorded} loading={loading} />
       case 'materials': return <MaterialsTab title={materialTitle} setTitle={setMaterialTitle} desc={materialDesc} setDesc={setMaterialDesc} type={materialType} setType={setMaterialType} targetYear={materialTargetYear} setTargetYear={setMaterialTargetYear} onSubmit={handleCreateMaterial} materials={sectionMaterials} loading={loading} onDownload={handleDownload} />
-      case 'analytics': return <AnalyticsTab analytics={analytics} loading={tabLoading} />
       default: return null
     }
   }
