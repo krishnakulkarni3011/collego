@@ -19,7 +19,7 @@ const EXAM_TYPES = [
 ]
 
 function fmtDate(value) {
-  if (!value) return '—'
+  if (!value) return '-'
   return new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
@@ -328,9 +328,9 @@ export function ExamsAdminTab({ showMsg }) {
                       <div>
                         <p className="text-sm font-semibold text-slate-800">{exam.name}</p>
                         <p className="text-[11px] text-slate-400">
-                          {exam.semesterName} · {EXAM_TYPES.find(t => t.value === exam.examType)?.label || exam.examType}
-                          {' · '}{fmtDate(exam.startDate)} – {fmtDate(exam.endDate)}
-                          {' · '}{exam.scheduleCount} paper{exam.scheduleCount === 1 ? '' : 's'}
+                          {exam.semesterName} - {EXAM_TYPES.find(t => t.value === exam.examType)?.label || exam.examType}
+                          {' - '}{fmtDate(exam.startDate)} - {fmtDate(exam.endDate)}
+                          {' - '}{exam.scheduleCount} paper{exam.scheduleCount === 1 ? '' : 's'}
                         </p>
                       </div>
                     </button>
@@ -367,8 +367,8 @@ export function ExamsAdminTab({ showMsg }) {
                                   <td className="text-slate-700 font-medium">{s.courseName}<span className="text-slate-400 text-[10px] ml-1">{s.courseCode}</span></td>
                                   <td className="text-slate-500">{s.sectionName}</td>
                                   <td className="text-slate-500">{fmtDate(s.examDate)}</td>
-                                  <td className="text-slate-500">{s.startTime?.slice(0, 5)} – {s.endTime?.slice(0, 5)}</td>
-                                  <td className="text-slate-500">{s.room || '—'}</td>
+                                  <td className="text-slate-500">{s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}</td>
+                                  <td className="text-slate-500">{s.room || '-'}</td>
                                   <td>
                                     <select
                                       value={s.invigilatorId || ''}
@@ -402,7 +402,7 @@ export function ExamsAdminTab({ showMsg }) {
                           <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Section</label>
                           <select required value={scheduleForm.sectionId} onChange={e => setScheduleForm({ ...scheduleForm, sectionId: e.target.value })} className="collego-input">
                             <option value="">Select section</option>
-                            {sectionOptions.map(s => <option key={s.id} value={s.id}>{s.courseName} · {s.name}</option>)}
+                            {sectionOptions.map(s => <option key={s.id} value={s.id}>{s.courseName} - {s.name}</option>)}
                           </select>
                         </div>
                         <div>
@@ -458,7 +458,7 @@ export function ExamsAdminTab({ showMsg }) {
                     <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-slate-50/70">
                       <p className="text-xs font-semibold text-slate-700">
                         {first.courseName} <span className="text-slate-400 font-normal">({first.courseCode})</span>
-                        {' · '}{fmtDate(first.examDate)} · {first.startTime?.slice(0, 5)} – {first.endTime?.slice(0, 5)}
+                        {' - '}{fmtDate(first.examDate)} - {first.startTime?.slice(0, 5)} - {first.endTime?.slice(0, 5)}
                       </p>
                       <p className="text-[11px] text-slate-500 flex items-center gap-3">
                         <span className="flex items-center gap-1"><MapPin size={11} /> {first.room || 'TBA'}</span>
@@ -498,7 +498,7 @@ export function ExamsAdminTab({ showMsg }) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium text-slate-800">{item.studentName} <span className="text-slate-400 text-xs">({item.enrollmentNumber})</span></p>
-                    <p className="text-xs text-slate-500">{item.courseName} · {item.semesterName}</p>
+                    <p className="text-xs text-slate-500">{item.courseName} - {item.semesterName}</p>
                     <p className="text-[11px] text-slate-400 mt-1 max-w-2xl">{item.reason}</p>
                     {item.response && <p className="text-[11px] text-slate-500 mt-1">Response: {item.response}</p>}
                   </div>
@@ -551,7 +551,7 @@ export function ExamsAdminTab({ showMsg }) {
         </div>
         {promotion.preview && (
           <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-xs text-emerald-800">
-            <p className="font-semibold flex items-center gap-1"><GraduationCap size={14} /> {promotion.preview.fromSemester} → {promotion.preview.toSemester}</p>
+            <p className="font-semibold flex items-center gap-1"><GraduationCap size={14} /> {promotion.preview.fromSemester} to {promotion.preview.toSemester}</p>
             <p className="mt-1">
               {promotion.preview.studentCount} students in the source semester,{' '}
               {promotion.preview.eligibleCount} eligible, {promotion.preview.targetSectionCount} sections in the target semester.

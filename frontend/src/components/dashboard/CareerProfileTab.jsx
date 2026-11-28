@@ -12,7 +12,7 @@ const STATUS = {
 }
 
 /**
- * Faculty Career Profile — the only place a faculty member can manage their
+ * Faculty Career Profile - the only place a faculty member can manage their
  * own resume. Other faculty resumes are not visible here.
  */
 export function CareerProfileTab({ profile, loading, onUpload, onRemove, onDownload }) {

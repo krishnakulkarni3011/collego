@@ -5,7 +5,7 @@ import { PageTitle, Panel, Spinner } from './PortalUI'
 import { Badge } from '../ui/badge'
 
 function fmtDate(value) {
-  if (!value) return '—'
+  if (!value) return '-'
   return new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
@@ -44,7 +44,7 @@ export function InvigilationsTab({ showMsg }) {
               <td className="text-slate-700 font-medium">{d.courseName} <span className="text-slate-400 text-[10px]">{d.courseCode}</span></td>
               <td className="text-slate-500">{d.sectionName}</td>
               <td className="text-slate-500">{fmtDate(d.examDate)}</td>
-              <td className="text-slate-500">{d.startTime?.slice(0, 5)} – {d.endTime?.slice(0, 5)}</td>
+              <td className="text-slate-500">{d.startTime?.slice(0, 5)} - {d.endTime?.slice(0, 5)}</td>
               <td className="text-slate-500">{d.room || 'TBA'}</td>
               <td className="text-slate-500">{d.studentCount}</td>
             </tr>

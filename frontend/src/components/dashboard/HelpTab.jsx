@@ -15,7 +15,7 @@ const FAQS = [
   },
   {
     q: 'How can I check my internal assessment marks?',
-    a: 'Navigate to Academics → Internal Assessment to view your subject-wise marks.',
+    a: 'Navigate to Academics -> Internal Assessment to view your subject-wise marks.',
   },
   {
     q: 'What should I do if there is an error in my attendance?',
