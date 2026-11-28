@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 # ─── Environment matrix ───────────────────────────────────────────────────────
 # Secrets expected in GitHub repo settings:
@@ -166,7 +167,7 @@ jobs:
     name: Docker — Build & Push to ECR
     needs: [backend-build, frontend-build, ai-service-check]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
@@ -228,7 +229,7 @@ jobs:
     name: Deploy to EC2 via SSM
     needs: docker-build-push
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
