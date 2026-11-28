@@ -1092,6 +1092,7 @@ public class FacultyPortalService {
         log.info("Faculty {} removed subject assignment {}", email, assignmentId);
     }
 
+    @Transactional(readOnly = true)
     public List<FacultySubjectAssignmentResponse> getMySubjectAssignments(String email) {
         FacultyProfile faculty = getFacultyByEmail(email);
         return facultySubjectAssignmentRepository.findByFacultyIdAndIsActiveTrue(faculty.getId())
