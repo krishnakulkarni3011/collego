@@ -129,7 +129,7 @@ function OverviewTab({ sections, overviewData, onSectionSelect, reminders = [], 
 
       <Panel title="My Teaching Sections" icon={BookOpen} accent="violet" bodyClassName="!flex-none" hover>
         {sections.length === 0 ? (
-          <EmptyState icon={BookOpen} title="No sections assigned" accent="violet" description="Assign yourself a subject from My Subject Assignments to load your sections and students." />
+          <EmptyState icon={BookOpen} title="No sections assigned" accent="violet" description="Assign yourself a subject from My Subject Assignments to load your sections and students. If you already assigned one, reload the page." />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {sections.map((sec, i) => (
