@@ -43,6 +43,11 @@ postgres_data/
 *.tfstate
 *.tfstate.backup
 tfplan
+*.tfvars
+
+# Local sensitive files
+credentials.txt
+response.json
 
 # Binary Tools & Zips
 infra/apache-maven-*/

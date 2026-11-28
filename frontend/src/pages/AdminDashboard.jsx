@@ -165,42 +165,7 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
           )}
         </Panel>
 
-        <Panel title="Upcoming Events" icon={CalendarDays} accent="amber" className="xl:col-span-4"
-          action={<button onClick={() => onTabChange('announcements')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors">View All</button>}
-        >
-          {upcomingEvents.length === 0 ? (
-            <EmptyState icon={CalendarDays} title="No upcoming events" description="New placement drives and activities will show up here." accent="amber" />
-          ) : (
-            <div className="space-y-2">
-              {upcomingEvents.map((ev) => {
-                const color = EVENT_COLORS[ev.category] || '#6366f1'
-                const date = ev.date ? new Date(ev.date) : null
-                return (
-                  <motion.div key={ev.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}
-                    className="event-item relative overflow-hidden group">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-current" style={{ opacity: 0.15, backgroundColor: color }} />
-                    <div className="flex items-center gap-3.5 p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-colors group-hover:border-indigo-300/70">
-                      <div className="flex flex-col items-center justify-center w-10 h-10 rounded-xl shrink-0" style={{ background: `${color}14`, border: `1px solid ${color}30` }}>
-                        <span className="text-[9px] font-bold uppercase" style={{ color }}>{date ? date.toLocaleDateString('en-IN', { month: 'short' }) : '-'}</span>
-                        <span className="text-sm font-extrabold text-slate-800 leading-none">{date ? date.getDate() : '-'}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-slate-800 truncate">{ev.title}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 truncate">
-                          <MapPin size={10} /> {ev.subtitle || ev.location}
-                        </p>
-                      </div>
-                      <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full shrink-0" style={{ color, background: `${color}14` }}>
-                        {ev.category}
-                      </span>
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </div>
-          )}
-        </Panel>
-      </div>
+              </div>
 
       {/* Notices / performers / quick actions */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">

@@ -1,6 +1,7 @@
 package com.collego.controller;
 
 import com.collego.dto.CampusEventResponse;
+import com.collego.dto.UnifiedEventResponse;
 import com.collego.service.CampusEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -50,6 +51,11 @@ public class CampusEventController {
     @GetMapping("/api/events/upcoming")
     public ResponseEntity<List<CampusEventResponse>> upcoming() {
         return ResponseEntity.ok(eventService.listUpcoming());
+    }
+
+    @GetMapping("/api/events/merged")
+    public ResponseEntity<List<UnifiedEventResponse>> merged() {
+        return ResponseEntity.ok(eventService.listMerged());
     }
 
     @GetMapping("/api/events/{id}/poster")

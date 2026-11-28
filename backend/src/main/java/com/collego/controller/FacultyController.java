@@ -427,6 +427,31 @@ public class FacultyController {
 
     // ==================== HoD — Resume Approvals ====================
 
+    // ==================== Personal Reminders ====================
+
+    @GetMapping("/reminders")
+    public ResponseEntity<List<FacultyReminderResponse>> getReminders(Authentication auth) {
+        return ResponseEntity.ok(facultyPortalService.getFacultyReminders(auth.getName()));
+    }
+
+    @PostMapping("/reminders")
+    public ResponseEntity<FacultyReminderResponse> createReminder(
+            Authentication auth, @Valid @RequestBody CreateReminderRequest request) {
+        return ResponseEntity.ok(facultyPortalService.createFacultyReminder(auth.getName(), request));
+    }
+
+    @PutMapping("/reminders/{reminderId}/toggle")
+    public ResponseEntity<FacultyReminderResponse> toggleReminder(
+            Authentication auth, @PathVariable Long reminderId) {
+        return ResponseEntity.ok(facultyPortalService.toggleFacultyReminder(auth.getName(), reminderId));
+    }
+
+    @DeleteMapping("/reminders/{reminderId}")
+    public ResponseEntity<Void> deleteReminder(Authentication auth, @PathVariable Long reminderId) {
+        facultyPortalService.deleteFacultyReminder(auth.getName(), reminderId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/hod/resumes/pending")
     public ResponseEntity<List<FacultyDirectoryResponse>> listPendingResumeApprovals(Authentication auth) {
         return ResponseEntity.ok(facultyDirectoryService.listPendingForHod(auth.getName()));
