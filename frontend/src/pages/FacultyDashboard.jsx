@@ -30,7 +30,7 @@ import { uiImages } from '../assets/uiImages'
 import welcomeFaculty from '../assets/ui/welcome-faculty.webp'
 import { timeAgo } from '../lib/time'
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Helpers -----------------------------------------------------------------
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
 const fmtNum = (n, dp = 2) => (n == null ? '-' : Number(n).toFixed(dp))
 const PIE_COLORS = ['#4f46e5', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
@@ -71,7 +71,7 @@ function AttBadge({ pct }) {
   return <Badge variant="destructive">{pct}%</Badge>
 }
 
-// â”€â”€â”€ Nav config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Nav config --------------------------------------------------------------
 const GLOBAL_NAV = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'subjectAssignments', label: 'My Subject Assignments', icon: BookUser },
@@ -100,7 +100,7 @@ const SECTION_TABS = [
   { id: 'materials', label: 'Materials', icon: FolderOpen },
 ]
 
-// â”€â”€â”€ Overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Overview ----------------------------------------------------------------
 function OverviewTab({ sections, overviewData, onSectionSelect, reminders = [], onCreateReminder, onToggleReminder, onDeleteReminder }) {
   const [reminderTitle, setReminderTitle] = useState('')
   const now = new Date()
@@ -217,7 +217,7 @@ function OverviewTab({ sections, overviewData, onSectionSelect, reminders = [], 
   )
 }
 
-// â”€â”€â”€ Section Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Section Header ----------------------------------------------------------
 function SectionHeader({ section, activeTab, onTabChange, onBack }) {
   const headerImage = {
     attendance: uiImages.classroom,
@@ -264,7 +264,7 @@ function SectionHeader({ section, activeTab, onTabChange, onBack }) {
   )
 }
 
-// â”€â”€â”€ Attendance Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Attendance Tab ----------------------------------------------------------
 function AttendanceTab({
   attendanceDate, setAttendanceDate, attendanceRecords, toggleAttendance, onSubmit, loading,
   holiday, holidays = [], holidayBusy, onDeclareHoliday, onRemoveHoliday,
@@ -349,7 +349,7 @@ function AttendanceTab({
                               : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
                           )}
                         >
-                          {r.status === 'PRESENT' ? 'âœ“ Present' : 'âœ- Absent'}
+                          {r.status === 'PRESENT' ? 'Present' : 'Absent'}
                         </button>
                       </td>
                     </tr>
@@ -396,7 +396,7 @@ function AttendanceTab({
   )
 }
 
-// â”€â”€â”€ Internal Marks Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Internal Marks Tab ------------------------------------------------------
 function StudentDetailsTab({ section, onDownload, loading }) {
   return (
     <div className="space-y-6">
@@ -568,7 +568,7 @@ function InternalMarksTab({ examName, setExamName, maxMarks, setMaxMarks, marksE
   )
 }
 
-// â”€â”€â”€ Assignment Marks Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Assignment Marks Tab ----------------------------------------------------
 function AssignmentMarksTab({
   assignments, selectedAssignmentId, setSelectedAssignmentId, entries, setEntries,
   onSubmit, sectionMarks, loading,
@@ -662,7 +662,7 @@ function AssignmentMarksTab({
   )
 }
 
-// â”€â”€â”€ Student Performance Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Student Performance Tab -------------------------------------------------
 function StudentPerformanceTab({ data, loading }) {
   return (
     <div className="space-y-6">
@@ -697,7 +697,7 @@ function StudentPerformanceTab({ data, loading }) {
   )
 }
 
-// â”€â”€â”€ Assignments Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Assignments Tab ---------------------------------------------------------
 function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, maxMarks, setMaxMarks, targetYear, setTargetYear, onSubmit, assignments, loading, onDownload, showMsg }) {
   const fileRef = useRef(null)
   const [pendingFile, setPendingFile] = useState(null)
@@ -775,7 +775,7 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, m
   )
 }
 
-// â”€â”€â”€ Assignment Submissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Assignment Submissions --------------------------------------------------
 function AssignmentSubmissions({ assignment, showMsg }) {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState([])
@@ -864,7 +864,7 @@ function SubmissionRow({ row, onGraded, onDownload, showMsg }) {
             {row.late && <span className="ml-2 text-amber-600">Late</span>}
             {row.fileName && <span className="ml-2">- {row.fileName}</span>}
           </p>
-          {row.note && <p className="text-xs text-slate-500 mt-1">â€œ{row.note}â€</p>}
+          {row.note && <p className="text-xs text-slate-500 mt-1">{row.note}</p>}
         </div>
         <div className="flex items-center gap-2">
           {row.hasFile && (
@@ -894,7 +894,7 @@ function SubmissionRow({ row, onGraded, onDownload, showMsg }) {
   )
 }
 
-// â”€â”€â”€ Materials Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Materials Tab -----------------------------------------------------------
 function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, targetYear, setTargetYear, onSubmit, materials, loading, onDownload }) {
   const MATERIAL_TYPES = ['NOTES', 'SLIDES', 'REFERENCE', 'VIDEO', 'ASSIGNMENT', 'OTHER']
   const fileRef = useRef(null)
@@ -973,7 +973,7 @@ function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, targetYea
   )
 }
 
-// â”€â”€â”€ Question Papers Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Question Papers Tab -----------------------------------------------------
 function QuestionPapersTab({ sections, examType, setExamType, year, setYear, targetYear, setTargetYear, fileName, setFileName, selectedSectionId, setSelectedSectionId, onSubmit, papers, loading, uploadFileLoading }) {
   const [pendingFile, setPendingFile] = useState(null)
   const fileRef = useRef(null)
@@ -1057,7 +1057,7 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, tar
   )
 }
 
-// â”€â”€â”€ Notices Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Notices Tab -------------------------------------------------------------
 function NoticesTab({ title, setTitle, message, setMessage, type, setType, targetYear, setTargetYear, departmentName, onSubmit, sentNotices, loading, inbox = [] }) {
   const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'EXAM']
   const [attachmentError, setAttachmentError] = useState('')
@@ -1161,7 +1161,7 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, targe
   )
 }
 
-// â”€â”€â”€ Subject Assignments Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Subject Assignments Tab -----------------------------------------------------
 function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove,
   selectedSemesterId, setSelectedSemesterId, courseName, setCourseName, courseCode, setCourseCode,
   credits, setCredits, sectionFilter, setSectionFilter, onOpenElective, openElectiveLoading }) {
@@ -1467,7 +1467,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
   )
 }
 
-// â”€â”€â”€ HoD Class Representatives â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- HoD Class Representatives -----------------------------------------------
 function HodClassRepresentativesTab({ showMsg }) {
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1605,7 +1605,7 @@ function HodClassRepresentativesTab({ showMsg }) {
   )
 }
 
-// â”€â”€â”€ HoD Class Timetables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- HoD Class Timetables ----------------------------------------------------
 function HodTimetablesTab({ showMsg }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1791,7 +1791,7 @@ function HodTimetablesTab({ showMsg }) {
   )
 }
 
-// â”€â”€â”€ Personal Reminders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Personal Reminders ------------------------------------------------------
 function FacultyNewslettersTab({ showMsg, isHod, onDownload }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -2021,7 +2021,7 @@ function RemindersTab({ facultyReminders = [], loading, onCreate, onToggle, onDe
   )
 }
 
-// â”€â”€â”€ Main Faculty Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Main Faculty Dashboard --------------------------------------------------
 export default function FacultyDashboard() {
   const navigate = useNavigate()
   const email = authService.getEmail()
