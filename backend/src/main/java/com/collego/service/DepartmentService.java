@@ -38,6 +38,7 @@ public class DepartmentService {
         return mapToResponse(department);
     }
 
+    @Transactional(readOnly = true)
     public List<DepartmentResponse> getAllDepartments() {
         return departmentRepository.findAll().stream()
                 .map(this::mapToResponse)
