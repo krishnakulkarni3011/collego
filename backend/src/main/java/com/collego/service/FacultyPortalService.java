@@ -59,7 +59,9 @@ public class FacultyPortalService {
 
     public List<FacultySectionResponse> getAssignedSections(String email) {
         FacultyProfile faculty = getFacultyByEmail(email);
-        List<Section> sections = sectionRepository.findByFacultyId(faculty.getId());
+        List<Section> sections = sectionRepository.findByFacultyId(faculty.getId()).stream()
+                .filter(section -> !section.isHidden())
+                .collect(Collectors.toList());
 
         return sections.stream().map(section -> {
             long enrolledCount = enrollmentRepository.countBySectionId(section.getId());
@@ -1167,16 +1169,37 @@ public class FacultyPortalService {
         if (request.getStudentIds() == null || request.getStudentIds().isEmpty()) {
             throw new BadRequestException("Select at least one student");
         }
-        Long departmentId = request.getDepartmentId();
-        if (departmentId == null) {
-            throw new BadRequestException("Department is required");
+        if (request.getDepartmentIds() == null || request.getDepartmentIds().isEmpty()) {
+            throw new BadRequestException("Select at least one department");
         }
-        departmentRepository.findById(departmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Department not found: " + departmentId));
+        Set<Long> departmentIds = new HashSet<>();
+        for (Long id : request.getDepartmentIds()) {
+            departmentRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Department not found: " + id));
+            departmentIds.add(id);
+        }
 
-        Optional<Course> existingCourse = courseRepository.findByDepartmentId(department.getId()).stream()
-                .filter(c -> c.getName().equalsIgnoreCase(courseName))
-                .findFirst();
+        // Optional manual subject code, same rules as a normal subject assignment.
+        String requestedCode = request.getCourseCode() != null ? request.getCourseCode().trim() : "";
+        if (!requestedCode.isBlank() && !requestedCode.matches("[A-Za-z0-9_\\-]+")) {
+            throw new BadRequestException("Subject code may contain only letters, numbers, '-' and '_'.");
+        }
+        String finalCode = requestedCode.isBlank() ? null : requestedCode.toUpperCase(Locale.ROOT);
+
+        Optional<Course> existingCourse;
+        if (finalCode != null) {
+            Optional<Course> byCode = courseRepository.findByCode(finalCode);
+            if (byCode.isPresent() && (byCode.get().getDepartment() == null
+                    || !Objects.equals(byCode.get().getDepartment().getId(), department.getId()))) {
+                throw new BadRequestException("Subject code already in use: " + finalCode);
+            }
+            existingCourse = byCode;
+        } else {
+            existingCourse = courseRepository.findByDepartmentId(department.getId()).stream()
+                    .filter(c -> c.getName().equalsIgnoreCase(courseName))
+                    .findFirst();
+        }
+
         Course course;
         if (existingCourse.isPresent()) {
             course = existingCourse.get();
@@ -1187,7 +1210,7 @@ public class FacultyPortalService {
         } else {
             course = courseRepository.save(Course.builder()
                     .name(courseName)
-                    .code(generateCourseCode(department, courseName))
+                    .code(finalCode != null ? finalCode : generateCourseCode(department, courseName))
                     .credits(credits)
                     .department(department)
                     .description(courseName + " (open elective)")
@@ -1196,10 +1219,6 @@ public class FacultyPortalService {
 
         Semester semester = semesterRepository.findById(request.getSemesterId())
                 .orElseThrow(() -> new ResourceNotFoundException("Semester not found: " + request.getSemesterId()));
-        Integer year = AcademicYearUtils.fromSemester(semester.getNumber());
-        if (year == null) {
-            throw new BadRequestException("Semester number must be between 1 and 8");
-        }
 
         Optional<FacultySubjectAssignment> existing = facultySubjectAssignmentRepository
                 .findByFacultyIdAndCourseIdAndSemesterId(faculty.getId(), course.getId(), semester.getId());
@@ -1217,23 +1236,53 @@ public class FacultyPortalService {
                     .build());
         }
 
-        List<Section> assignedSections = claimSectionsForFaculty(faculty, course, semester);
-        if (assignedSections.isEmpty()) {
-            throw new BadRequestException("No section is available for this subject and semester.");
+        // Open electives have no visible sections. A single hidden section is used
+        // internally only so attendance/enrollment records can still be stored.
+        final Course finalCourse = course;
+        Section section = sectionRepository.findByCourseIdAndSemesterId(finalCourse.getId(), semester.getId()).stream()
+                .filter(sec -> sec.isHidden() && "OPEN ELECTIVE".equalsIgnoreCase(sec.getName()))
+                .findFirst()
+                .orElseGet(() -> sectionRepository.save(Section.builder()
+                        .name("OPEN ELECTIVE")
+                        .course(finalCourse)
+                        .semester(semester)
+                        .faculty(faculty)
+                        .hidden(true)
+                        .maxCapacity(500)
+                        .build()));
+        if (section.getFaculty() == null) {
+            section.setFaculty(faculty);
+            section = sectionRepository.save(section);
         }
 
-        int enrolled = enrollSelectedStudents(request.getStudentIds(), departmentId, assignedSections);
+        int enrolled = 0;
+        for (Long studentId : request.getStudentIds()) {
+            StudentProfile student = studentProfileRepository.findById(studentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentId));
+            if (student.getDepartment() == null || !departmentIds.contains(student.getDepartment().getId())) {
+                throw new BadRequestException("Student " + student.getEnrollmentNumber()
+                        + " is not from one of the selected departments.");
+            }
+            if (!enrollmentRepository.existsByStudentIdAndSectionId(student.getId(), section.getId())) {
+                enrollmentRepository.save(Enrollment.builder()
+                        .student(student)
+                        .section(section)
+                        .status(EnrollmentStatus.ACTIVE)
+                        .build());
+            }
+            enrolled++;
+        }
 
-        log.info("Faculty {} created open elective {} for semester {} with {} students from department {}",
-                email, course.getName(), semester.getName(), enrolled, departmentId);
+        log.info("Faculty {} created open elective {} for semester {} with {} students from {} department(s)",
+                email, course.getName(), semester.getName(), enrolled, departmentIds.size());
 
         FacultySubjectAssignmentResponse response = mapSubjectAssignmentToResponse(assignment);
-        response.setSectionCount(assignedSections.size());
+        response.setSectionCount(0);
         response.setStudentCount(enrolled);
         return response;
     }
 
-    private List<Section> claimSectionsForFaculty(FacultyProfile faculty, Course course, Semester semester) {
+private List<Section> claimSectionsForFaculty(FacultyProfile faculty, Course course, Semester semester) {
         List<Section> sections = sectionRepository.findByCourseIdAndSemesterId(course.getId(), semester.getId());
 
         List<Section> unassigned = sections.stream()
