@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test('login page renders for all portal roles', async ({ page }) => {
   await page.goto('/login')
   await expect(page.getByText('Welcome back')).toBeVisible()
-  await expect(page.locator('#btn-login-submit')).toBeVisible()
+  await expect(page.getByText('Select your role to sign in to Collego')).toBeVisible()
 })
 
 test('reset password page renders', async ({ page }) => {
