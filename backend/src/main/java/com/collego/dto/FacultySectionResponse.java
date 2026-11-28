@@ -20,4 +20,5 @@ public class FacultySectionResponse {
     private Integer semesterNumber;
     private Integer year;
     private long enrolledStudents;
+    private boolean openElective;
 }

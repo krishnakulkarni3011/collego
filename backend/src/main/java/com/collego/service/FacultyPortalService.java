@@ -59,9 +59,7 @@ public class FacultyPortalService {
 
     public List<FacultySectionResponse> getAssignedSections(String email) {
         FacultyProfile faculty = getFacultyByEmail(email);
-        List<Section> sections = sectionRepository.findByFacultyId(faculty.getId()).stream()
-                .filter(section -> !"OPEN ELECTIVE".equalsIgnoreCase(section.getName()))
-                .collect(Collectors.toList());
+        List<Section> sections = sectionRepository.findByFacultyId(faculty.getId());
 
         return sections.stream().map(section -> {
             long enrolledCount = enrollmentRepository.countBySectionId(section.getId());
@@ -82,6 +80,7 @@ public class FacultyPortalService {
                     .semesterNumber(section.getSemester().getNumber())
                     .year((section.getSemester().getNumber() + 1) / 2)
                     .enrolledStudents(enrolledCount)
+                    .openElective("OPEN ELECTIVE".equalsIgnoreCase(section.getName()))
                     .build();
         }).collect(Collectors.toList());
     }
