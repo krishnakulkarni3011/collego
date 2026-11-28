@@ -16,6 +16,7 @@ import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
 import { InvigilationsTab } from '../components/dashboard/InvigilationsTab'
 import { CareerProfileTab } from '../components/dashboard/CareerProfileTab'
+import { GraduatedStudentsTab } from '../components/dashboard/GraduatedStudentsTab'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -2643,6 +2644,7 @@ export default function FacultyDashboard() {
           { id: 'classRepresentatives', label: 'Class Representatives', icon: Crown },
           { id: 'hodTimetables', label: 'Class Timetables', icon: CalendarDays },
           { id: 'resumeApprovals', label: 'Resume Approvals', icon: ShieldCheck },
+          { id: 'graduatedStudents', label: 'Graduated Students', icon: GraduationCap },
         ]
       : []),
   ]
@@ -2684,6 +2686,7 @@ export default function FacultyDashboard() {
         case 'help': return <HelpTab accent="violet" />
 case 'reminders': return <RemindersTab facultyReminders={facultyReminders} loading={facultyRemindersLoading} onCreate={handleCreateReminder} onToggle={handleToggleReminder} onDelete={handleDeleteReminder} />
         case 'resumeApprovals': return <HodResumeApprovalsTab showMsg={showMsg} />
+        case 'graduatedStudents': return <GraduatedStudentsTab endpoint="/api/faculty/hod/graduated-students" title="Department Graduates" />
         case 'newsletters': return <FacultyNewslettersTab showMsg={showMsg} isHod={careerProfile?.isHod} onDownload={handleDownload} />
         case 'invigilations': return <InvigilationsTab showMsg={showMsg} />
         default: return null

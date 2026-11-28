@@ -22,6 +22,8 @@ import { downloadFile, previewFile } from '../lib/download'
 import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
 import { ExamsAdminTab } from '../components/dashboard/ExamsAdminTab'
+import { PromotionTab } from '../components/dashboard/PromotionTab'
+import { GraduatedStudentsTab } from '../components/dashboard/GraduatedStudentsTab'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -68,6 +70,8 @@ const NAV_SECTIONS = [
     title: 'Administration',
     items: [
       { id: 'reports', label: 'Reports', icon: BarChart3 },
+      { id: 'promotion', label: 'Semester Promotion', icon: GraduationCap },
+      { id: 'graduatedStudents', label: 'Graduated Students', icon: GraduationCap },
       { id: 'settings', label: 'Settings', icon: Settings },
       { id: 'help', label: 'Help & Support', icon: HelpCircle },
     ],
@@ -1717,6 +1721,8 @@ export default function AdminDashboard() {
       case 'placements': return <PlacementsTab placementStats={placementStats} notices={placementNotices} departments={departments} onCreatePlacement={onCreatePlacement} onDeactivatePlacement={onDeactivatePlacement} />
       case 'broadcasts': return <BroadcastCenterTab broadcasts={broadcasts} users={users} departments={departments} onSend={handleSendBroadcast} />
       case 'reports': return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} departments={departments} />
+      case 'promotion': return <PromotionTab semesters={semesters} showMsg={showMsg} />
+      case 'graduatedStudents': return <GraduatedStudentsTab endpoint="/api/admin/graduated-students" />
       case 'announcements': return <NoticesTab broadcasts={broadcasts} insights={insights} />
       case 'settings': return <SettingsTab showMsg={showMsg} accent="indigo" />
       case 'help': return <HelpTab accent="indigo" />
