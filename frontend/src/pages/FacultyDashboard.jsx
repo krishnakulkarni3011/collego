@@ -1178,7 +1178,8 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
   const [oeCourseName, setOeCourseName] = useState('')
   const [oeCredits, setOeCredits] = useState('4')
   const [oeSemesterId, setOeSemesterId] = useState('')
-  const [oeDepartmentId, setOeDepartmentId] = useState('')
+  const [oeCourseCode, setOeCourseCode] = useState('')
+  const [oeDepartmentIds, setOeDepartmentIds] = useState([])
   const [oeStudents, setOeStudents] = useState([])
   const [oeSelected, setOeSelected] = useState([])
   const [oeQuery, setOeQuery] = useState('')
@@ -1207,20 +1208,17 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
   }, [targetDepartmentId])
 
   useEffect(() => {
-    if (!oeDepartmentId) {
-      setOeStudents([])
-      setOeSelected([])
-      return
-    }
     setOeLoadingStudents(true)
-    api.get(`/api/faculty/departments/${oeDepartmentId}/students`)
-      .then(res => {
-        setOeStudents(Array.isArray(res.data) ? res.data : [])
-      })
+    api.get('/api/faculty/all-students')
+      .then(res => setOeStudents(Array.isArray(res.data) ? res.data : []))
       .catch(() => setOeStudents([]))
       .finally(() => setOeLoadingStudents(false))
+  }, [])
+
+  const toggleOeDepartment = (id) => {
+    setOeDepartmentIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
     setOeSelected([])
-  }, [oeDepartmentId])
+  }
 
   const filterStudents = (list, query) => {
     if (!query.trim()) return list
@@ -1234,7 +1232,10 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
     setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
   const filteredParticular = filterStudents(particularStudents, particularQuery)
-  const filteredOe = filterStudents(oeStudents, oeQuery)
+  const filteredOe = filterStudents(
+    oeStudents.filter(s => oeDepartmentIds.length === 0 || oeDepartmentIds.includes(s.departmentId)),
+    oeQuery
+  )
 
   return (
     <div className="space-y-6">
@@ -1380,13 +1381,19 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
           <Layers size={15} className="text-violet-500" /> Open Elective Subject
         </h3>
         <p className="text-[11px] text-slate-400 mb-5">
-          Add an elective and choose particular students from one department.
+          Add an elective and pick students from one or more departments.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Subject Name</label>
             <input value={oeCourseName} onChange={e => setOeCourseName(e.target.value)}
               placeholder="e.g. Cyber Security" className="collego-input" />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Subject Code</label>
+            <input value={oeCourseCode} onChange={e => setOeCourseCode(e.target.value.toUpperCase())}
+              placeholder="e.g. OE301" maxLength={30} className="collego-input" />
+            <p className="text-[10px] text-slate-400 mt-1">Leave blank to generate.</p>
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Credits</label>
@@ -1401,50 +1408,61 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Department</label>
-            <select value={oeDepartmentId} onChange={e => setOeDepartmentId(e.target.value)} className="collego-input">
-              <option value="">Select department</option>
-              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Departments</label>
+            <div className="max-h-28 overflow-y-auto rounded-xl border border-white/60 bg-white/60 p-2 space-y-1">
+              {departments.map(d => (
+                <label key={d.id} className="flex items-center gap-2 text-[11px] text-slate-600 cursor-pointer hover:text-slate-900">
+                  <input type="checkbox" checked={oeDepartmentIds.includes(d.id)}
+                    onChange={() => toggleOeDepartment(d.id)} className="rounded w-3.5 h-3.5 cursor-pointer" />
+                  <span className="truncate">{d.name}</span>
+                </label>
+              ))}
+              {departments.length === 0 && <p className="text-[10px] text-slate-400">No departments available.</p>}
+            </div>
           </div>
         </div>
 
-        {oeDepartmentId && (
-          <div className="mt-4">
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
-              Students of this department - {oeSelected.length} selected
-            </label>
-            <input value={oeQuery} onChange={e => setOeQuery(e.target.value)}
-              placeholder="Search by name or USN" className="collego-input mb-3" />
-            <div className="max-h-64 overflow-y-auto rounded-xl border border-white/60 bg-white/50 divide-y divide-white/50">
-              {oeLoadingStudents ? (
-                <div className="p-6 text-center text-xs text-slate-400">Loading students...</div>
-              ) : filteredOe.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-400">No students in this department.</div>
-              ) : filteredOe.map(s => (
-                <label key={s.studentId} className="flex items-center gap-3 px-3 py-2 hover:bg-white/70 cursor-pointer">
-                  <input type="checkbox" checked={oeSelected.includes(s.studentId)}
-                    onChange={() => toggle(s.studentId, oeSelected, setOeSelected)}
-                    className="rounded w-4 h-4 cursor-pointer" />
-                  <span className="min-w-0 flex-1">
-                    <span className="text-xs font-semibold text-slate-700 block truncate">{s.name}</span>
-                    <span className="text-[10px] text-slate-400">{s.enrollmentNumber} - {s.departmentName}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
+        <div className="mt-4">
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
+            Students from selected departments - {oeSelected.length} selected
+          </label>
+          <input value={oeQuery} onChange={e => setOeQuery(e.target.value)}
+            placeholder="Search by name or USN" className="collego-input mb-3" />
+          <div className="max-h-64 overflow-y-auto rounded-xl border border-white/60 bg-white/50 divide-y divide-white/50">
+            {oeLoadingStudents ? (
+              <div className="p-6 text-center text-xs text-slate-400">Loading students...</div>
+            ) : oeDepartmentIds.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400">Select at least one department above.</div>
+            ) : filteredOe.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400">No students found in selected departments.</div>
+            ) : filteredOe.map(s => (
+              <label key={s.studentId} className="flex items-center gap-3 px-3 py-2 hover:bg-white/70 cursor-pointer">
+                <input type="checkbox" checked={oeSelected.includes(s.studentId)}
+                  onChange={() => toggle(s.studentId, oeSelected, setOeSelected)}
+                  className="rounded w-4 h-4 cursor-pointer" />
+                <span className="min-w-0 flex-1">
+                  <span className="text-xs font-semibold text-slate-700 block truncate">{s.name}</span>
+                  <span className="text-[10px] text-slate-400">{s.enrollmentNumber} - {s.departmentName}</span>
+                </span>
+              </label>
+            ))}
           </div>
-        )}
+        </div>
 
         <Button variant="gradient" size="sm" className="mt-4 px-5"
-          disabled={openElectiveLoading || !oeCourseName.trim() || !oeSemesterId || !oeDepartmentId || !Number(oeCredits) || oeSelected.length === 0}
+          disabled={openElectiveLoading || !oeCourseName.trim() || !oeSemesterId || oeDepartmentIds.length === 0 || !Number(oeCredits) || oeSelected.length === 0}
           onClick={() => onOpenElective({
-            courseName: oeCourseName.trim(), semesterId: parseInt(oeSemesterId),
-            credits: Number(oeCredits), departmentId: parseInt(oeDepartmentId), studentIds: oeSelected,
+            courseName: oeCourseName.trim(), courseCode: oeCourseCode.trim(),
+            semesterId: parseInt(oeSemesterId), credits: Number(oeCredits),
+            departmentIds: oeDepartmentIds, studentIds: oeSelected,
           })}>
           {openElectiveLoading ? <><RefreshCw size={14} className="animate-spin" /> Creating...</> : <><Plus size={13} /> Create Open Elective &amp; Add Students</>}
         </Button>
+        <p className="text-[10px] text-slate-400 mt-2">
+          Open elective subjects do not create visible sections. Students are added directly to the elective.
+        </p>
       </div>
+
     </div>
   )
 }
@@ -2635,7 +2653,7 @@ export default function FacultyDashboard() {
     try {
       const res = await api.post('/api/faculty/open-elective', payload)
       const count = res.data?.studentCount ?? 0
-      showMsg(`Open elective created â€” ${count} cross-department student${count === 1 ? '' : 's'} added.`)
+      showMsg(`Open elective created - ${count} student${count === 1 ? '' : 's'} added from selected departments.`)
       await Promise.all([loadMySubjectAssignments(), fetchSections()])
     } catch (err) {
       showMsg(err.response?.data?.message || 'Failed to create open elective', 'error')
