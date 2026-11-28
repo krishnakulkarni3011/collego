@@ -6,7 +6,7 @@ import { Button } from '../ui/button'
 
 const STATUS = {
   NONE: { label: 'Not submitted', variant: 'secondary', copy: 'Upload your resume to start the approval process.' },
-  PENDING: { label: 'Pending review', variant: 'warning', copy: 'The administration is reviewing your resume. Students cannot download it yet.' },
+  PENDING: { label: 'Pending review', variant: 'warning', copy: 'Your Head of Department is reviewing your resume. Students cannot download it yet.' },
   APPROVED: { label: 'Approved', variant: 'success', copy: 'Your resume is live in the student faculty directory.' },
   REJECTED: { label: 'Rejected', variant: 'destructive', copy: 'Your resume was not approved. Upload a revised copy.' },
 }
@@ -49,7 +49,7 @@ export function CareerProfileTab({ profile, loading, onUpload, onRemove, onDownl
       <PageTitle
         icon={UserCircle}
         title="Career Profile"
-        subtitle="Upload your resume. Only you and the administration can see it until it is approved."
+        subtitle="Upload your resume. Only you and your Head of Department can see it until it is approved."
         accent="violet"
       />
 
@@ -109,11 +109,11 @@ export function CareerProfileTab({ profile, loading, onUpload, onRemove, onDownl
           <ol className="space-y-4 text-xs text-slate-500">
             <li className="flex gap-2.5">
               <span className="w-5 h-5 rounded-full bg-violet-100 text-violet-600 font-bold flex items-center justify-center shrink-0 text-[10px]">1</span>
-              Upload your latest resume here. It is visible only to you and the administration.
+              Upload your latest resume here. It is visible only to you and your Head of Department.
             </li>
             <li className="flex gap-2.5">
               <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 font-bold flex items-center justify-center shrink-0 text-[10px]">2</span>
-              An administrator reviews the file. Your status changes to Pending while you wait.
+              Your Head of Department reviews the file. Your status changes to Pending while you wait.
             </li>
             <li className="flex gap-2.5">
               <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 font-bold flex items-center justify-center shrink-0 text-[10px]">3</span>

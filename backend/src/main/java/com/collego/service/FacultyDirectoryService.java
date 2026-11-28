@@ -13,6 +13,7 @@ import com.collego.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +22,7 @@ import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -104,9 +106,47 @@ public class FacultyDirectoryService {
         return map(faculty, true);
     }
 
+    /** Admin review path (kept for existing admin tooling). */
     @Transactional
     public FacultyDirectoryResponse reviewResume(Long facultyId, boolean approve, String note) {
-        FacultyProfile faculty = findFaculty(facultyId);
+        return applyReview(findFaculty(facultyId), approve, note, "administration");
+    }
+
+    /** Pending resumes belonging to the HoD's department. */
+    @Transactional(readOnly = true)
+    public List<FacultyDirectoryResponse> listPendingForHod(String email) {
+        FacultyProfile hod = requireHod(email);
+        return facultyProfileRepository.findByDepartmentId(hod.getDepartment().getId()).stream()
+                .filter(p -> STATUS_PENDING.equals(resolveStatus(p)))
+                .sorted(facultyOrder())
+                .map(p -> map(p, true))
+                .collect(Collectors.toList());
+    }
+
+    /** HoD reviews a resume from a faculty member of their own department. */
+    @Transactional
+    public FacultyDirectoryResponse reviewResumeAsHod(String email, Long facultyId, boolean approve, String note) {
+        FacultyProfile hod = requireHod(email);
+        FacultyProfile target = findFaculty(facultyId);
+        if (target.getDepartment() == null || !Objects.equals(target.getDepartment().getId(), hod.getDepartment().getId())) {
+            throw new BadRequestException("You can only review resumes of faculty in your department.");
+        }
+        return applyReview(target, approve, note, "Head of Department");
+    }
+
+    private FacultyProfile requireHod(String email) {
+        FacultyProfile faculty = facultyProfileRepository.findByUserEmailIgnoreCase(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Faculty profile not found"));
+        if (!Boolean.TRUE.equals(faculty.getIsHod())) {
+            throw new AccessDeniedException("Only the Head of Department can review faculty resumes.");
+        }
+        if (faculty.getDepartment() == null) {
+            throw new BadRequestException("Your faculty profile has no department assigned.");
+        }
+        return faculty;
+    }
+
+    private FacultyDirectoryResponse applyReview(FacultyProfile faculty, boolean approve, String note, String reviewerLabel) {
         if (faculty.getResumePath() == null || faculty.getResumePath().isBlank()) {
             throw new BadRequestException("This faculty member has not uploaded a resume yet.");
         }
@@ -117,7 +157,8 @@ public class FacultyDirectoryService {
         User user = faculty.getUser();
         String title = approve ? "Career profile approved" : "Career profile update";
         String message = approve
-                ? "Your resume was approved by the administration and is now visible in the student faculty directory."
+                ? "Your resume was approved by the " + reviewerLabel
+                        + " and is now visible in the student faculty directory."
                 : "Your resume was not approved" + (faculty.getResumeReviewNote() != null
                         ? ": " + faculty.getResumeReviewNote() : ". Please upload a revised copy.");
         notificationRepository.save(Notification.builder()
@@ -128,7 +169,7 @@ public class FacultyDirectoryService {
                 .category(NotificationCategory.NOTICE)
                 .build());
 
-        log.info("Resume for faculty profile {} marked {}", facultyId, faculty.getResumeStatus());
+        log.info("Resume for faculty profile {} marked {} by {}", faculty.getId(), faculty.getResumeStatus(), reviewerLabel);
         return map(faculty, true);
     }
 

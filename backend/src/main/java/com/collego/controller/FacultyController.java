@@ -160,22 +160,6 @@ public class FacultyController {
         return ResponseEntity.ok(facultyPortalService.getInternalMarksForSection(auth.getName(), sectionId));
     }
 
-    // ==================== Semester Marks ====================
-
-    @PostMapping("/marks/semester")
-    public ResponseEntity<Map<String, Object>> uploadSemesterMarks(
-            Authentication auth,
-            @Valid @RequestBody UploadSemesterMarksRequest request) {
-        return ResponseEntity.ok(facultyPortalService.uploadSemesterMarks(auth.getName(), request));
-    }
-
-    @GetMapping("/marks/semester/{sectionId}")
-    public ResponseEntity<List<Map<String, Object>>> getSemesterMarksForSection(
-            Authentication auth,
-            @PathVariable Long sectionId) {
-        return ResponseEntity.ok(facultyPortalService.getSemesterMarksForSection(auth.getName(), sectionId));
-    }
-
     // ==================== Assignments ====================
 
     @PostMapping("/assignments")
@@ -391,15 +375,6 @@ public class FacultyController {
                 .body(facultyPortalService.draftNotice(auth.getName(), request));
     }
 
-    // ==================== Analytics ====================
-
-    @GetMapping("/analytics/{sectionId}")
-    public ResponseEntity<FacultyAnalyticsResponse> getAnalytics(
-            Authentication auth,
-            @PathVariable Long sectionId) {
-        return ResponseEntity.ok(facultyPortalService.getAnalytics(auth.getName(), sectionId));
-    }
-
     // ==================== Notifications ====================
 
     @GetMapping("/notifications")
@@ -448,5 +423,26 @@ public class FacultyController {
     @DeleteMapping("/career-profile/resume")
     public ResponseEntity<FacultyDirectoryResponse> removeCareerResume(Authentication auth) {
         return ResponseEntity.ok(facultyDirectoryService.removeOwnResume(auth.getName()));
+    }
+
+    // ==================== HoD — Resume Approvals ====================
+
+    @GetMapping("/hod/resumes/pending")
+    public ResponseEntity<List<FacultyDirectoryResponse>> listPendingResumeApprovals(Authentication auth) {
+        return ResponseEntity.ok(facultyDirectoryService.listPendingForHod(auth.getName()));
+    }
+
+    @PutMapping("/hod/resumes/{facultyId}/approve")
+    public ResponseEntity<FacultyDirectoryResponse> approveResumeAsHod(
+            Authentication auth, @PathVariable Long facultyId) {
+        return ResponseEntity.ok(facultyDirectoryService.reviewResumeAsHod(auth.getName(), facultyId, true, null));
+    }
+
+    @PutMapping("/hod/resumes/{facultyId}/reject")
+    public ResponseEntity<FacultyDirectoryResponse> rejectResumeAsHod(
+            Authentication auth, @PathVariable Long facultyId,
+            @RequestBody(required = false) Map<String, String> body) {
+        String note = body != null ? body.get("note") : null;
+        return ResponseEntity.ok(facultyDirectoryService.reviewResumeAsHod(auth.getName(), facultyId, false, note));
     }
 }
