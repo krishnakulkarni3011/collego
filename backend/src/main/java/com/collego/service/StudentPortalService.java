@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -41,6 +42,7 @@ public class StudentPortalService {
     private final ClassTimetableService classTimetableService;
     private final S3StorageService s3StorageService;
     private final HolidayRepository holidayRepository;
+    private final StudentReminderRepository studentReminderRepository;
 
     @Value("${collego.aws.s3-bucket-assignments:collego-assignments-prod}")
     private String assignmentBucket;
@@ -69,6 +71,38 @@ public class StudentPortalService {
                 .admissionYear(student.getAdmissionYear())
                 .isCr(Boolean.TRUE.equals(student.getIsCr()))
                 .build();
+    }
+
+    /**
+     * Semesters in which this student has an enrollment. Used by the Documents
+     * tab so every semester can offer a semester-wise internal marks/attendance
+     * document, even when no semester-end marks have been published yet.
+     */
+    @Transactional(readOnly = true)
+    public List<SemesterResponse> getEnrolledSemesters(String email) {
+        StudentProfile student = getStudentByEmail(email);
+        Map<Long, Semester> unique = new LinkedHashMap<>();
+        for (Enrollment enrollment : enrollmentRepository.findByStudentId(student.getId())) {
+            Semester semester = enrollment.getSection() != null
+                    ? enrollment.getSection().getSemester()
+                    : null;
+            if (semester != null) {
+                unique.putIfAbsent(semester.getId(), semester);
+            }
+        }
+        return unique.values().stream()
+                .sorted(Comparator.comparingInt(Semester::getNumber))
+                .map(semester -> SemesterResponse.builder()
+                        .id(semester.getId())
+                        .name(semester.getName())
+                        .number(semester.getNumber())
+                        .academicYear(semester.getAcademicYear())
+                        .startDate(semester.getStartDate())
+                        .endDate(semester.getEndDate())
+                        .active(semester.isActive())
+                        .createdAt(semester.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     // ==================== Attendance ====================
@@ -183,6 +217,60 @@ public class StudentPortalService {
                     .ia2ObtainedMarks(ia2Obtained)
                     .build();
         }).collect(Collectors.toList());
+    }
+
+    // ==================== Personal Reminders ====================
+
+    @Transactional(readOnly = true)
+    public List<StudentReminderResponse> getReminders(String email) {
+        StudentProfile student = getStudentByEmail(email);
+        return studentReminderRepository
+                .findByStudentIdOrderByCompletedAscCreatedAtDesc(student.getId())
+                .stream()
+                .map(this::mapReminderResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public StudentReminderResponse createReminder(String email, CreateReminderRequest request) {
+        StudentProfile student = getStudentByEmail(email);
+        StudentReminder reminder = StudentReminder.builder()
+                .student(student)
+                .title(request.getTitle().trim())
+                .build();
+        studentReminderRepository.save(reminder);
+        return mapReminderResponse(reminder);
+    }
+
+    @Transactional
+    public StudentReminderResponse toggleReminder(String email, Long reminderId) {
+        StudentProfile student = getStudentByEmail(email);
+        StudentReminder reminder = studentReminderRepository
+                .findByIdAndStudentId(reminderId, student.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Reminder not found: " + reminderId));
+        reminder.setCompleted(!reminder.isCompleted());
+        reminder.setCompletedAt(reminder.isCompleted() ? LocalDateTime.now() : null);
+        studentReminderRepository.save(reminder);
+        return mapReminderResponse(reminder);
+    }
+
+    @Transactional
+    public void deleteReminder(String email, Long reminderId) {
+        StudentProfile student = getStudentByEmail(email);
+        StudentReminder reminder = studentReminderRepository
+                .findByIdAndStudentId(reminderId, student.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Reminder not found: " + reminderId));
+        studentReminderRepository.delete(reminder);
+    }
+
+    private StudentReminderResponse mapReminderResponse(StudentReminder reminder) {
+        return StudentReminderResponse.builder()
+                .id(reminder.getId())
+                .title(reminder.getTitle())
+                .completed(reminder.isCompleted())
+                .createdAt(reminder.getCreatedAt())
+                .completedAt(reminder.getCompletedAt())
+                .build();
     }
 
     // ==================== Semester Marks ====================
@@ -538,19 +626,24 @@ public class StudentPortalService {
             throw new BadRequestException("You are not enrolled in this assignment's course.");
         }
 
-        if (file == null || file.isEmpty()) {
-            throw new BadRequestException("Please choose a file to upload.");
-        }
-        if (file.getSize() > 25L * 1024 * 1024) {
-            throw new BadRequestException("Submission file must be 25 MB or smaller.");
-        }
-        String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "submission";
-        String lower = originalName.toLowerCase();
-        if (!(lower.endsWith(".pdf") || lower.endsWith(".doc") || lower.endsWith(".docx")
-                || lower.endsWith(".ppt") || lower.endsWith(".pptx") || lower.endsWith(".zip")
-                || lower.endsWith(".txt") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")
-                || lower.endsWith(".png"))) {
-            throw new BadRequestException("Unsupported file type. Upload PDF, DOC/DOCX, PPT/PPTX, ZIP, TXT or an image.");
+        // A submission may be made without a file when the student hands the
+        // work over to the faculty physically. In that case the note becomes
+        // the only record of the submission.
+        boolean hasFile = file != null && !file.isEmpty();
+        String originalName = null;
+
+        if (hasFile) {
+            if (file.getSize() > 25L * 1024 * 1024) {
+                throw new BadRequestException("Submission file must be 25 MB or smaller.");
+            }
+            originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "submission";
+            String lower = originalName.toLowerCase();
+            if (!(lower.endsWith(".pdf") || lower.endsWith(".doc") || lower.endsWith(".docx")
+                    || lower.endsWith(".ppt") || lower.endsWith(".pptx") || lower.endsWith(".zip")
+                    || lower.endsWith(".txt") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+                    || lower.endsWith(".png"))) {
+                throw new BadRequestException("Unsupported file type. Upload PDF, DOC/DOCX, PPT/PPTX, ZIP, TXT or an image.");
+            }
         }
 
         AssignmentSubmission submission = assignmentSubmissionRepository
@@ -569,16 +662,29 @@ public class StudentPortalService {
             s3StorageService.delete(assignmentBucket, submission.getFilePath());
         }
 
-        String uniqueName = UUID.randomUUID() + "_" + sanitizeFilename(originalName);
-        String key = "submissions/" + assignmentId + "/" + student.getId() + "/" + uniqueName;
-        s3StorageService.upload(assignmentBucket, key, file.getInputStream(), file.getSize(),
-                S3StorageService.detectContentType(originalName));
+        if (hasFile) {
+            String uniqueName = UUID.randomUUID() + "_" + sanitizeFilename(originalName);
+            String key = "submissions/" + assignmentId + "/" + student.getId() + "/" + uniqueName;
+            s3StorageService.upload(assignmentBucket, key, file.getInputStream(), file.getSize(),
+                    S3StorageService.detectContentType(originalName));
 
-        submission.setFilePath(key);
-        submission.setFileName(originalName);
-        submission.setFileSize(file.getSize());
-        submission.setContentType(S3StorageService.detectContentType(originalName));
-        submission.setNote(note);
+            submission.setFilePath(key);
+            submission.setFileName(originalName);
+            submission.setFileSize(file.getSize());
+            submission.setContentType(S3StorageService.detectContentType(originalName));
+        } else {
+            submission.setFilePath(null);
+            submission.setFileName(null);
+            submission.setFileSize(null);
+            submission.setContentType(null);
+        }
+
+        String finalNote = note;
+        if (!hasFile && (finalNote == null || finalNote.isBlank())) {
+            finalNote = "Submitted physically to faculty (no file uploaded).";
+        }
+
+        submission.setNote(finalNote);
         submission.setSubmittedAt(java.time.LocalDateTime.now());
         submission.setLate(assignment.getDueDate() != null
                 && LocalDate.now().isAfter(assignment.getDueDate()));
@@ -589,7 +695,8 @@ public class StudentPortalService {
         submission.setGradedBy(null);
         assignmentSubmissionRepository.save(submission);
 
-        log.info("Student {} submitted assignment {} ({} bytes)", email, assignmentId, file.getSize());
+        log.info("Student {} submitted assignment {}{}", email, assignmentId,
+                hasFile ? " (" + file.getSize() + " bytes)" : " without a file");
         return mapSubmissionResponse(submission);
     }
 

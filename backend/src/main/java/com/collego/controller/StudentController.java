@@ -3,6 +3,7 @@ package com.collego.controller;
 import com.collego.dto.*;
 import com.collego.service.MarksheetService;
 import com.collego.service.StudentPortalService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -31,6 +32,11 @@ public class StudentController {
         return ResponseEntity.ok(studentPortalService.getProfile(auth.getName()));
     }
 
+    @GetMapping("/semesters")
+    public ResponseEntity<List<SemesterResponse>> getMySemesters(Authentication auth) {
+        return ResponseEntity.ok(studentPortalService.getEnrolledSemesters(auth.getName()));
+    }
+
     @GetMapping("/attendance")
     public ResponseEntity<List<SubjectAttendanceResponse>> getAttendance(
             Authentication auth,
@@ -55,6 +61,33 @@ public class StudentController {
             Authentication auth,
             @PathVariable Long semesterId) {
         return ResponseEntity.ok(studentPortalService.getSemesterMarks(auth.getName(), semesterId));
+    }
+
+    // ==================== Personal Reminders ====================
+
+    @GetMapping("/reminders")
+    public ResponseEntity<List<StudentReminderResponse>> getReminders(Authentication auth) {
+        return ResponseEntity.ok(studentPortalService.getReminders(auth.getName()));
+    }
+
+    @PostMapping("/reminders")
+    public ResponseEntity<StudentReminderResponse> createReminder(
+            Authentication auth,
+            @Valid @RequestBody CreateReminderRequest request) {
+        return ResponseEntity.ok(studentPortalService.createReminder(auth.getName(), request));
+    }
+
+    @PutMapping("/reminders/{reminderId}/toggle")
+    public ResponseEntity<StudentReminderResponse> toggleReminder(
+            Authentication auth,
+            @PathVariable Long reminderId) {
+        return ResponseEntity.ok(studentPortalService.toggleReminder(auth.getName(), reminderId));
+    }
+
+    @DeleteMapping("/reminders/{reminderId}")
+    public ResponseEntity<Void> deleteReminder(Authentication auth, @PathVariable Long reminderId) {
+        studentPortalService.deleteReminder(auth.getName(), reminderId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/cgpa")
@@ -130,7 +163,7 @@ public class StudentController {
     public ResponseEntity<byte[]> downloadMarksheet(Authentication auth, @PathVariable Long semesterId) {
         byte[] pdf = marksheetService.generateMarksheet(auth.getName(), semesterId);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=marksheet_sem" + semesterId + ".pdf")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=internal_assessment_sem" + semesterId + ".pdf")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
     }
@@ -192,7 +225,7 @@ public class StudentController {
             Authentication auth,
             @PathVariable Long assignmentId,
             @RequestParam(value = "note", required = false) String note,
-            @RequestParam("file") MultipartFile file) throws IOException {
+            @RequestParam(value = "file", required = false) MultipartFile file) throws IOException {
         return ResponseEntity.ok(studentPortalService.submitAssignment(auth.getName(), assignmentId, note, file));
     }
 

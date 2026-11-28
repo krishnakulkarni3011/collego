@@ -1,8 +1,10 @@
 package com.collego.service;
 
 import com.collego.dto.CgpaResponse;
+import com.collego.dto.InternalMarksResponse;
 import com.collego.dto.SgpaResponse;
 import com.collego.dto.SemesterMarksResponse;
+import com.collego.dto.SubjectAttendanceResponse;
 import com.collego.entity.*;
 import com.collego.exception.ResourceNotFoundException;
 import com.collego.repository.*;
@@ -19,6 +21,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -52,13 +57,19 @@ public class MarksheetService {
         Semester semester = semesterRepository.findById(semesterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Semester not found with id: " + semesterId));
 
-        CgpaResponse cgpaData = studentPortalService.calculateCgpa(email);
+        List<InternalMarksResponse> internalMarks = studentPortalService.getInternalMarks(email, semesterId);
+        List<SubjectAttendanceResponse> attendance = studentPortalService.getAttendance(email, semesterId);
 
-        // Find SGPA for the requested semester
-        SgpaResponse semesterData = cgpaData.getSemesters().stream()
-                .filter(s -> s.getSemesterId().equals(semesterId))
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("No marks found for semester: " + semester.getName()));
+        if (internalMarks.isEmpty() && attendance.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    "No internal assessment or attendance data for semester: " + semester.getName());
+        }
+
+        Map<Long, SubjectAttendanceResponse> attendanceBySection = attendance.stream()
+                .collect(Collectors.toMap(
+                        SubjectAttendanceResponse::getSectionId,
+                        a -> a,
+                        (a, b) -> a));
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Document document = new Document(PageSize.A4, 40, 40, 40, 40);
@@ -71,17 +82,12 @@ public class MarksheetService {
             // Student Info
             addStudentInfo(document, student, user, semester);
 
-            // Marks Table
-            addMarksTable(document, semesterData);
-
-            // Summary
-            addSummary(document, semesterData, cgpaData);
-
-            // Grade Legend
-            addGradeLegend(document);
+            // Internal marks + attendance only. No semester-end marks, grades,
+            // SGPA or CGPA are included in this document.
+            addInternalMarksTable(document, internalMarks, attendanceBySection);
 
             // Footer
-            addFooter(document);
+            addInternalFooter(document);
 
             document.close();
             byte[] pdfBytes = baos.toByteArray();
@@ -172,7 +178,7 @@ public class MarksheetService {
         collegeName.setAlignment(Element.ALIGN_CENTER);
         document.add(collegeName);
 
-        Paragraph subtitle = new Paragraph("STATEMENT OF MARKS", SUBTITLE_FONT);
+        Paragraph subtitle = new Paragraph("INTERNAL ASSESSMENT & ATTENDANCE", SUBTITLE_FONT);
         subtitle.setAlignment(Element.ALIGN_CENTER);
         document.add(subtitle);
 
@@ -180,6 +186,11 @@ public class MarksheetService {
                 semester.getName() + " — Academic Year " + semester.getAcademicYear(), BODY_FONT);
         semesterInfo.setAlignment(Element.ALIGN_CENTER);
         document.add(semesterInfo);
+
+        Paragraph note = new Paragraph(
+                "Internal exam marks and subject-wise attendance only", BODY_FONT);
+        note.setAlignment(Element.ALIGN_CENTER);
+        document.add(note);
 
         document.add(new Paragraph(" "));
     }
@@ -269,17 +280,55 @@ public class MarksheetService {
         document.add(table);
     }
 
-    private void addSummary(Document document, SgpaResponse semesterData, CgpaResponse cgpaData) throws DocumentException {
-        document.add(new Paragraph(" "));
+    private void addInternalMarksTable(Document document,
+                                       List<InternalMarksResponse> internalMarks,
+                                       Map<Long, SubjectAttendanceResponse> attendanceBySection)
+            throws DocumentException {
+        PdfPTable table = new PdfPTable(6);
+        table.setWidthPercentage(100);
+        table.setWidths(new float[]{0.5f, 1.2f, 3.2f, 1.1f, 1.1f, 1.1f});
 
-        PdfPTable summaryTable = new PdfPTable(2);
-        summaryTable.setWidthPercentage(50);
-        summaryTable.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        Color headerBg = new Color(0, 51, 102);
+        addHeaderCell(table, "Sl.", headerBg);
+        addHeaderCell(table, "Code", headerBg);
+        addHeaderCell(table, "Subject", headerBg);
+        addHeaderCell(table, "IA-1", headerBg);
+        addHeaderCell(table, "IA-2", headerBg);
+        addHeaderCell(table, "Attendance", headerBg);
 
-        addSummaryRow(summaryTable, "SGPA", String.format("%.2f", semesterData.getSgpa()));
-        addSummaryRow(summaryTable, "CGPA", String.format("%.2f", cgpaData.getCumulativeCgpa()));
+        int slNo = 1;
+        for (InternalMarksResponse subject : internalMarks) {
+            Color rowBg = (slNo % 2 == 0) ? new Color(240, 245, 250) : Color.WHITE;
+            SubjectAttendanceResponse attendance = attendanceBySection.get(subject.getSectionId());
 
-        document.add(summaryTable);
+            addDataCell(table, String.valueOf(slNo++), rowBg, Element.ALIGN_CENTER);
+            addDataCell(table, subject.getCourseCode(), rowBg, Element.ALIGN_LEFT);
+            addDataCell(table, subject.getCourseName(), rowBg, Element.ALIGN_LEFT);
+            addDataCell(table,
+                    formatInternalMarks(subject.getIa1ObtainedMarks(), subject.getIa1MaxMarks()),
+                    rowBg, Element.ALIGN_CENTER);
+            addDataCell(table,
+                    formatInternalMarks(subject.getIa2ObtainedMarks(), subject.getIa2MaxMarks()),
+                    rowBg, Element.ALIGN_CENTER);
+            addDataCell(table,
+                    attendance != null ? String.format("%.2f%%", attendance.getPercentage()) : "-",
+                    rowBg, Element.ALIGN_CENTER);
+        }
+
+        document.add(table);
+    }
+
+    private String formatInternalMarks(Double obtained, Double max) {
+        if (obtained == null && max == null) {
+            return "-";
+        }
+        if (max == null) {
+            return String.format("%.0f", obtained);
+        }
+        if (obtained == null) {
+            return String.format("-/%.0f", max);
+        }
+        return String.format("%.0f/%.0f", obtained, max);
     }
 
     private void addSgpaLine(Document document, SgpaResponse semesterData) throws DocumentException {
@@ -288,19 +337,6 @@ public class MarksheetService {
                 " | Credits: " + (int) semesterData.getTotalCredits(), BODY_BOLD_FONT);
         sgpa.setAlignment(Element.ALIGN_RIGHT);
         document.add(sgpa);
-    }
-
-    private void addSummaryRow(PdfPTable table, String label, String value) {
-        PdfPCell labelCell = new PdfPCell(new Phrase(label, BODY_BOLD_FONT));
-        labelCell.setBackgroundColor(new Color(240, 245, 250));
-        labelCell.setPadding(5);
-        table.addCell(labelCell);
-
-        PdfPCell valueCell = new PdfPCell(new Phrase(value, BODY_BOLD_FONT));
-        valueCell.setBackgroundColor(new Color(240, 245, 250));
-        valueCell.setPadding(5);
-        valueCell.setHorizontalAlignment(Element.ALIGN_CENTER);
-        table.addCell(valueCell);
     }
 
     private void addGradeLegend(Document document) throws DocumentException {
@@ -336,6 +372,33 @@ public class MarksheetService {
         }
 
         document.add(legendTable);
+    }
+
+    private void addInternalFooter(Document document) throws DocumentException {
+        document.add(new Paragraph(" "));
+        document.add(new Paragraph(" "));
+
+        PdfPTable footerTable = new PdfPTable(3);
+        footerTable.setWidthPercentage(100);
+
+        String dateStr = "Date: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+
+        PdfPCell dateCell = new PdfPCell(new Phrase(dateStr, SMALL_FONT));
+        dateCell.setBorder(PdfPCell.NO_BORDER);
+        dateCell.setHorizontalAlignment(Element.ALIGN_LEFT);
+        footerTable.addCell(dateCell);
+
+        PdfPCell facultyCell = new PdfPCell(new Phrase("Faculty In-charge\n\n_______________", SMALL_FONT));
+        facultyCell.setBorder(PdfPCell.NO_BORDER);
+        facultyCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        footerTable.addCell(facultyCell);
+
+        PdfPCell hodCell = new PdfPCell(new Phrase("Head of Department\n\n_______________", SMALL_FONT));
+        hodCell.setBorder(PdfPCell.NO_BORDER);
+        hodCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        footerTable.addCell(hodCell);
+
+        document.add(footerTable);
     }
 
     private void addFooter(Document document) throws DocumentException {
