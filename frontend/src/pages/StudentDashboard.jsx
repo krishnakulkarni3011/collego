@@ -3,16 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, ClipboardCheck, BookMarked, Calendar, CalendarDays,
-  DollarSign, Briefcase, Bell, Sparkles, Target,
+  Briefcase, Bell, Sparkles, Target,
   TrendingUp, Download, Send, FileText,
   GraduationCap, CheckCircle2, Bot,
-  Layers, Award, Wallet, ScrollText, Search, AlertTriangle, RefreshCw,
+  Layers, Award, Search, AlertTriangle, RefreshCw,
   BookOpen, FolderOpen, Upload, Clock, Paperclip, Settings, HelpCircle, Users, Eye, X,
-  CalendarOff,
+  CalendarOff, ListTodo, Plus, Trash2,
 } from 'lucide-react'
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
+  AreaChart, Area, ResponsiveContainer,
 } from 'recharts'
 import { authService } from '../services/authService'
 import api from '../services/api'
@@ -26,7 +25,7 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import {
   PortalSidebar, PortalTopbar, Toast, StatCard, Panel, PageTitle,
-  WelcomeBanner, ChartTooltip, EmptyState, Spinner, ImageStrip,
+  WelcomeBanner, EmptyState, Spinner, ImageStrip,
 } from '../components/dashboard/PortalUI'
 import { uiImages } from '../assets/uiImages'
 import welcomeStudent from '../assets/ui/welcome-student.webp'
@@ -34,6 +33,9 @@ import { timeAgo } from '../lib/time'
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 const fmtNum = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
+const sortReminders = (list = []) => [...list].sort((a, b) =>
+  Number(a.completed) - Number(b.completed) ||
+  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
 const GRADE_COLORS = { O: '#10b981', 'A+': '#059669', A: '#06b6d4', 'B+': '#3b82f6', B: '#6366f1', C: '#f59e0b', P: '#f59e0b', F: '#ef4444' }
 const DAY_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
@@ -69,6 +71,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'placements', label: 'Placements', icon: Briefcase },
       { id: 'notifications', label: 'Notifications', icon: Bell },
+      { id: 'reminders', label: 'My Reminders', icon: ListTodo },
       { id: 'settings', label: 'Settings', icon: Settings },
       { id: 'help', label: 'Help & Support', icon: HelpCircle },
     ],
@@ -100,14 +103,13 @@ function AttBadge({ pct }) {
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ profile, overall, subjects, cgpa, notifications, placements, timetable, onTabChange }) {
+function OverviewTab({ profile, overall, subjects, cgpa, notifications, placements, reminders = [], onTabChange }) {
   const now = new Date()
   const hour = now.getHours()
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
   const unread = notifications.filter(n => !n.read).length
   const overallPct = overall?.overallPercentage || 0
 
-  const sgpaData = (cgpa?.semesters || []).map(s => ({ name: s.semesterName?.substring(0, 4) || 'Sem', v: s.sgpa || 0 }))
   const attData = [50, 60, 55, 70, 65, 78, 75, 80, 82, 87].map(v => ({ v }))
 
   const statCards = [
@@ -115,15 +117,13 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
       sub: `${overall?.totalPresent ?? 0}/${overall?.totalClasses ?? 0} classes`, onClick: () => onTabChange('attendance'),
       spark: <Sparkline data={attData} color="#10b981" />, glow: true },
     { label: 'Current CGPA', value: cgpa?.cumulativeCgpa ?? 0, decimals: 2, icon: GraduationCap, accent: 'violet',
-      sub: `${cgpa?.totalCreditsAllSemesters?.toFixed(0) ?? 0} total credits`, onClick: () => onTabChange('marks'),
-      spark: <Sparkline data={sgpaData.length ? sgpaData : [{ v: 0 }]} color="#8b5cf6" />, glow: true },
+      sub: `${cgpa?.totalCreditsAllSemesters?.toFixed(0) ?? 0} total credits`, onClick: () => onTabChange('marks'), glow: true },
     { label: 'Notifications', value: unread, icon: Bell, accent: 'blue',
       sub: `${notifications.length} total`, onClick: () => onTabChange('notifications'),
       spark: <Sparkline data={[{ v: 3 }, { v: 5 }, { v: 2 }, { v: 7 }, { v: 4 }]} color="#3b82f6" />, glow: true },
   ]
 
-  const today = DAY_ORDER[now.getDay() === 0 ? 5 : now.getDay() - 1]
-  const todaySlots = (timetable?.weeklySchedule?.[today] || []).slice().sort((a, b) => a.startTime?.localeCompare(b.startTime))
+  const pendingReminders = (reminders || []).filter(r => !r.completed).slice(0, 5)
   const upcomingPlacements = (placements || []).filter(p => {
     const deadline = p.lastDate || p.driveDate
     return !deadline || new Date(deadline) >= new Date()
@@ -146,7 +146,7 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        <Panel title="Subject-wise Attendance" icon={ClipboardCheck} accent="emerald" className="xl:col-span-5"
+        <Panel title="Subject-wise Attendance" icon={ClipboardCheck} accent="emerald" className="xl:col-span-7"
           action={<button onClick={() => onTabChange('attendance')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 px-2 py-1 rounded-lg transition-colors">Details</button>}>
           {subjects.length === 0 ? (
             <EmptyState icon={ClipboardCheck} title="No attendance data" accent="emerald" description="Your subject attendance will appear once classes are marked." />
@@ -171,55 +171,21 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
           )}
         </Panel>
 
-        <Panel title="SGPA History" icon={GraduationCap} accent="violet" className="xl:col-span-4">
-          {sgpaData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={sgpaData} margin={{ top: 8, right: 8, left: -25, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="sgpaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip />} />
-                <Area type="monotone" dataKey="v" stroke="#8b5cf6" fill="url(#sgpaGrad)" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 3 }} name="SGPA" />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState icon={GraduationCap} title="No results yet" accent="violet" description="SGPA trend appears after semester results." />
-          )}
-          <div className="mt-4 p-3 rounded-2xl border border-violet-100 bg-violet-50/40 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Cumulative CGPA</p>
-              <span className="text-2xl font-bold text-violet-600">{fmtNum(cgpa?.cumulativeCgpa)}</span>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-white/70 flex items-center justify-center text-violet-600 border border-violet-200">
-              <GraduationCap size={14} />
-            </div>
-          </div>
-        </Panel>
-
-        <Panel title="Today's Schedule" icon={Calendar} accent="blue" className="xl:col-span-3"
-          action={<button onClick={() => onTabChange('timetable')} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors">Full</button>}>
-          {todaySlots.length === 0 ? (
-            <EmptyState icon={Calendar} title="No classes today" accent="blue" description="Enjoy your day off!" />
+        <Panel title="My Reminders" icon={ListTodo} accent="emerald" className="xl:col-span-5"
+          action={<button onClick={() => onTabChange('reminders')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 px-2 py-1 rounded-lg transition-colors">Open</button>}>
+          {pendingReminders.length === 0 ? (
+            <EmptyState icon={ListTodo} title="No pending reminders" accent="emerald" description="Add personal tasks from the My Reminders tab." />
           ) : (
             <div className="space-y-2">
-              {todaySlots.map(slot => (
-                <div key={slot.id} className="flex items-center gap-3 p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-all group">
-                  <div className="text-center shrink-0 w-16">
-                    <p className="text-xs font-bold font-mono text-indigo-600">{slot.startTime}</p>
-                    <p className="text-[9px] font-mono text-slate-400">{slot.endTime}</p>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-slate-800 truncate">{slot.courseName}</p>
-                    <p className="text-[9px] text-slate-400 truncate">{slot.roomNumber} · {slot.facultyName || 'TBD'}</p>
-                  </div>
+              {pendingReminders.map(r => (
+                <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-all">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  <p className="text-xs font-medium text-slate-700 truncate">{r.title}</p>
                 </div>
               ))}
+              <p className="text-[10px] text-slate-400 pt-1">
+                {reminders.filter(r => !r.completed).length} pending · {reminders.filter(r => r.completed).length} completed
+              </p>
             </div>
           )}
         </Panel>
@@ -593,6 +559,7 @@ function AssignmentsTab({ assignments = [], loading, onSubmit, onDownload }) {
 function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
   const [showSubmit, setShowSubmit] = useState(false)
   const [file, setFile] = useState(null)
+  const [physical, setPhysical] = useState(false)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const fileRef = useRef(null)
@@ -603,12 +570,13 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
   const overdue = canSubmit && !submitted && a.dueDate && new Date(a.dueDate).getTime() < Date.now()
 
   const submit = async () => {
-    if (!file) return
+    if (!physical && !file) return
     setBusy(true)
     try {
-      await onSubmit(a.id, file, note)
+      await onSubmit(a.id, physical ? null : file, note)
       setShowSubmit(false)
       setFile(null)
+      setPhysical(false)
       setNote('')
       if (fileRef.current) fileRef.current.value = ''
     } catch { /* toast is shown by the parent */ } finally {
@@ -650,7 +618,21 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
             </Button>
           )}
           {canSubmit && !submitted && (
-            <Button variant="gradient" size="sm" onClick={() => setShowSubmit(v => !v)}>
+            <Button
+              variant="gradient"
+              size="sm"
+              onClick={() => {
+                if (showSubmit) {
+                  setShowSubmit(false)
+                  setPhysical(false)
+                  setFile(null)
+                  setNote('')
+                  if (fileRef.current) fileRef.current.value = ''
+                } else {
+                  setShowSubmit(true)
+                }
+              }}
+            >
               <Upload size={12} /> {showSubmit ? 'Cancel' : 'Submit'}
             </Button>
           )}
@@ -659,24 +641,151 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
 
       {showSubmit && !submitted && (
         <div className="mt-4 pt-4 border-t border-white/60 space-y-3">
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Your file</label>
-            <input ref={fileRef} type="file" onChange={e => setFile(e.target.files?.[0] || null)}
-              className="collego-input file:mr-3 file:rounded-lg file:border-0 file:bg-amber-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-amber-600" />
-            {file && <p className="text-[10px] text-slate-400 mt-1 truncate">{file.name}</p>}
-          </div>
+          {!physical && (
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Your file</label>
+              <input ref={fileRef} type="file" onChange={e => setFile(e.target.files?.[0] || null)}
+                className="collego-input file:mr-3 file:rounded-lg file:border-0 file:bg-amber-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-amber-600" />
+              {file && <p className="text-[10px] text-slate-400 mt-1 truncate">{file.name}</p>}
+            </div>
+          )}
+          <label className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50/50 p-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={physical}
+              onChange={e => {
+                setPhysical(e.target.checked)
+                if (e.target.checked) {
+                  setFile(null)
+                  if (fileRef.current) fileRef.current.value = ''
+                }
+              }}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+            />
+            <span>
+              <span className="text-xs font-semibold text-slate-700">Submitting physically to faculty</span>
+              <span className="block text-[10px] text-slate-400 mt-0.5">
+                Choose this if you are handing over the assignment in person instead of uploading a file.
+              </span>
+            </span>
+          </label>
           <div>
             <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Note (optional)</label>
             <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Add a note for your faculty..."
               className="collego-input resize-none" />
           </div>
           <div className="flex justify-end">
-            <Button variant="success" size="sm" onClick={submit} disabled={!file || busy}>
-              {busy ? <><RefreshCw size={12} className="animate-spin" /> Submitting...</> : <><Upload size={12} /> Submit Assignment</>}
+            <Button variant="success" size="sm" onClick={submit} disabled={busy || (!physical && !file)}>
+              {busy
+                ? <><RefreshCw size={12} className="animate-spin" /> Submitting...</>
+                : physical
+                  ? <><CheckCircle2 size={12} /> Submit Without File</>
+                  : <><Upload size={12} /> Submit Assignment</>}
             </Button>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Personal Reminders ──────────────────────────────────────────────────────
+function RemindersTab({ reminders = [], loading, onCreate, onToggle, onDelete }) {
+  const [title, setTitle] = useState('')
+  const [busy, setBusy] = useState(false)
+  const pending = reminders.filter(r => !r.completed).length
+
+  const submit = async (e) => {
+    e.preventDefault()
+    const value = title.trim()
+    if (!value || busy) return
+    setBusy(true)
+    try {
+      await onCreate(value)
+      setTitle('')
+    } catch { /* toast is shown by the parent */ } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle
+        icon={ListTodo}
+        title="My Reminders"
+        subtitle="Personal tasks and reminders. Tick them off once completed."
+        accent="emerald"
+        actions={reminders.length > 0
+          ? <Badge variant={pending ? 'warning' : 'success'}>{pending ? `${pending} pending` : 'All done'}</Badge>
+          : undefined}
+      />
+
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
+          <Plus size={15} className="text-emerald-500" /> Add a reminder
+        </h3>
+        <form onSubmit={submit} className="flex flex-col sm:flex-row gap-3">
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="e.g. Submit physics record book by Friday"
+            maxLength={200}
+            className="collego-input flex-1"
+          />
+          <Button type="submit" variant="gradient" disabled={!title.trim() || busy}>
+            {busy ? <><RefreshCw size={14} className="animate-spin" /> Adding...</> : <><Plus size={14} /> Add Reminder</>}
+          </Button>
+        </form>
+        <p className="text-[10px] text-slate-400 mt-2">Reminders are private to your account.</p>
+      </div>
+
+      <div className="glass-card p-6 border border-white/60">
+        <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
+          <ListTodo size={15} className="text-emerald-500" /> To be completed
+        </h3>
+        {loading ? (
+          <div className="flex items-center justify-center py-10"><Spinner color="emerald" /></div>
+        ) : reminders.length === 0 ? (
+          <EmptyState icon={ListTodo} title="No reminders yet" accent="emerald" description="Add your first personal task above." />
+        ) : (
+          <div className="divide-y divide-white/60">
+            {reminders.map(r => (
+              <div key={r.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <button
+                  type="button"
+                  onClick={() => onToggle(r.id)}
+                  aria-label={r.completed ? 'Mark as pending' : 'Mark as completed'}
+                  className={cn(
+                    'w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
+                    r.completed
+                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                      : 'border-slate-300 hover:border-emerald-500'
+                  )}
+                >
+                  {r.completed && <CheckCircle2 size={14} />}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className={cn('text-sm', r.completed ? 'line-through text-slate-400' : 'text-slate-700')}>
+                    {r.title}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Added {fmtDate(r.createdAt)}
+                    {r.completedAt ? ` · Completed ${fmtDate(r.completedAt)}` : ''}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onDelete(r.id)}
+                  aria-label="Delete reminder"
+                  className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -882,61 +991,68 @@ function NotificationsTab({ notifications, onMarkRead }) {
 }
 
 // ─── Documents ───────────────────────────────────────────────────────────────
-function DocumentsTab({ cgpa, showMessage }) {
+function DocumentsTab({ semesters = [], showMessage }) {
   const [downloading, setDownloading] = useState(null)
-  const downloadMarksheet = async (semesterId, semName) => {
+  const list = Array.isArray(semesters) ? semesters : []
+
+  const downloadDocument = async (semesterId, semName) => {
     try {
       setDownloading(`sem-${semesterId}`)
       const res = await api.get(`/api/student/marksheet/${semesterId}`, { responseType: 'blob' })
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-      const a = document.createElement('a'); a.href = url; a.download = `marksheet_${semName.replace(/ /g, '_')}.pdf`; a.click()
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `internal_assessment_${semName.replace(/ /g, '_')}.pdf`
+      a.click()
       window.URL.revokeObjectURL(url)
-      showMessage(`Downloaded marksheet for ${semName}`)
-    } catch (err) { showMessage(err.response?.data?.message || `No marks data for ${semName}`, 'error') } finally { setDownloading(null) }
+      showMessage(`Downloaded ${semName} internal assessment & attendance`)
+    } catch (err) {
+      showMessage(err.response?.data?.message || `No internal assessment data for ${semName}`, 'error')
+    } finally {
+      setDownloading(null)
+    }
   }
-  const downloadTranscript = async () => {
-    try {
-      setDownloading('transcript')
-      const res = await api.get('/api/student/transcript', { responseType: 'blob' })
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-      const a = document.createElement('a'); a.href = url; a.download = 'academic_transcript.pdf'; a.click()
-      window.URL.revokeObjectURL(url)
-      showMessage('Transcript downloaded')
-    } catch { showMessage('No academic data for transcript yet', 'error') } finally { setDownloading(null) }
-  }
-  const sems = cgpa?.semesters || []
+
   return (
     <div className="space-y-6">
-      <PageTitle icon={FileText} title="Academic Documents" subtitle="Download your marksheets and official transcript." accent="violet" image={uiImages.studentServices} imageAlt="Student services desk" />
-      <div className="glass-card p-6 flex flex-wrap items-center justify-between gap-5 border border-white/60">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/25">
-            <ScrollText size={24} />
-          </div>
-          <div>
-            <h3 className="font-semibold text-slate-800 mb-0.5">Full Academic Transcript</h3>
-            <p className="text-sm text-slate-500">Complete academic history across all semesters with CGPA.</p>
-          </div>
-        </div>
-        <Button variant="gradient" onClick={downloadTranscript} disabled={downloading === 'transcript'} className="px-5">
-          <Download size={14} /> {downloading === 'transcript' ? 'Generating...' : 'Download Transcript'}
-        </Button>
-      </div>
+      <PageTitle
+        icon={FileText}
+        title="Academic Documents"
+        subtitle="Download semester-wise internal assessment marks and attendance."
+        accent="violet"
+        image={uiImages.studentServices}
+        imageAlt="Student services desk"
+      />
       <div>
-        <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Semester Marksheets</h3>
+        <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-4">Semester-wise Documents</h3>
         <div className="space-y-3">
-          {sems.map(sem => (
-            <div key={sem.semesterId} className="glass-card p-5 flex items-center justify-between border border-white/60 hover:border-indigo-300/70 transition-all">
+          {list.map(sem => (
+            <div key={sem.id} className="glass-card p-5 flex items-center justify-between border border-white/60 hover:border-indigo-300/70 transition-all">
               <div>
-                <p className="font-semibold text-slate-800">{sem.semesterName}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{sem.academicYear} · {sem.subjects?.length} subjects · SGPA {fmtNum(sem.sgpa)}</p>
+                <p className="font-semibold text-slate-800">{sem.name}</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {sem.academicYear} · Internal exam marks & attendance %
+                </p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => downloadMarksheet(sem.semesterId, sem.semesterName)} disabled={downloading === `sem-${sem.semesterId}`} className="px-4">
-                <Download size={13} /> {downloading === `sem-${sem.semesterId}` ? 'Generating...' : 'Download PDF'}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => downloadDocument(sem.id, sem.name)}
+                disabled={downloading === `sem-${sem.id}`}
+                className="px-4"
+              >
+                <Download size={13} /> {downloading === `sem-${sem.id}` ? 'Generating...' : 'Download PDF'}
               </Button>
             </div>
           ))}
-          {!sems.length && <EmptyState icon={FileText} title="No documents yet" accent="violet" description="Marksheets appear once results are published." />}
+          {!list.length && (
+            <EmptyState
+              icon={FileText}
+              title="No documents yet"
+              accent="violet"
+              description="Documents appear once you are enrolled in a semester."
+            />
+          )}
         </div>
       </div>
     </div>
@@ -1353,6 +1469,9 @@ export default function StudentDashboard() {
   const [internalMarks, setInternalMarks] = useState([])
   const [placements, setPlacements] = useState([])
   const [semesters, setSemesters] = useState([])
+  const [mySemesters, setMySemesters] = useState([])
+  const [reminders, setReminders] = useState([])
+  const [remindersLoading, setRemindersLoading] = useState(true)
   const [assignments, setAssignments] = useState([])
   const [materials, setMaterials] = useState([])
   const [questionPapers, setQuestionPapers] = useState([])
@@ -1387,8 +1506,9 @@ export default function StudentDashboard() {
 
   const handleSubmitAssignment = useCallback(async (assignmentId, file, note) => {
     const fd = new FormData()
-    fd.append('file', file)
+    if (file) fd.append('file', file)
     if (note) fd.append('note', note)
+    else if (!file) fd.append('note', 'Submitted physically to faculty (no file uploaded).')
     try {
       await api.post(`/api/student/assignments/${assignmentId}/submit`, fd)
       showMsg('Assignment submitted successfully')
@@ -1399,9 +1519,40 @@ export default function StudentDashboard() {
     }
   }, [refreshAssignments, showMsg])
 
+  const handleCreateReminder = useCallback(async (title) => {
+    try {
+      const res = await api.post('/api/student/reminders', { title })
+      setReminders(prev => sortReminders([res.data, ...prev]))
+      showMsg('Reminder added')
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to add reminder', 'error')
+      throw err
+    }
+  }, [showMsg])
+
+  const handleToggleReminder = useCallback(async (id) => {
+    try {
+      const res = await api.put(`/api/student/reminders/${id}/toggle`)
+      setReminders(prev => sortReminders(prev.map(r => r.id === id ? res.data : r)))
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to update reminder', 'error')
+    }
+  }, [showMsg])
+
+  const handleDeleteReminder = useCallback(async (id) => {
+    if (!window.confirm('Delete this reminder?')) return
+    try {
+      await api.delete(`/api/student/reminders/${id}`)
+      setReminders(prev => prev.filter(r => r.id !== id))
+      showMsg('Reminder deleted')
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to delete reminder', 'error')
+    }
+  }, [showMsg])
+
   useEffect(() => {
     const load = async () => {
-      const [prRes, atRes, ovRes, cgRes, notRes, ttRes, imRes, plRes, semRes, asRes, maRes, qpRes, fdRes, ucRes] = await Promise.allSettled([
+      const [prRes, atRes, ovRes, cgRes, notRes, ttRes, imRes, plRes, semRes, mySemRes, remRes, asRes, maRes, qpRes, fdRes, ucRes] = await Promise.allSettled([
         api.get('/api/student/profile'),
         api.get('/api/student/attendance'),
         api.get('/api/student/attendance/overall'),
@@ -1411,6 +1562,8 @@ export default function StudentDashboard() {
         api.get('/api/student/marks/internal'),
         api.get('/api/student/placements'),
         api.get('/api/semesters'),
+        api.get('/api/student/semesters'),
+        api.get('/api/student/reminders'),
         api.get('/api/student/assignments'),
         api.get('/api/student/materials'),
         api.get('/api/student/question-papers'),
@@ -1426,6 +1579,9 @@ export default function StudentDashboard() {
       if (imRes.status === 'fulfilled') setInternalMarks(Array.isArray(imRes.value.data) ? imRes.value.data : [])
       if (plRes.status === 'fulfilled') setPlacements(Array.isArray(plRes.value.data) ? plRes.value.data : [])
       if (semRes.status === 'fulfilled') setSemesters(Array.isArray(semRes.value.data) ? semRes.value.data : [])
+      if (mySemRes.status === 'fulfilled') setMySemesters(Array.isArray(mySemRes.value.data) ? mySemRes.value.data : [])
+      if (remRes.status === 'fulfilled') setReminders(sortReminders(remRes.value.data || []))
+      setRemindersLoading(false)
       if (asRes.status === 'fulfilled') setAssignments(Array.isArray(asRes.value.data) ? asRes.value.data : [])
       if (maRes.status === 'fulfilled') setMaterials(Array.isArray(maRes.value.data) ? maRes.value.data : [])
       if (qpRes.status === 'fulfilled') setQuestionPapers(Array.isArray(qpRes.value.data) ? qpRes.value.data : [])
@@ -1475,7 +1631,7 @@ export default function StudentDashboard() {
 
   const renderTab = () => {
     switch (activeTab) {
-      case 'overview': return <OverviewTab profile={profile} overall={overall} subjects={subjects} cgpa={cgpa} notifications={notifications} placements={placements} timetable={timetable} onTabChange={handleTabChange} />
+      case 'overview': return <OverviewTab profile={profile} overall={overall} subjects={subjects} cgpa={cgpa} notifications={notifications} placements={placements} reminders={reminders} onTabChange={handleTabChange} />
       case 'attendance': return <AttendanceTab overall={overall} subjects={subjects} semesters={semesters} onSemesterChange={handleSemesterChange} loading={loadingTab} />
       case 'marks': return <MarksTab internalMarks={internalMarks} cgpa={cgpa} />
       case 'assignments': return <AssignmentsTab assignments={assignments} loading={loadingTab} onSubmit={handleSubmitAssignment} onDownload={handleDownload} />
@@ -1486,7 +1642,8 @@ export default function StudentDashboard() {
       case 'timetable': return <TimetableTab timetable={timetable} loading={loadingTab} />
       case 'placements': return <PlacementsTab notices={placements} onDownload={handleDownload} />
       case 'notifications': return <NotificationsTab notifications={notifications} onMarkRead={handleMarkRead} />
-      case 'documents': return <DocumentsTab cgpa={cgpa} showMessage={showMsg} />
+      case 'documents': return <DocumentsTab semesters={mySemesters} showMessage={showMsg} />
+      case 'reminders': return <RemindersTab reminders={reminders} loading={remindersLoading} onCreate={handleCreateReminder} onToggle={handleToggleReminder} onDelete={handleDeleteReminder} />
       case 'aiAssistant': return <AiAssistantTab overall={overall} cgpa={cgpa} />
       case 'aiResumeAnalyzer': return <AiResumeAnalyzerTab />
       case 'settings': return <SettingsTab showMsg={showMsg} accent="blue" />
