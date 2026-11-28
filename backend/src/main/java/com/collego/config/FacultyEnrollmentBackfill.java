@@ -23,6 +23,7 @@ public class FacultyEnrollmentBackfill implements CommandLineRunner {
     public void run(String... args) {
         try {
             facultyPortalService.backfillStudentEnrollmentsForActiveAssignments();
+            log.info("Faculty subject assignment section backfill completed.");
         } catch (Exception e) {
             log.warn("Faculty student enrollment backfill skipped: {}", e.getMessage(), e);
         }
