@@ -82,6 +82,19 @@ public class FacultyController {
         return ResponseEntity.ok(facultyPortalService.getMySubjectAssignments(auth.getName()));
     }
 
+    @GetMapping("/all-students")
+    public ResponseEntity<List<FacultyAllStudentResponse>> getAllStudents(Authentication auth) {
+        return ResponseEntity.ok(facultyPortalService.getAllStudentsForFaculty(auth.getName()));
+    }
+
+    @PostMapping("/open-elective")
+    public ResponseEntity<FacultySubjectAssignmentResponse> createOpenElective(
+            Authentication auth,
+            @Valid @RequestBody CreateOpenElectiveRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(facultyPortalService.createOpenElective(auth.getName(), request));
+    }
+
     @DeleteMapping("/subject-assignments/{assignmentId}")
     public ResponseEntity<Map<String, String>> removeSubjectAssignment(
             Authentication auth,

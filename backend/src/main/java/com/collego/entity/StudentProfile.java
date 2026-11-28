@@ -30,6 +30,8 @@ public class StudentProfile {
 
     private String section;
 
+    private String division;
+
     private Integer admissionYear;
 
     /**
