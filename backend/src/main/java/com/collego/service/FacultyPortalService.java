@@ -60,7 +60,7 @@ public class FacultyPortalService {
     public List<FacultySectionResponse> getAssignedSections(String email) {
         FacultyProfile faculty = getFacultyByEmail(email);
         List<Section> sections = sectionRepository.findByFacultyId(faculty.getId()).stream()
-                .filter(section -> !section.isHidden())
+                .filter(section -> !"OPEN ELECTIVE".equalsIgnoreCase(section.getName()))
                 .collect(Collectors.toList());
 
         return sections.stream().map(section -> {
@@ -1240,14 +1240,13 @@ public class FacultyPortalService {
         // internally only so attendance/enrollment records can still be stored.
         final Course finalCourse = course;
         Section section = sectionRepository.findByCourseIdAndSemesterId(finalCourse.getId(), semester.getId()).stream()
-                .filter(sec -> sec.isHidden() && "OPEN ELECTIVE".equalsIgnoreCase(sec.getName()))
+                .filter(sec -> "OPEN ELECTIVE".equalsIgnoreCase(sec.getName()))
                 .findFirst()
                 .orElseGet(() -> sectionRepository.save(Section.builder()
                         .name("OPEN ELECTIVE")
                         .course(finalCourse)
                         .semester(semester)
                         .faculty(faculty)
-                        .hidden(true)
                         .maxCapacity(500)
                         .build()));
         if (section.getFaculty() == null) {
@@ -1320,7 +1319,6 @@ private List<Section> claimSectionsForFaculty(FacultyProfile faculty, Course cou
                     .semester(semester)
                     .faculty(faculty)
                     .maxCapacity(60)
-                    .hidden(false)
                     .build()));
         }
 
