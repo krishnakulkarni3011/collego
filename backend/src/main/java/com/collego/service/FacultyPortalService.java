@@ -1101,6 +1101,7 @@ public class FacultyPortalService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<CourseResponse> getAvailableCoursesForDepartment(String email) {
         FacultyProfile faculty = getFacultyByEmail(email);
         return courseRepository.findByDepartmentId(faculty.getDepartment().getId())
