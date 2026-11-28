@@ -27,12 +27,14 @@ export function PlacedStudentsPanel({ users = [], departments = [], showMsg }) {
 
   const students = (users || []).filter(u => u.role === 'STUDENT' && u.active)
   const filtered = students.filter(s => {
-    if (!query.trim()) return true
-    const q = query.toLowerCase()
-    return (s.firstName || '').toLowerCase().includes(q)
-      || (s.lastName || '').toLowerCase().includes(q)
-      || (s.usn || s.enrollmentNumber || '').toLowerCase().includes(q)
-      || (s.email || '').toLowerCase().includes(q)
+    const text = query.trim()
+    if (!text) return true
+    const tokens = text.toLowerCase().split(/\s+/).filter(Boolean)
+    const fullName = `${s.firstName || ''} ${s.lastName || ''}`.trim().toLowerCase()
+    const usn = (s.enrollmentNumber || '').toLowerCase()
+    // Every typed word must appear in the displayed name or USN.
+    // Email is intentionally excluded so unrelated names do not surface.
+    return tokens.every(token => fullName.includes(token) || usn.includes(token))
   })
 
   const toggle = (id) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -63,11 +65,14 @@ export function PlacedStudentsPanel({ users = [], departments = [], showMsg }) {
         <div className="rounded-2xl border border-white/60 bg-white/60 p-4">
           <div className="flex items-center justify-between gap-3 mb-3">
             <p className="text-xs font-semibold text-slate-700">Select students <Badge variant="secondary" className="ml-1">{selected.length}</Badge></p>
-            {selected.length > 0 && <button onClick={() => setSelected([])} className="text-[11px] text-indigo-600 hover:underline">Clear</button>}
+            <div className="flex items-center gap-3">
+              {query && <button onClick={() => setQuery('')} className="text-[11px] text-indigo-600 hover:underline">Clear search</button>}
+              {selected.length > 0 && <button onClick={() => setSelected([])} className="text-[11px] text-indigo-600 hover:underline">Clear selection</button>}
+            </div>
           </div>
           <div className="relative mb-2">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search name, USN or email" className="collego-input !pl-9" />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by student name or USN" className="collego-input !pl-9" />
           </div>
           <div className="max-h-56 overflow-y-auto rounded-xl border border-white/60 bg-white/70 divide-y divide-white/50">
             {filtered.length === 0 ? (
