@@ -21,6 +21,7 @@ import { SettingsTab } from '../components/dashboard/SettingsTab'
 import { HelpTab } from '../components/dashboard/HelpTab'
 import { FacultyDirectoryTab } from '../components/dashboard/FacultyDirectoryTab'
 import { ExamsStudentTab } from '../components/dashboard/ExamsStudentTab'
+import { EventBox } from '../components/dashboard/EventBox.jsx'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -73,7 +74,6 @@ const NAV_SECTIONS = [
       { id: 'placements', label: 'Placements', icon: Briefcase },
       { id: 'notifications', label: 'Notifications', icon: Bell },
       { id: 'newsletters', label: 'Newsletters', icon: Newspaper },
-      { id: 'reminders', label: 'My Reminders', icon: ListTodo },
       { id: 'settings', label: 'Settings', icon: Settings },
       { id: 'help', label: 'Help & Support', icon: HelpCircle },
     ],
@@ -105,7 +105,8 @@ function AttBadge({ pct }) {
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ profile, overall, subjects, cgpa, notifications, placements, reminders = [], onTabChange }) {
+function OverviewTab({ profile, overall, subjects, cgpa, notifications, placements, reminders = [], onTabChange, onCreateReminder, onToggleReminder, onDeleteReminder }) {
+  const [reminderTitle, setReminderTitle] = useState('')
   const now = new Date()
   const hour = now.getHours()
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
@@ -173,19 +174,32 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
           )}
         </Panel>
 
-        <Panel title="My Reminders" icon={ListTodo} accent="emerald" className="xl:col-span-5"
-          action={<button onClick={() => onTabChange('reminders')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 px-2 py-1 rounded-lg transition-colors">Open</button>}>
-          {pendingReminders.length === 0 ? (
-            <EmptyState icon={ListTodo} title="No pending reminders" accent="emerald" description="Add personal tasks from the My Reminders tab." />
+        <Panel title="My Tasks & Reminders" icon={ListTodo} accent="emerald" className="xl:col-span-5">
+          <form onSubmit={async (e) => {
+            e.preventDefault()
+            const value = reminderTitle.trim()
+            if (!value) return
+            await onCreateReminder?.(value)
+            setReminderTitle('')
+          }} className="flex gap-2 mb-3">
+            <input value={reminderTitle} onChange={e => setReminderTitle(e.target.value)} placeholder="Add a reminder or task..." className="collego-input flex-1 !py-2" />
+            <Button type="submit" variant="gradient" size="sm" disabled={!reminderTitle.trim()}><Plus size={13} /> Add</Button>
+          </form>
+          {reminders.length === 0 ? (
+            <EmptyState icon={ListTodo} title="No reminders yet" accent="emerald" description="Add your first personal task above." />
           ) : (
-            <div className="space-y-2">
-              {pendingReminders.map(r => (
-                <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-all">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                  <p className="text-xs font-medium text-slate-700 truncate">{r.title}</p>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {reminders.map(r => (
+                <div key={r.id} className="flex items-center gap-3 p-2 rounded-xl border border-white/60 bg-white/70">
+                  <button type="button" onClick={() => onToggleReminder?.(r.id)} aria-label={r.completed ? 'Mark pending' : 'Mark complete'}
+                    className={cn('w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center', r.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-emerald-500')}>
+                    {r.completed && <CheckCircle2 size={12} />}
+                  </button>
+                  <p className={cn('text-xs flex-1 min-w-0 truncate', r.completed ? 'line-through text-slate-400' : 'text-slate-700')}>{r.title}</p>
+                  <button type="button" onClick={() => onDeleteReminder?.(r.id)} aria-label="Delete" className="text-slate-300 hover:text-red-500"><Trash2 size={13} /></button>
                 </div>
               ))}
-              <p className="text-[10px] text-slate-400 pt-1">
+              <p className="text-[10px] text-slate-400">
                 {reminders.filter(r => !r.completed).length} pending · {reminders.filter(r => r.completed).length} completed
               </p>
             </div>
@@ -243,6 +257,8 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
           )}
         </Panel>
       </div>
+
+      <EventBox accent="emerald" />
 
       <ImageStrip
         title="Campus Moments"
@@ -1666,7 +1682,7 @@ export default function StudentDashboard() {
 
   const renderTab = () => {
     switch (activeTab) {
-      case 'overview': return <OverviewTab profile={profile} overall={overall} subjects={subjects} cgpa={cgpa} notifications={notifications} placements={placements} reminders={reminders} onTabChange={handleTabChange} />
+      case 'overview': return <OverviewTab profile={profile} overall={overall} subjects={subjects} cgpa={cgpa} notifications={notifications} placements={placements} reminders={reminders} onTabChange={handleTabChange} onCreateReminder={handleCreateReminder} onToggleReminder={handleToggleReminder} onDeleteReminder={handleDeleteReminder} />
       case 'attendance': return <AttendanceTab overall={overall} subjects={subjects} semesters={semesters} onSemesterChange={handleSemesterChange} loading={loadingTab} />
       case 'marks': return <MarksTab internalMarks={internalMarks} cgpa={cgpa} />
       case 'assignments': return <AssignmentsTab assignments={assignments} loading={loadingTab} onSubmit={handleSubmitAssignment} onDownload={handleDownload} />
@@ -1678,7 +1694,6 @@ export default function StudentDashboard() {
       case 'placements': return <PlacementsTab notices={placements} onDownload={handleDownload} />
       case 'notifications': return <NotificationsTab notifications={notifications} onMarkRead={handleMarkRead} />
       case 'documents': return <DocumentsTab semesters={mySemesters} showMessage={showMsg} />
-      case 'reminders': return <RemindersTab reminders={reminders} loading={remindersLoading} onCreate={handleCreateReminder} onToggle={handleToggleReminder} onDelete={handleDeleteReminder} />
       case 'newsletters': return <NewslettersTab newsletters={newsletters} showMessage={showMsg} />
       case 'aiAssistant': return <AiAssistantTab overall={overall} cgpa={cgpa} />
       case 'aiResumeAnalyzer': return <AiResumeAnalyzerTab />

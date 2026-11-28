@@ -18,6 +18,7 @@ import { HelpTab } from '../components/dashboard/HelpTab'
 import { InvigilationsTab } from '../components/dashboard/InvigilationsTab'
 import { CareerProfileTab } from '../components/dashboard/CareerProfileTab'
 import { GraduatedStudentsTab } from '../components/dashboard/GraduatedStudentsTab'
+import { EventBox } from '../components/dashboard/EventBox.jsx'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -80,7 +81,6 @@ const GLOBAL_NAV = [
   { id: 'invigilations', label: 'Invigilation Duties', icon: CalendarDays },
   { id: 'notices', label: 'Notices', icon: Megaphone },
   { id: 'newsletters', label: 'Newsletters', icon: Newspaper },
-  { id: 'reminders', label: 'My Reminders', icon: ListTodo },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'help', label: 'Help & Support', icon: HelpCircle },
 ]
@@ -101,7 +101,8 @@ const SECTION_TABS = [
 ]
 
 // â”€â”€â”€ Overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function OverviewTab({ sections, overviewData, onSectionSelect }) {
+function OverviewTab({ sections, overviewData, onSectionSelect, reminders = [], onCreateReminder, onToggleReminder, onDeleteReminder }) {
+  const [reminderTitle, setReminderTitle] = useState('')
   const now = new Date()
   const hour = now.getHours()
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
@@ -169,28 +170,39 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
         )}
       </Panel>
 
-      <Panel title="My Reminders" icon={ListTodo} accent="emerald" hover>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[
-            { icon: CheckCircle2, label: 'Mark task complete', desc: 'Tick off a personal or assigned task', accent: 'emerald' },
-            { icon: Clock, label: 'Upcoming deadlines', desc: 'View assignment/assessment due dates', accent: 'amber' },
-          ].map(f => {
-            const Icon = f.icon
-            const a = ACCENTS[f.accent]
-            return (
-              <div key={f.label} className="flex items-start gap-3 p-4 rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white hover:border-indigo-300/70 transition-all group">
-                <span className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', a.softBg, a.shadow)}>
-                  <Icon size={16} className={a.text} />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-800">{f.label}</p>
-                  <p className="text-[10px] text-slate-500 mt-1">{f.desc}</p>
-                </div>
+      <Panel title="My Tasks & Reminders" icon={ListTodo} accent="emerald" hover>
+        <form onSubmit={async (e) => {
+          e.preventDefault()
+          const value = reminderTitle.trim()
+          if (!value) return
+          await onCreateReminder?.(value)
+          setReminderTitle('')
+        }} className="flex gap-2 mb-3">
+          <input value={reminderTitle} onChange={e => setReminderTitle(e.target.value)} placeholder="Add a reminder or task..." className="collego-input flex-1 !py-2" />
+          <Button type="submit" variant="gradient" size="sm" disabled={!reminderTitle.trim()}><Plus size={13} /> Add</Button>
+        </form>
+        {reminders.length === 0 ? (
+          <EmptyState icon={ListTodo} title="No reminders yet" accent="emerald" description="Add your first personal task above." />
+        ) : (
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {reminders.map(r => (
+              <div key={r.id} className="flex items-center gap-3 p-2 rounded-xl border border-white/60 bg-white/70">
+                <button type="button" onClick={() => onToggleReminder?.(r.id)} aria-label={r.completed ? 'Mark pending' : 'Mark complete'}
+                  className={cn('w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center', r.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-emerald-500')}>
+                  {r.completed && <CheckCircle2 size={12} />}
+                </button>
+                <p className={cn('text-xs flex-1 min-w-0 truncate', r.completed ? 'line-through text-slate-400' : 'text-slate-700')}>{r.title}</p>
+                <button type="button" onClick={() => onDeleteReminder?.(r.id)} aria-label="Delete" className="text-slate-300 hover:text-red-500"><Trash2 size={13} /></button>
               </div>
-            )
-          })}
-        </div>
+            ))}
+            <p className="text-[10px] text-slate-400">
+              {reminders.filter(r => !r.completed).length} pending · {reminders.filter(r => r.completed).length} completed
+            </p>
+          </div>
+        )}
       </Panel>
+
+      <EventBox accent="violet" />
 
       <ImageStrip
         title="Teaching Moments"
@@ -2675,7 +2687,7 @@ export default function FacultyDashboard() {
   const renderContent = () => {
     if (!selectedSection) {
       switch (activeTab) {
-        case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
+        case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} reminders={facultyReminders} onCreateReminder={handleCreateReminder} onToggleReminder={handleToggleReminder} onDeleteReminder={handleDeleteReminder} />
         case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} courseCode={newCourseCode} setCourseCode={setNewCourseCode} credits={newCourseCredits} setCredits={setNewCourseCredits} sectionFilter={sectionFilter} setSectionFilter={setSectionFilter} onOpenElective={handleOpenElective} openElectiveLoading={subjectAssignmentsLoading} />
         case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} targetYear={qpTargetYear} setTargetYear={setQpTargetYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
         case 'careerProfile': return <CareerProfileTab profile={careerProfile} loading={careerLoading} onUpload={handleUploadCareerResume} onRemove={handleRemoveCareerResume} onDownload={handleDownload} />
@@ -2685,7 +2697,6 @@ export default function FacultyDashboard() {
         case 'notices': return <NoticesTab title={noticeTitle} setTitle={setNoticeTitle} message={noticeMessage} setMessage={setNoticeMessage} type={noticeType} setType={setNoticeType} targetYear={noticeTargetYear} setTargetYear={setNoticeTargetYear} departmentName={facultyDepartmentName} onSubmit={handleDraftNotice} sentNotices={sentNotices} loading={loading} inbox={notifications} />
         case 'settings': return <SettingsTab showMsg={showMsg} accent="violet" />
         case 'help': return <HelpTab accent="violet" />
-case 'reminders': return <RemindersTab facultyReminders={facultyReminders} loading={facultyRemindersLoading} onCreate={handleCreateReminder} onToggle={handleToggleReminder} onDelete={handleDeleteReminder} />
         case 'resumeApprovals': return <HodResumeApprovalsTab showMsg={showMsg} />
         case 'graduatedStudents': return <GraduatedStudentsTab endpoint="/api/faculty/hod/graduated-students" title="Department Graduates" />
         case 'newsletters': return <FacultyNewslettersTab showMsg={showMsg} isHod={careerProfile?.isHod} onDownload={handleDownload} />
