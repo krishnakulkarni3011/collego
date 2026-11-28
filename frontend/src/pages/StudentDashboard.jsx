@@ -8,7 +8,7 @@ import {
   GraduationCap, CheckCircle2, Bot,
   Layers, Award, Search, AlertTriangle, RefreshCw,
   BookOpen, FolderOpen, Upload, Clock, Paperclip, Settings, HelpCircle, Users, Eye, X,
-  CalendarOff, ListTodo, Plus, Trash2,
+  CalendarOff, ListTodo, Plus, Trash2, Newspaper,
 } from 'lucide-react'
 import {
   AreaChart, Area, ResponsiveContainer,
@@ -71,6 +71,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'placements', label: 'Placements', icon: Briefcase },
       { id: 'notifications', label: 'Notifications', icon: Bell },
+      { id: 'newsletters', label: 'Newsletters', icon: Newspaper },
       { id: 'reminders', label: 'My Reminders', icon: ListTodo },
       { id: 'settings', label: 'Settings', icon: Settings },
       { id: 'help', label: 'Help & Support', icon: HelpCircle },
@@ -690,6 +691,36 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
 }
 
 // ─── Personal Reminders ──────────────────────────────────────────────────────
+function NewslettersTab({ newsletters = [], showMessage }) {
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={Newspaper} title="Department Newsletters" accent="emerald"
+        subtitle="Newsletters shared by your Head of Department." />
+      {newsletters.length === 0 ? (
+        <div className="glass-card p-12 border border-white/60">
+          <EmptyState icon={Newspaper} title="No newsletters yet" accent="emerald" description="Department newsletters will appear here once uploaded." />
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {newsletters.map(n => (
+            <div key={n.id} className="glass-card p-5 border border-white/60 flex flex-wrap items-center gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-800">{n.title}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {fmtDate(n.createdAt)} · {n.uploadedByName} · {n.fileName}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => downloadFile(`/api/newsletters/${n.id}/file`, n.fileName || 'newsletter.pdf').catch(() => showMessage('Download failed', 'error'))}>
+                <Download size={13} /> Download
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RemindersTab({ reminders = [], loading, onCreate, onToggle, onDelete }) {
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState(false)
@@ -1472,6 +1503,7 @@ export default function StudentDashboard() {
   const [mySemesters, setMySemesters] = useState([])
   const [reminders, setReminders] = useState([])
   const [remindersLoading, setRemindersLoading] = useState(true)
+  const [newsletters, setNewsletters] = useState([])
   const [assignments, setAssignments] = useState([])
   const [materials, setMaterials] = useState([])
   const [questionPapers, setQuestionPapers] = useState([])
@@ -1552,7 +1584,7 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const [prRes, atRes, ovRes, cgRes, notRes, ttRes, imRes, plRes, semRes, mySemRes, remRes, asRes, maRes, qpRes, fdRes, ucRes] = await Promise.allSettled([
+      const [prRes, atRes, ovRes, cgRes, notRes, ttRes, imRes, plRes, semRes, mySemRes, remRes, nlRes, asRes, maRes, qpRes, fdRes, ucRes] = await Promise.allSettled([
         api.get('/api/student/profile'),
         api.get('/api/student/attendance'),
         api.get('/api/student/attendance/overall'),
@@ -1564,6 +1596,7 @@ export default function StudentDashboard() {
         api.get('/api/semesters'),
         api.get('/api/student/semesters'),
         api.get('/api/student/reminders'),
+        api.get('/api/student/newsletters'),
         api.get('/api/student/assignments'),
         api.get('/api/student/materials'),
         api.get('/api/student/question-papers'),
@@ -1581,6 +1614,7 @@ export default function StudentDashboard() {
       if (semRes.status === 'fulfilled') setSemesters(Array.isArray(semRes.value.data) ? semRes.value.data : [])
       if (mySemRes.status === 'fulfilled') setMySemesters(Array.isArray(mySemRes.value.data) ? mySemRes.value.data : [])
       if (remRes.status === 'fulfilled') setReminders(sortReminders(remRes.value.data || []))
+      if (nlRes.status === 'fulfilled') setNewsletters(Array.isArray(nlRes.value.data) ? nlRes.value.data : [])
       setRemindersLoading(false)
       if (asRes.status === 'fulfilled') setAssignments(Array.isArray(asRes.value.data) ? asRes.value.data : [])
       if (maRes.status === 'fulfilled') setMaterials(Array.isArray(maRes.value.data) ? maRes.value.data : [])
@@ -1644,6 +1678,7 @@ export default function StudentDashboard() {
       case 'notifications': return <NotificationsTab notifications={notifications} onMarkRead={handleMarkRead} />
       case 'documents': return <DocumentsTab semesters={mySemesters} showMessage={showMsg} />
       case 'reminders': return <RemindersTab reminders={reminders} loading={remindersLoading} onCreate={handleCreateReminder} onToggle={handleToggleReminder} onDelete={handleDeleteReminder} />
+      case 'newsletters': return <NewslettersTab newsletters={newsletters} showMessage={showMsg} />
       case 'aiAssistant': return <AiAssistantTab overall={overall} cgpa={cgpa} />
       case 'aiResumeAnalyzer': return <AiResumeAnalyzerTab />
       case 'settings': return <SettingsTab showMsg={showMsg} accent="blue" />
