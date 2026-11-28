@@ -24,6 +24,9 @@ import { HelpTab } from '../components/dashboard/HelpTab'
 import { ExamsAdminTab } from '../components/dashboard/ExamsAdminTab'
 import { PromotionTab } from '../components/dashboard/PromotionTab'
 import { GraduatedStudentsTab } from '../components/dashboard/GraduatedStudentsTab'
+import { AdminEventsTab } from '../components/dashboard/AdminEventsTab.jsx'
+import { PlacedStudentsPanel } from '../components/dashboard/PlacedStudentsPanel.jsx'
+import { EventBox } from '../components/dashboard/EventBox.jsx'
 import { confirmAction } from '../components/common/ConfirmDialog.jsx'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/ui/badge'
@@ -65,6 +68,7 @@ const NAV_SECTIONS = [
     title: 'Administration',
     items: [
       { id: 'announcements', label: 'Notices & Events', icon: Megaphone },
+      { id: 'events', label: 'Upcoming Events', icon: CalendarDays },
       { id: 'reports', label: 'Reports', icon: BarChart3 },
       { id: 'promotion', label: 'Semester Promotion', icon: GraduationCap },
       { id: 'graduatedStudents', label: 'Graduated Students', icon: GraduationCap },
@@ -230,6 +234,8 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
         </Panel>
 
         </div>
+
+      <EventBox accent="indigo" />
 
       <ImageStrip
         title="Campus at a Glance"
@@ -1279,47 +1285,7 @@ function PlacementsTab({ placementStats, notices = [], departments = [], users =
             </div>
           )}
         </Panel>
-        <Panel title="Placed Students" icon={Trophy} accent="amber">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Students (multiple)</label>
-                <select multiple value={placedForm.studentIds.map(String)}
-                  onChange={e => setPlacedForm({ ...placedForm, studentIds: Array.from(e.target.selectedOptions).map(o => Number(o.value)) })}
-                  className="collego-input !h-32">
-                  {studentOptions.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName} - {u.usn || u.enrollmentNumber || u.email}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-1 gap-3">
-                <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Company Name</label><input value={placedForm.companyName} onChange={e => setPlacedForm({ ...placedForm, companyName: e.target.value })} placeholder="Company" className="collego-input" /></div>
-                <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Salary</label><input value={placedForm.salary} onChange={e => setPlacedForm({ ...placedForm, salary: e.target.value })} placeholder="e.g. 8 LPA" className="collego-input" /></div>
-                <div><label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Role</label><input value={placedForm.role} onChange={e => setPlacedForm({ ...placedForm, role: e.target.value })} placeholder="e.g. Software Engineer" className="collego-input" /></div>
-                <div>
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Department (optional)</label>
-                  <select value={placedForm.departmentId} onChange={e => setPlacedForm({ ...placedForm, departmentId: e.target.value })} className="collego-input">
-                    <option value="">Use student department</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
-                <Button variant="gradient" size="sm" onClick={submitPlaced} disabled={placedBusy || !placedForm.companyName.trim() || !placedForm.studentIds.length}>
-                  {placedBusy ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><Plus size={14} /> Add Placed Students</>}
-                </Button>
-              </div>
-            </div>
-            <div className="divide-y divide-white/60 rounded-xl border border-white/60 bg-white/50 max-h-72 overflow-y-auto">
-              {placedStudents.length === 0 ? (
-                <p className="p-4 text-xs text-slate-400">No placed students recorded yet.</p>
-              ) : placedStudents.map(p => (
-                <div key={p.id} className="flex items-center justify-between gap-3 p-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-800 truncate">{p.name} <span className="text-slate-400 font-normal">({p.usn})</span></p>
-                    <p className="text-[10px] text-slate-400">{p.companyName} - {p.role || 'Role N/A'} - {p.salary || 'Salary N/A'} - {p.department || 'N/A'}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Panel>
+        <PlacedStudentsPanel users={users} departments={departments} showMsg={showMsg} />
       </div>
     </div>
   )
@@ -1774,6 +1740,7 @@ export default function AdminDashboard() {
       case 'promotion': return <PromotionTab semesters={semesters} showMsg={showMsg} />
       case 'graduatedStudents': return <GraduatedStudentsTab endpoint="/api/admin/graduated-students" />
       case 'announcements': return <NoticesTab broadcasts={broadcasts} insights={insights} />
+      case 'events': return <AdminEventsTab showMsg={showMsg} />
       case 'settings': return <SettingsTab showMsg={showMsg} accent="indigo" />
       case 'help': return <HelpTab accent="indigo" />
       default: return null
