@@ -1264,8 +1264,8 @@ function PlacementsTab({ placementStats, notices = [], departments = [], users =
         )}
       </Panel>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Panel title="Department Placements" icon={Layers} accent="indigo" className="xl:col-span-2">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <Panel title="Department Placements" icon={Layers} accent="indigo">
           {deptData.length === 0 ? <EmptyState icon={Briefcase} title="No placement data" accent="indigo" /> : (
             <div className="overflow-x-auto">
               <table className="collego-table">
