@@ -1148,136 +1148,140 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, targe
 }
 
 // â”€â”€â”€ Subject Assignments Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove, selectedSemesterId, setSelectedSemesterId, courseName, setCourseName, courseCode, setCourseCode, credits, setCredits, divisionFilter, setDivisionFilter, loadFromAllDepartments, setLoadFromAllDepartments, onOpenElective, openElectiveLoading }) {
+function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove,
+  selectedSemesterId, setSelectedSemesterId, courseName, setCourseName, courseCode, setCourseCode,
+  credits, setCredits, sectionFilter, setSectionFilter, onOpenElective, openElectiveLoading }) {
   const selectedSemester = semesters.find(s => String(s.id) === String(selectedSemesterId))
   const selectedYear = semesterYear(selectedSemester?.number)
+
+  const [departments, setDepartments] = useState([])
+  const [targetDepartmentId, setTargetDepartmentId] = useState('')
+  const [particularStudents, setParticularStudents] = useState([])
+  const [particularSelected, setParticularSelected] = useState([])
+  const [particularQuery, setParticularQuery] = useState('')
+  const [particularLoading, setParticularLoading] = useState(false)
+
   const [oeCourseName, setOeCourseName] = useState('')
   const [oeCredits, setOeCredits] = useState('4')
   const [oeSemesterId, setOeSemesterId] = useState('')
+  const [oeDepartmentId, setOeDepartmentId] = useState('')
   const [oeStudents, setOeStudents] = useState([])
   const [oeSelected, setOeSelected] = useState([])
-  const [oeLoadingStudents, setOeLoadingStudents] = useState(false)
   const [oeQuery, setOeQuery] = useState('')
+  const [oeLoadingStudents, setOeLoadingStudents] = useState(false)
 
   useEffect(() => {
-    if (!oeStudents.length) {
-      setOeLoadingStudents(true)
-      api.get('/api/faculty/all-students')
-        .then(res => setOeStudents(Array.isArray(res.data) ? res.data : []))
-        .catch(() => setOeStudents([]))
-        .finally(() => setOeLoadingStudents(false))
+    api.get('/api/departments')
+      .then(res => setDepartments(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setDepartments([]))
+  }, [])
+
+  useEffect(() => {
+    if (!targetDepartmentId) {
+      setParticularStudents([])
+      setParticularSelected([])
+      return
     }
-  }, [oeStudents.length])
+    setParticularLoading(true)
+    api.get(`/api/faculty/departments/${targetDepartmentId}/students`)
+      .then(res => {
+        setParticularStudents(Array.isArray(res.data) ? res.data : [])
+      })
+      .catch(() => setParticularStudents([]))
+      .finally(() => setParticularLoading(false))
+    setParticularSelected([])
+  }, [targetDepartmentId])
 
-  const filteredOeStudents = oeStudents.filter(s => {
-    if (!oeQuery.trim()) return true
-    const q = oeQuery.toLowerCase()
-    return (s.name || '').toLowerCase().includes(q)
-      || (s.enrollmentNumber || '').toLowerCase().includes(q)
-      || (s.departmentName || '').toLowerCase().includes(q)
-  })
+  useEffect(() => {
+    if (!oeDepartmentId) {
+      setOeStudents([])
+      setOeSelected([])
+      return
+    }
+    setOeLoadingStudents(true)
+    api.get(`/api/faculty/departments/${oeDepartmentId}/students`)
+      .then(res => {
+        setOeStudents(Array.isArray(res.data) ? res.data : [])
+      })
+      .catch(() => setOeStudents([]))
+      .finally(() => setOeLoadingStudents(false))
+    setOeSelected([])
+  }, [oeDepartmentId])
 
-  const toggleOeStudent = (id) => setOeSelected(prev =>
-    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const filterStudents = (list, query) => {
+    if (!query.trim()) return list
+    const q = query.toLowerCase()
+    return list.filter(s =>
+      (s.name || '').toLowerCase().includes(q) ||
+      (s.enrollmentNumber || '').toLowerCase().includes(q))
+  }
+
+  const toggle = (id, selected, setter) =>
+    setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+  const filteredParticular = filterStudents(particularStudents, particularQuery)
+  const filteredOe = filterStudents(oeStudents, oeQuery)
 
   return (
     <div className="space-y-6">
-      <PageTitle icon={BookUser} title="My Subject Assignments" subtitle="Assign yourself to a subject and semester. Students from the matching academic year are loaded automatically into the sections you manage." accent="violet"
+      <PageTitle icon={BookUser} title="My Subject Assignments" subtitle="Assign a subject, choose a semester and optionally load only a section or particular students." accent="violet"
         image={uiImages.campus} imageAlt="College campus"
         actions={<Badge variant="purple">Full Independence</Badge>} />
 
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={14} className="text-violet-500" /> Assign New Subject</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Name (type any course)</label>
-            <input
-              value={courseName}
-              onChange={e => setCourseName(e.target.value)}
-              placeholder="e.g., UI/UX Design, Prompt Engineering, Machine Learning, etc."
-              className="collego-input"
-            />
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Name</label>
+            <input value={courseName} onChange={e => setCourseName(e.target.value)}
+              placeholder="e.g. Machine Learning" className="collego-input" />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Subject Code (optional)</label>
-            <input
-              value={courseCode}
-              onChange={e => setCourseCode(e.target.value.toUpperCase())}
-              placeholder="e.g., CSE301"
-              maxLength={30}
-              className="collego-input"
-            />
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Subject Code</label>
+            <input value={courseCode} onChange={e => setCourseCode(e.target.value.toUpperCase())}
+              placeholder="e.g. CSE301" maxLength={30} className="collego-input" />
             <p className="text-[10px] text-slate-400 mt-1">Leave blank to generate automatically.</p>
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Number of Credits</label>
-            <input
-              type="number"
-              min="1"
-              max="12"
-              step="1"
-              value={credits}
-              onChange={e => setCredits(e.target.value)}
-              placeholder="e.g., 4"
-              className="collego-input"
-            />
-            <p className="text-[10px] text-slate-400 mt-1">Credit value saved on the subject (1â€“12).</p>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Credits</label>
+            <input type="number" min="1" max="12" step="1" value={credits}
+              onChange={e => setCredits(e.target.value)} placeholder="4" className="collego-input" />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Division</label>
-            <select value={divisionFilter} onChange={e => setDivisionFilter(e.target.value)} className="collego-input">
-              <option value="">All Divisions</option>
-              {'A B C D E'.split(' ').map(div => <option key={div} value={div}>{div}</option>)}
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Section</label>
+            <select value={sectionFilter} onChange={e => setSectionFilter(e.target.value)} className="collego-input">
+              <option value="">All Sections</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
             </select>
-          </div>
-          <div>
-            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Load From</label>
-            <label className="flex items-center gap-2 mb-1">
-              <input
-                type="radio"
-                checked={!loadFromAllDepartments}
-                onChange={() => setLoadFromAllDepartments(false)}
-                className="rounded w-4 h-4 cursor-pointer"
-              /> Department
-            </label>
-            <label className="flex items-center gap-2 mb-1">
-              <input
-                type="radio"
-                checked={loadFromAllDepartments}
-                onChange={() => setLoadFromAllDepartments(true)}
-                className="rounded w-4 h-4 cursor-pointer"
-              /> All Departments
-            </label>
+            <p className="text-[10px] text-slate-400 mt-1">Load students of this section from the selected semester.</p>
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Semester</label>
             <select value={selectedSemesterId} onChange={e => setSelectedSemesterId(e.target.value)} className="collego-input">
               <option value="">Select semester</option>
-              {semesters.map(s => {
-                const year = semesterYear(s.number)
-                return <option key={s.id} value={s.id}>{s.name} Â· {targetYearLabel(year)} ({s.academicYear})</option>
-              })}
+              {semesters.map(s => (
+                <option key={s.id} value={s.id}>{s.name} ({s.academicYear})</option>
+              ))}
             </select>
-            {selectedSemester && (
-              <div className="mt-2 flex items-start gap-2 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2">
-                <GraduationCap size={14} className="text-violet-500 mt-0.5 shrink-0" />
-                <p className="text-[11px] text-violet-700 leading-relaxed">
-                  <span className="font-semibold">{targetYearLabel(selectedYear)} students</span> from your department will be loaded into the sections for this subject, ready for attendance, marks and resources.
-                </p>
-              </div>
-            )}
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Department</label>
+            <select value={targetDepartmentId} onChange={e => setTargetDepartmentId(e.target.value)} className="collego-input">
+              <option value="">My Department</option>
+              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
           </div>
         </div>
 
         <div className="mt-5 rounded-xl border border-white/60 bg-white/50 p-3">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Semester â†’ Academic Year</p>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Semester to Academic Year</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {SEMESTER_YEAR_MAP.map(item => (
               <div key={item.year} className={cn(
                 'rounded-lg border px-2.5 py-2 text-center transition-colors',
-                selectedYear === item.year
-                  ? 'border-violet-200 bg-violet-50'
-                  : 'border-white/70 bg-white/60'
+                selectedYear === item.year ? 'border-violet-200 bg-violet-50' : 'border-white/70 bg-white/60'
               )}>
                 <p className="text-[10px] text-slate-400">{item.semesters}</p>
                 <p className={cn('text-xs font-semibold mt-0.5', selectedYear === item.year ? 'text-violet-700' : 'text-slate-700')}>{targetYearLabel(item.year)}</p>
@@ -1286,7 +1290,42 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
           </div>
         </div>
 
-        <Button variant="gradient" size="sm" className="mt-5 px-5" onClick={onAssign} disabled={loading || !courseName.trim() || !selectedSemesterId || !Number(credits)}>
+        {targetDepartmentId && (
+          <div className="mt-5 rounded-xl border border-violet-100 bg-violet-50/40 p-4">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Load particular students (backlog) - {particularSelected.length} selected
+            </p>
+            <input value={particularQuery} onChange={e => setParticularQuery(e.target.value)}
+              placeholder="Search by name or USN" className="collego-input mb-2" />
+            <div className="max-h-48 overflow-y-auto rounded-xl border border-white/60 bg-white/70 divide-y divide-white/50">
+              {particularLoading ? (
+                <div className="p-4 text-center text-xs text-slate-400">Loading students...</div>
+              ) : filteredParticular.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400">No students in this department.</div>
+              ) : filteredParticular.map(s => (
+                <label key={s.studentId} className="flex items-center gap-3 px-3 py-2 hover:bg-white cursor-pointer">
+                  <input type="checkbox" checked={particularSelected.includes(s.studentId)}
+                    onChange={() => toggle(s.studentId, particularSelected, setParticularSelected)}
+                    className="rounded w-4 h-4 cursor-pointer" />
+                  <span className="min-w-0 flex-1">
+                    <span className="text-xs font-semibold text-slate-700 block truncate">{s.name}</span>
+                    <span className="text-[10px] text-slate-400">{s.enrollmentNumber} - {s.departmentName}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-400 mt-2">If none are selected, all students of the semester and section are loaded.</p>
+          </div>
+        )}
+
+        <Button variant="gradient" size="sm" className="mt-5 px-5"
+          onClick={() => onAssign({
+            courseName: courseName.trim(), courseCode: courseCode.trim(), credits: Number(credits),
+            semesterId: parseInt(selectedSemesterId), sectionFilter,
+            departmentId: targetDepartmentId ? parseInt(targetDepartmentId) : undefined,
+            studentIds: particularSelected,
+          })}
+          disabled={loading || !courseName.trim() || !selectedSemesterId || !Number(credits)}>
           {loading ? <><RefreshCw size={14} className="animate-spin" /> Assigning...</> : <><Plus size={13} /> Assign Subject &amp; Load Students</>}
         </Button>
       </div>
@@ -1299,7 +1338,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
               <div key={a.id} className="px-5 py-4 hover:bg-white/30 transition-colors flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800 truncate">{a.courseName}</p>
-                  <p className="text-xs text-slate-400 mt-1">{a.courseCode} Â· {a.credits ?? 4} credits</p>
+                  <p className="text-xs text-slate-400 mt-1">{a.courseCode} - {a.credits ?? 4} credits</p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <Badge variant="secondary">{a.yearLabel || targetYearLabel(a.year || semesterYear(a.semesterNumber))}</Badge>
@@ -1322,22 +1361,23 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
         </div>
       )}
 
-      {/* Open Elective / Backlog cross-department student picker */}
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-1 flex items-center gap-2">
           <Layers size={15} className="text-violet-500" /> Open Elective Subject
         </h3>
         <p className="text-[11px] text-slate-400 mb-5">
-          Add an elective subject and hand-pick students from any department â€” useful for backlog and open-elective batches.
+          Add an elective and choose particular students from one department.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Subject Name</label>
-            <input value={oeCourseName} onChange={e => setOeCourseName(e.target.value)} placeholder="e.g. Open Elective â€” Cyber Security" className="collego-input" />
+            <input value={oeCourseName} onChange={e => setOeCourseName(e.target.value)}
+              placeholder="e.g. Cyber Security" className="collego-input" />
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Credits</label>
-            <input type="number" min="1" max="12" value={oeCredits} onChange={e => setOeCredits(e.target.value)} className="collego-input" />
+            <input type="number" min="1" max="12" value={oeCredits}
+              onChange={e => setOeCredits(e.target.value)} className="collego-input" />
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Semester</label>
@@ -1346,33 +1386,48 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
               {semesters.map(s => <option key={s.id} value={s.id}>{s.name} ({s.academicYear})</option>)}
             </select>
           </div>
-        </div>
-
-        <div className="mt-4">
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
-            Students across departments <Badge variant="secondary" className="ml-2">{oeSelected.length} selected</Badge>
-          </label>
-          <input value={oeQuery} onChange={e => setOeQuery(e.target.value)} placeholder="Search by name, USN or department..." className="collego-input mb-3" />
-          <div className="max-h-64 overflow-y-auto rounded-xl border border-white/60 bg-white/50 divide-y divide-white/50">
-            {oeLoadingStudents ? (
-              <div className="p-6 text-center text-xs text-slate-400"><RefreshCw size={14} className="animate-spin mx-auto mb-2" /> Loading students...</div>
-            ) : filteredOeStudents.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-400">No students found.</div>
-            ) : filteredOeStudents.map(s => (
-              <label key={s.studentId} className="flex items-center gap-3 px-3 py-2 hover:bg-white/70 cursor-pointer">
-                <input type="checkbox" checked={oeSelected.includes(s.studentId)} onChange={() => toggleOeStudent(s.studentId)} className="rounded w-4 h-4 cursor-pointer" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-slate-700 truncate">{s.name}</p>
-                  <p className="text-[10px] text-slate-400">{s.enrollmentNumber} Â· {s.departmentName} Â· {s.section ? `Sec ${s.section}` : `Year ${s.year || 'â€”'}`}</p>
-                </div>
-              </label>
-            ))}
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Department</label>
+            <select value={oeDepartmentId} onChange={e => setOeDepartmentId(e.target.value)} className="collego-input">
+              <option value="">Select department</option>
+              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
           </div>
         </div>
 
+        {oeDepartmentId && (
+          <div className="mt-4">
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
+              Students of this department - {oeSelected.length} selected
+            </label>
+            <input value={oeQuery} onChange={e => setOeQuery(e.target.value)}
+              placeholder="Search by name or USN" className="collego-input mb-3" />
+            <div className="max-h-64 overflow-y-auto rounded-xl border border-white/60 bg-white/50 divide-y divide-white/50">
+              {oeLoadingStudents ? (
+                <div className="p-6 text-center text-xs text-slate-400">Loading students...</div>
+              ) : filteredOe.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400">No students in this department.</div>
+              ) : filteredOe.map(s => (
+                <label key={s.studentId} className="flex items-center gap-3 px-3 py-2 hover:bg-white/70 cursor-pointer">
+                  <input type="checkbox" checked={oeSelected.includes(s.studentId)}
+                    onChange={() => toggle(s.studentId, oeSelected, setOeSelected)}
+                    className="rounded w-4 h-4 cursor-pointer" />
+                  <span className="min-w-0 flex-1">
+                    <span className="text-xs font-semibold text-slate-700 block truncate">{s.name}</span>
+                    <span className="text-[10px] text-slate-400">{s.enrollmentNumber} - {s.departmentName}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
         <Button variant="gradient" size="sm" className="mt-4 px-5"
-          disabled={openElectiveLoading || !oeCourseName.trim() || !oeSemesterId || !Number(oeCredits) || oeSelected.length === 0}
-          onClick={() => onOpenElective({ courseName: oeCourseName.trim(), semesterId: parseInt(oeSemesterId), credits: Number(oeCredits), studentIds: oeSelected })}>
+          disabled={openElectiveLoading || !oeCourseName.trim() || !oeSemesterId || !oeDepartmentId || !Number(oeCredits) || oeSelected.length === 0}
+          onClick={() => onOpenElective({
+            courseName: oeCourseName.trim(), semesterId: parseInt(oeSemesterId),
+            credits: Number(oeCredits), departmentId: parseInt(oeDepartmentId), studentIds: oeSelected,
+          })}>
           {openElectiveLoading ? <><RefreshCw size={14} className="animate-spin" /> Creating...</> : <><Plus size={13} /> Create Open Elective &amp; Add Students</>}
         </Button>
       </div>
@@ -2011,8 +2066,7 @@ export default function FacultyDashboard() {
   const [newCourseName, setNewCourseName] = useState('')
   const [newCourseCode, setNewCourseCode] = useState('')
   const [newCourseCredits, setNewCourseCredits] = useState('4')
-  const [divisionFilter, setDivisionFilter] = useState('')
-  const [loadFromAllDepartments, setLoadFromAllDepartments] = useState(false)
+  const [sectionFilter, setSectionFilter] = useState('')
   const [subjectAssignmentsLoading, setSubjectAssignmentsLoading] = useState(false)
 
   // Personal Reminders
@@ -2530,16 +2584,11 @@ export default function FacultyDashboard() {
     catch { /* ignore */ } finally { setSubjectAssignmentsLoading(false) }
   }
 
-  const handleAssignSubject = async () => {
-    if (!newCourseName.trim() || !selectedSemesterId) return
-    const credits = Number(newCourseCredits)
-    if (!Number.isInteger(credits) || credits < 1 || credits > 12) {
-      showMsg('Enter a valid number of credits (1â€“12)', 'error')
-      return
-    }
+  const handleAssignSubject = async (payload) => {
+    if (!payload.courseName || !payload.semesterId) return
     setSubjectAssignmentsLoading(true)
     try {
-      const res = await api.post('/api/faculty/subject-assignments', { courseName: newCourseName.trim(), courseCode: newCourseCode.trim(), semesterId: parseInt(selectedSemesterId), credits, divisionFilter, loadFromAllDepartments })
+      const res = await api.post('/api/faculty/subject-assignments', payload)
       const studentCount = res.data?.studentCount ?? 0
       const yearLabel = res.data?.yearLabel || targetYearLabel(res.data?.year)
       const sectionCount = res.data?.sectionCount ?? 0
@@ -2547,12 +2596,11 @@ export default function FacultyDashboard() {
       setNewCourseCode('')
       setNewCourseCredits('4')
       setSelectedSemesterId('')
+      setSectionFilter('')
       await Promise.all([loadMySubjectAssignments(), fetchSections()])
       showMsg(studentCount > 0
-        ? `Subject assigned â€” ${studentCount} ${yearLabel} students loaded into ${sectionCount} section${sectionCount === 1 ? '' : 's'}. Open the subject under My Sections to manage them.`
-        : loadFromAllDepartments
-          ? `Subject assigned from all departments â€” no students found across all departments.`
-          : `Subject assigned, but no ${yearLabel} students were found in your department yet.`)
+        ? `Subject assigned - ${studentCount} ${yearLabel} students loaded into ${sectionCount} section${sectionCount === 1 ? '' : 's'}.`
+        : `Subject assigned, but no students were found for this selection yet.`)
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to assign subject', 'error') }
     finally { setSubjectAssignmentsLoading(false) }
   }
@@ -2625,7 +2673,7 @@ export default function FacultyDashboard() {
     if (!selectedSection) {
       switch (activeTab) {
         case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
-        case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} courseCode={newCourseCode} setCourseCode={setNewCourseCode} credits={newCourseCredits} setCredits={setNewCourseCredits} divisionFilter={divisionFilter} setDivisionFilter={setDivisionFilter} loadFromAllDepartments={loadFromAllDepartments} setLoadFromAllDepartments={setLoadFromAllDepartments} onOpenElective={handleOpenElective} openElectiveLoading={subjectAssignmentsLoading} />
+        case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} courseCode={newCourseCode} setCourseCode={setNewCourseCode} credits={newCourseCredits} setCredits={setNewCourseCredits} sectionFilter={sectionFilter} setSectionFilter={setSectionFilter} onOpenElective={handleOpenElective} openElectiveLoading={subjectAssignmentsLoading} />
         case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} targetYear={qpTargetYear} setTargetYear={setQpTargetYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
         case 'careerProfile': return <CareerProfileTab profile={careerProfile} loading={careerLoading} onUpload={handleUploadCareerResume} onRemove={handleRemoveCareerResume} onDownload={handleDownload} />
         case 'placements': return <UpcomingPlacementsTab placements={upcomingPlacements} loading={placementsLoading} onRefresh={loadUpcomingPlacements} />
