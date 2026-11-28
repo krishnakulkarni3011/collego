@@ -46,6 +46,7 @@ public class PlacementService {
     private final UserRepository userRepository;
     private final SemesterMarksRepository semesterMarksRepository;
     private final PlacementNoticeRepository placementNoticeRepository;
+    private final PlacedStudentRepository placedStudentRepository;
     private final S3StorageService s3StorageService;
 
     @Value("${collego.aws.s3-bucket-resumes:collego-resumes-prod}")
@@ -522,7 +523,8 @@ public class PlacementService {
         long totalCompanies = companyRepository.countByActiveTrue();
         long openPostings = jobPostingRepository.findByStatus("OPEN").size();
         long totalApplications = applicationRepository.count();
-        long studentsPlaced = applicationRepository.countDistinctStudentsPlaced();
+        Set<Long> placedIds = placedStudentIds();
+        long studentsPlaced = placedIds.size();
         long totalOffers = applicationRepository.countByStatus(ApplicationStatus.SELECTED);
         long shortlisted = applicationRepository.countByStatus(ApplicationStatus.SHORTLISTED);
         long pending = applicationRepository.countByStatus(ApplicationStatus.APPLIED);
@@ -534,7 +536,7 @@ public class PlacementService {
 
         // Department breakdown
         List<PlacementStatsResponse.DepartmentPlacementEntry> deptBreakdown =
-                buildDepartmentBreakdown();
+                buildDepartmentBreakdown(placedIds);
 
         // Top companies by offers
         List<PlacementStatsResponse.CompanyPlacementEntry> topCompanies =
@@ -554,7 +556,72 @@ public class PlacementService {
                 .build();
     }
 
-    private List<PlacementStatsResponse.DepartmentPlacementEntry> buildDepartmentBreakdown() {
+    private Set<Long> placedStudentIds() {
+        Set<Long> ids = applicationRepository.findByStatus(ApplicationStatus.SELECTED).stream()
+                .filter(a -> a.getStudent() != null)
+                .map(a -> a.getStudent().getId())
+                .collect(Collectors.toSet());
+        placedStudentRepository.findAll().stream()
+                .filter(p -> p.getStudent() != null)
+                .forEach(p -> ids.add(p.getStudent().getId()));
+        return ids;
+    }
+
+    @Transactional
+    public List<PlacedStudentResponse> createPlacedStudents(PlacedStudentRequest request) {
+        if (request.getStudentIds() == null || request.getStudentIds().isEmpty()) {
+            throw new BadRequestException("Select at least one student");
+        }
+        String company = request.getCompanyName() == null ? "" : request.getCompanyName().trim();
+        if (company.isEmpty()) {
+            throw new BadRequestException("Company is required");
+        }
+        Department department = null;
+        if (request.getDepartmentId() != null) {
+            department = departmentRepository.findById(request.getDepartmentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
+        }
+        List<PlacedStudentResponse> created = new ArrayList<>();
+        for (Long studentId : request.getStudentIds()) {
+            StudentProfile student = studentProfileRepository.findById(studentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentId));
+            PlacedStudent record = PlacedStudent.builder()
+                    .student(student)
+                    .companyName(company)
+                    .salary(request.getSalary())
+                    .role(request.getRole())
+                    .department(department != null ? department : student.getDepartment())
+                    .build();
+            placedStudentRepository.save(record);
+            created.add(mapPlacedStudent(record));
+        }
+        log.info("Recorded {} placed students for company {}", created.size(), company);
+        return created;
+    }
+
+    public List<PlacedStudentResponse> listPlacedStudents() {
+        return placedStudentRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(this::mapPlacedStudent)
+                .collect(Collectors.toList());
+    }
+
+    private PlacedStudentResponse mapPlacedStudent(PlacedStudent record) {
+        String name = record.getStudent() != null && record.getStudent().getUser() != null
+                ? (record.getStudent().getUser().getFirstName() + " " + record.getStudent().getUser().getLastName()).trim()
+                : "";
+        return PlacedStudentResponse.builder()
+                .id(record.getId())
+                .studentId(record.getStudent() != null ? record.getStudent().getId() : null)
+                .name(name)
+                .usn(record.getStudent() != null ? record.getStudent().getEnrollmentNumber() : null)
+                .companyName(record.getCompanyName())
+                .salary(record.getSalary())
+                .role(record.getRole())
+                .department(record.getDepartment() != null ? record.getDepartment().getName() : null)
+                .build();
+    }
+
+    private List<PlacementStatsResponse.DepartmentPlacementEntry> buildDepartmentBreakdown(Set<Long> placedIds) {
         return departmentRepository.findAll().stream().map(dept -> {
             long totalStudents = studentProfileRepository.countByDepartmentId(dept.getId());
 
@@ -563,8 +630,7 @@ public class PlacementService {
                     .filter(s -> !applicationRepository.findByStudentIdOrderByAppliedAtDesc(s.getId()).isEmpty())
                     .count();
             long placed = students.stream()
-                    .filter(s -> applicationRepository.findByStudentIdOrderByAppliedAtDesc(s.getId())
-                            .stream().anyMatch(a -> a.getStatus() == ApplicationStatus.SELECTED))
+                    .filter(s -> placedIds.contains(s.getId()))
                     .count();
             double rate = totalStudents > 0
                     ? Math.round((placed * 100.0 / totalStudents) * 100.0) / 100.0

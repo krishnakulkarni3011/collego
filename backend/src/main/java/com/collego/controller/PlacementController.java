@@ -325,4 +325,20 @@ public class PlacementController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(bytes);
     }
+
+    // ==================== Placed Students (Admin) ====================
+
+    @PostMapping("/placed-students")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<PlacedStudentResponse>> createPlacedStudents(
+            @Valid @RequestBody PlacedStudentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(placementService.createPlacedStudents(request));
+    }
+
+    @GetMapping("/placed-students")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<PlacedStudentResponse>> listPlacedStudents() {
+        return ResponseEntity.ok(placementService.listPlacedStudents());
+    }
 }
