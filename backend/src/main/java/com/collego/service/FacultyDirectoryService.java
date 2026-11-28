@@ -66,6 +66,7 @@ public class FacultyDirectoryService {
     }
 
     /** Admin view: includes pending/rejected submissions. */
+    @Transactional(readOnly = true)
     public List<FacultyDirectoryResponse> listForAdmin(String status) {
         String wanted = status != null ? status.trim().toUpperCase(Locale.ROOT) : null;
         return facultyProfileRepository.findAll().stream()
