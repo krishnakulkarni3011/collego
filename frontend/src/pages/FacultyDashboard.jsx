@@ -143,8 +143,11 @@ function OverviewTab({ sections, overviewData, onSectionSelect, reminders = [], 
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-slate-800 group-hover:text-violet-600 transition-colors leading-tight">{sec.courseName}</h4>
-                    <p className="text-[10px] text-slate-400 font-mono mt-1">{sec.courseCode}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="font-bold text-slate-800 group-hover:text-violet-600 transition-colors leading-tight">{sec.courseName}</h4>
+                      {sec.openElective && <Badge variant="purple" className="text-[9px] px-1.5 py-0">Open Elective</Badge>}
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-mono mt-1">{sec.courseCode} - Sec {sec.sectionName}</p>
                   </div>
                   <div className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center text-sm font-bold shadow-sm" style={{ background: `${PIE_COLORS[i % PIE_COLORS.length]}15`, color: PIE_COLORS[i % PIE_COLORS.length] }}>
                     {sec.sectionName}
@@ -236,6 +239,7 @@ function SectionHeader({ section, activeTab, onTabChange, onBack }) {
         </button>
         <h2 className="text-lg font-bold text-slate-900">{section.courseName}</h2>
         <Badge variant="purple" className="text-[10px] px-2.5 py-0.5">{section.courseCode}</Badge>
+        {section.openElective && <Badge variant="success" className="text-[10px] px-2.5 py-0.5">Open Elective</Badge>}
         <p className="text-xs text-slate-400 ml-3 hidden sm:block">{section.sectionName} - {section.semesterName} - {section.enrolledStudents} students</p>
         {headerImage && (
           <div className="hidden md:block ml-auto h-12 w-44 shrink-0 opacity-75 pointer-events-none" aria-hidden="true">
@@ -2702,7 +2706,7 @@ export default function FacultyDashboard() {
     },
     {
       title: 'My Sections',
-      items: sections.map(sec => ({ id: `section-${sec.sectionId}`, label: sec.courseName, icon: Layers, meta: `${sec.courseCode || ''} - Sec ${sec.sectionName} - ${targetYearLabel(sec.year)}` })),
+      items: sections.map(sec => ({ id: `section-${sec.sectionId}`, label: sec.courseName, icon: Layers, meta: sec.openElective ? 'Open Elective' : `${sec.courseCode || ''} - Sec ${sec.sectionName} - ${targetYearLabel(sec.year)}` })),
     },
   ]
   const sidebarActive = selectedSection ? `section-${selectedSection.sectionId}` : activeTab
