@@ -1,11 +1,13 @@
 # docker-compose.prod.yml
 # Production stack — uses ECR images + RDS (no local postgres container)
-# All secrets injected via .env file on the EC2 instance
+# All secrets injected via .env file on the EC2 instance.
+# App images use ${IMAGE_TAG:-latest}; CI exports IMAGE_TAG=<short commit SHA>
+# so deployments are pinned to the exact image that was just built.
 
 services:
 
   backend:
-    image: ${ECR_REGISTRY}/collego-backend:latest
+    image: ${ECR_REGISTRY}/collego-backend:${IMAGE_TAG:-latest}
     container_name: collego-backend
     restart: always
     environment:
@@ -67,7 +69,7 @@ services:
       start_period: 120s
 
   frontend:
-    image: ${ECR_REGISTRY}/collego-frontend:latest
+    image: ${ECR_REGISTRY}/collego-frontend:${IMAGE_TAG:-latest}
     container_name: collego-frontend
     restart: always
     expose:
@@ -84,7 +86,7 @@ services:
         awslogs-stream: frontend
 
   ai-service:
-    image: ${ECR_REGISTRY}/collego-ai-service:latest
+    image: ${ECR_REGISTRY}/collego-ai-service:${IMAGE_TAG:-latest}
     container_name: collego-ai-service
     restart: always
     environment:

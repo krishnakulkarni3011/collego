@@ -10,14 +10,21 @@ on:
 # Secrets expected in GitHub repo settings:
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
 #   ECR_REGISTRY  (e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com)
-#   EC2_HOST, EC2_USER, EC2_SSH_KEY  (for SSH deploy)
+#   EC2_INSTANCE_ID   (SSM-managed EC2 instance used for deploy)
 #   DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD   (RDS endpoint for prod)
 #   JWT_SECRET
 #   ADMIN_EMAIL, ADMIN_PASSWORD
 #   VITE_API_URL  (e.g. https://api.collego.example.com)
 #   S3_BUCKET_NAME  (main bucket, kept for legacy; individual buckets below)
-#   EC2_INSTANCE_ID   (Phase 8: enables SSM pg_dump backup trigger)
 #   OPENROUTER_API_KEY  (Phase 9: LLM for AI notice generator — optional, stub used if blank)
+#
+# Deployment:
+#   The deploy job uploads docker-compose.prod.yml, infra/nginx/ and a generated
+#   deploy.sh to s3://collego-db-backups-prod/deploy/. It then runs the script on
+#   the EC2 instance through AWS Systems Manager (SSM). No inbound SSH is needed.
+#   The live /opt/collego/.env is NOT overwritten by CI; it stays the single
+#   source of production secrets (Groq key, Gmail app password, DB password, ...).
+#   EC2_HOST, EC2_USER and EC2_SSH_KEY are no longer used by the deploy job.
 
 jobs:
   # ═══════════════════════════════════════════════════════════
@@ -189,10 +196,10 @@ jobs:
             ${{ steps.tags.outputs.REGISTRY }}/collego-ai-service:${{ steps.tags.outputs.SHA }}
 
   # ═══════════════════════════════════════════════════════════
-  #  5. DEPLOY TO EC2  (main branch only, after ECR push)
+  #  5. DEPLOY TO EC2 VIA SSM  (main branch only, after ECR push)
   # ═══════════════════════════════════════════════════════════
   deploy:
-    name: Deploy to EC2
+    name: Deploy to EC2 via SSM
     needs: docker-build-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -200,55 +207,126 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copy docker-compose.prod.yml to EC2
-        uses: appleboy/scp-action@v0.1.7
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.prod.yml,infra/nginx/"
-          target: "/opt/collego"
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: SSH deploy — pull new images & restart
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
-            cd /opt/collego
+      # Upload the compose file, nginx config and a generated deploy script.
+      # The EC2 instance pulls these from S3 via SSM — no inbound SSH needed.
+      - name: Upload deploy assets to S3
+        run: |
+          set -euo pipefail
+          BUCKET="collego-db-backups-prod"
+          PREFIX="deploy"
 
-            # Write .env for docker compose
-            cat > .env <<EOF
-            ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}
-            AWS_REGION=${{ secrets.AWS_REGION }}
-            DB_HOST=${{ secrets.DB_HOST }}
-            DB_PORT=5432
-            DB_NAME=${{ secrets.DB_NAME }}
-            DB_USERNAME=${{ secrets.DB_USERNAME }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            ADMIN_EMAIL=admin@collego.edu
-            ADMIN_PASSWORD=Admin@123
-            VITE_API_URL=${{ secrets.VITE_API_URL }}
-            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
-            EC2_INSTANCE_ID=${{ secrets.EC2_INSTANCE_ID }}
-            OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
-            ALLOWED_ORIGINS=https://65-0-244-196.sslip.io,https://api-65-0-244-196.sslip.io
-            EOF
+          aws s3 cp docker-compose.prod.yml "s3://${BUCKET}/${PREFIX}/docker-compose.prod.yml"
+          aws s3 sync infra/nginx/ "s3://${BUCKET}/${PREFIX}/infra/nginx/" --delete
 
-            # Login to ECR on the EC2 instance
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-              docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+          cat > deploy.sh <<'DEPLOY_SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          cd /opt/collego
 
-            # Pull latest images and recreate containers
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          IMAGE_TAG="__IMAGE_TAG__"
+          REGION="ap-south-1"
+          BUCKET="collego-db-backups-prod"
+          PREFIX="deploy"
 
-            # Reload Nginx if config changed
-            docker exec collego-nginx nginx -s reload 2>/dev/null || true
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          export ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+          export IMAGE_TAG
 
-            echo "✅ Deployment complete: $(date)"
+          aws s3 cp "s3://${BUCKET}/${PREFIX}/docker-compose.prod.yml" ./docker-compose.prod.yml
+          mkdir -p infra/nginx
+          aws s3 sync "s3://${BUCKET}/${PREFIX}/infra/nginx/" ./infra/nginx/ --delete
+
+          aws ecr get-login-password --region "${REGION}" | \
+            docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+
+          docker compose -f docker-compose.prod.yml pull
+          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          docker exec collego-nginx nginx -s reload 2>/dev/null || true
+
+          echo "Deployment complete: ${IMAGE_TAG} at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          DEPLOY_SCRIPT
+
+          sed -i "s/__IMAGE_TAG__/${GITHUB_SHA::7}/" deploy.sh
+          aws s3 cp deploy.sh "s3://${BUCKET}/${PREFIX}/deploy.sh"
+
+      - name: Deploy via SSM
+        env:
+          INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          set -euo pipefail
+          BUCKET="collego-db-backups-prod"
+          PREFIX="deploy"
+
+          COMMAND_ID=$(aws ssm send-command \
+            --region "${AWS_REGION}" \
+            --instance-ids "${INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Collego deploy ${GITHUB_SHA::7}" \
+            --timeout-seconds 900 \
+            --parameters 'commands=["aws s3 cp s3://collego-db-backups-prod/deploy/deploy.sh /tmp/collego-deploy.sh && chown ec2-user:ec2-user /tmp/collego-deploy.sh && sudo -u ec2-user bash /tmp/collego-deploy.sh"]' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM command: ${COMMAND_ID}"
+
+          for i in $(seq 1 90); do
+            STATUS=$(aws ssm get-command-invocation \
+              --region "${AWS_REGION}" \
+              --command-id "${COMMAND_ID}" \
+              --instance-id "${INSTANCE_ID}" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+
+            echo "SSM status: ${STATUS} (attempt ${i}/90)"
+
+            case "${STATUS}" in
+              Success)
+                aws ssm get-command-invocation \
+                  --region "${AWS_REGION}" \
+                  --command-id "${COMMAND_ID}" \
+                  --instance-id "${INSTANCE_ID}" \
+                  --query "StandardOutputContent" \
+                  --output text
+                exit 0
+                ;;
+              Failed|Cancelled|TimedOut)
+                echo "::error::SSM deployment failed with status ${STATUS}"
+                aws ssm get-command-invocation \
+                  --region "${AWS_REGION}" \
+                  --command-id "${COMMAND_ID}" \
+                  --instance-id "${INSTANCE_ID}" \
+                  --query "{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}" \
+                  --output json
+                exit 1
+                ;;
+            esac
+
+            sleep 10
+          done
+
+          echo "::error::Timed out waiting for SSM command ${COMMAND_ID}"
+          exit 1
+
+      - name: Verify public health endpoints
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            API=$(curl -fsS https://65-0-244-196.sslip.io/api/health || true)
+            AI=$(curl -fsS https://65-0-244-196.sslip.io/ai/health || true)
+            if echo "${API}" | grep -q '"status":"UP"' && echo "${AI}" | grep -q '"status":"UP"'; then
+              echo "Health checks passed"
+              exit 0
+            fi
+            echo "Waiting for health checks (attempt ${i}/30)"
+            sleep 10
+          done
+          echo "::error::Public health checks did not pass"
+          exit 1
