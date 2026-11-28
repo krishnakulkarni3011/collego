@@ -2688,7 +2688,7 @@ export default function FacultyDashboard() {
     },
     {
       title: 'My Sections',
-      items: sections.map(sec => ({ id: `section-${sec.sectionId}`, label: sec.courseName, icon: Layers, meta: `Sec ${sec.sectionName} Â· ${targetYearLabel(sec.year)}` })),
+      items: sections.map(sec => ({ id: `section-${sec.sectionId}`, label: sec.courseName, icon: Layers, meta: `${sec.courseCode || ''} - Sec ${sec.sectionName} - ${targetYearLabel(sec.year)}` })),
     },
   ]
   const sidebarActive = selectedSection ? `section-${selectedSection.sectionId}` : activeTab
