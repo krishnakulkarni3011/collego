@@ -331,98 +331,6 @@ public class FacultyPortalService {
         return rows;
     }
 
-    // ==================== Semester Marks ====================
-
-    @Transactional
-    public Map<String, Object> uploadSemesterMarks(String email, UploadSemesterMarksRequest request) {
-        FacultyProfile faculty = getFacultyByEmail(email);
-        Section section = sectionRepository.findById(request.getSectionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + request.getSectionId()));
-        validateFacultyOwnsSection(faculty, section);
-
-        int updated = 0;
-        int created = 0;
-
-        for (UploadSemesterMarksRequest.StudentSemesterMarksEntry entry : request.getEntries()) {
-            StudentProfile student = studentProfileRepository.findById(entry.getStudentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + entry.getStudentId()));
-
-            if (!enrollmentRepository.existsByStudentIdAndSectionId(student.getId(), section.getId())) {
-                throw new BadRequestException("Student " + entry.getStudentId() + " is not enrolled in section " + section.getId());
-            }
-
-            if (entry.getObtainedMarks() > request.getMaxMarks()) {
-                throw new BadRequestException("Obtained marks exceeds max marks for student " + entry.getStudentId());
-            }
-
-            double percentage = (entry.getObtainedMarks() / request.getMaxMarks()) * 100.0;
-            String grade = Grade.calculateGrade(percentage);
-            double gradePoints = Grade.calculateGradePoints(percentage);
-
-            Optional<SemesterMarks> existing = semesterMarksRepository
-                    .findByStudentIdAndSectionIdEquals(student.getId(), section.getId());
-
-            if (existing.isPresent()) {
-                existing.get().setMaxMarks(request.getMaxMarks());
-                existing.get().setObtainedMarks(entry.getObtainedMarks());
-                existing.get().setGrade(grade);
-                existing.get().setGradePoints(gradePoints);
-                semesterMarksRepository.save(existing.get());
-                updated++;
-            } else {
-                SemesterMarks marks = SemesterMarks.builder()
-                        .student(student)
-                        .section(section)
-                        .maxMarks(request.getMaxMarks())
-                        .obtainedMarks(entry.getObtainedMarks())
-                        .grade(grade)
-                        .gradePoints(gradePoints)
-                        .build();
-                semesterMarksRepository.save(marks);
-                created++;
-            }
-        }
-
-        log.info("Faculty {} uploaded semester marks for section {}: {} created, {} updated",
-                email, section.getId(), created, updated);
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("sectionId", section.getId());
-        result.put("created", created);
-        result.put("updated", updated);
-        result.put("message", "Semester marks uploaded successfully");
-        return result;
-    }
-
-    public List<Map<String, Object>> getSemesterMarksForSection(String email, Long sectionId) {
-        FacultyProfile faculty = getFacultyByEmail(email);
-        Section section = sectionRepository.findById(sectionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + sectionId));
-        validateFacultyOwnsSection(faculty, section);
-
-        List<Map<String, Object>> rows = new ArrayList<>();
-        for (Enrollment enrollment : enrollmentRepository.findBySectionId(sectionId)) {
-            StudentProfile student = enrollment.getStudent();
-            User studentUser = student.getUser();
-
-            for (SemesterMarks mark : semesterMarksRepository.findByStudentIdAndSectionId(student.getId(), sectionId)) {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("id", mark.getId());
-                entry.put("studentId", student.getId());
-                entry.put("enrollmentNumber", student.getEnrollmentNumber());
-                entry.put("studentName", studentUser.getFirstName() + " " + studentUser.getLastName());
-                entry.put("maxMarks", mark.getMaxMarks());
-                entry.put("obtainedMarks", mark.getObtainedMarks());
-                entry.put("grade", mark.getGrade());
-                entry.put("gradePoints", mark.getGradePoints());
-                entry.put("createdAt", mark.getCreatedAt());
-                rows.add(entry);
-            }
-        }
-
-        return rows;
-    }
-
     // ==================== Assignments ====================
 
     @Transactional
@@ -1003,118 +911,6 @@ public class FacultyPortalService {
         return targetYear;
     }
 
-    // ==================== Analytics ====================
-
-    public FacultyAnalyticsResponse getAnalytics(String email, Long sectionId) {
-        FacultyProfile faculty = getFacultyByEmail(email);
-        Section section = sectionRepository.findById(sectionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + sectionId));
-        validateFacultyOwnsSection(faculty, section);
-
-        List<Enrollment> enrollments = enrollmentRepository.findBySectionId(sectionId);
-        long totalStudents = enrollments.size();
-
-        // --- Attendance Analytics ---
-        double totalAttendancePercentage = 0;
-        long above75 = 0;
-        long below75 = 0;
-
-        for (Enrollment enrollment : enrollments) {
-            long total = attendanceRepository.countByStudentIdAndSectionId(enrollment.getStudent().getId(), sectionId);
-            long present = attendanceRepository.countByStudentIdAndSectionIdAndStatus(
-                    enrollment.getStudent().getId(), sectionId, AttendanceStatus.PRESENT);
-            double pct = total > 0 ? (present * 100.0) / total : 0.0;
-            totalAttendancePercentage += pct;
-            if (pct >= 75.0) above75++;
-            else below75++;
-        }
-
-        double avgAttendance = totalStudents > 0 ? Math.round((totalAttendancePercentage / totalStudents) * 100.0) / 100.0 : 0.0;
-
-        // --- Internal Marks Analytics ---
-        Double ia1Avg = null, ia2Avg = null, ia1Max = null, ia2Max = null;
-        double ia1Total = 0, ia2Total = 0;
-        int ia1Count = 0, ia2Count = 0;
-
-        for (Enrollment enrollment : enrollments) {
-            List<InternalMarks> marks = internalMarksRepository.findByStudentIdAndSectionId(
-                    enrollment.getStudent().getId(), sectionId);
-            for (InternalMarks m : marks) {
-                if ("IA-1".equals(m.getExamName())) {
-                    ia1Total += m.getObtainedMarks();
-                    ia1Max = m.getMaxMarks();
-                    ia1Count++;
-                } else if ("IA-2".equals(m.getExamName())) {
-                    ia2Total += m.getObtainedMarks();
-                    ia2Max = m.getMaxMarks();
-                    ia2Count++;
-                }
-            }
-        }
-
-        if (ia1Count > 0) ia1Avg = Math.round((ia1Total / ia1Count) * 100.0) / 100.0;
-        if (ia2Count > 0) ia2Avg = Math.round((ia2Total / ia2Count) * 100.0) / 100.0;
-
-        // --- Semester Marks Analytics ---
-        Double semAvg = null, semMax = null, passPct = null;
-        long totalPassed = 0, totalFailed = 0;
-        double semTotal = 0;
-        int semCount = 0;
-        Map<String, Long> gradeMap = new LinkedHashMap<>();
-
-        for (Enrollment enrollment : enrollments) {
-            Optional<SemesterMarks> semMarks = semesterMarksRepository
-                    .findByStudentIdAndSectionIdEquals(enrollment.getStudent().getId(), sectionId);
-            if (semMarks.isPresent()) {
-                SemesterMarks sm = semMarks.get();
-                semTotal += sm.getObtainedMarks();
-                semMax = sm.getMaxMarks();
-                semCount++;
-
-                if (sm.getGrade() != null && !"F".equals(sm.getGrade())) {
-                    totalPassed++;
-                } else if (sm.getGrade() != null) {
-                    totalFailed++;
-                }
-
-                String grade = sm.getGrade() != null ? sm.getGrade() : "N/A";
-                gradeMap.merge(grade, 1L, Long::sum);
-            }
-        }
-
-        if (semCount > 0) {
-            semAvg = Math.round((semTotal / semCount) * 100.0) / 100.0;
-            passPct = Math.round((totalPassed * 100.0) / semCount * 100.0) / 100.0;
-        }
-
-        List<FacultyAnalyticsResponse.GradeCount> gradeDistribution = gradeMap.entrySet().stream()
-                .map(e -> FacultyAnalyticsResponse.GradeCount.builder()
-                        .grade(e.getKey())
-                        .count(e.getValue())
-                        .build())
-                .collect(Collectors.toList());
-
-        return FacultyAnalyticsResponse.builder()
-                .sectionId(sectionId)
-                .courseName(section.getCourse().getName())
-                .courseCode(section.getCourse().getCode())
-                .totalStudents(totalStudents)
-                .averageAttendancePercentage(avgAttendance)
-                .studentsAbove75Attendance(above75)
-                .studentsBelow75Attendance(below75)
-                .ia1Average(ia1Avg)
-                .ia2Average(ia2Avg)
-                .ia1MaxMarks(ia1Max)
-                .ia2MaxMarks(ia2Max)
-                .semesterAverage(semAvg)
-                .semesterMaxMarks(semMax)
-                .passPercentage(passPct)
-                .totalPassed(totalPassed)
-                .totalFailed(totalFailed)
-                .gradeDistribution(gradeDistribution)
-                .build();
-    }
-
     // ==================== Faculty Subject Assignment ====================
 
     @Transactional
@@ -1132,24 +928,40 @@ public class FacultyPortalService {
             throw new BadRequestException("Credits must be between 1 and 12");
         }
 
-        // Faculty type any subject name; reuse an existing course with the same
-        // name in their department, otherwise create it on the fly.
-        Optional<Course> existingCourse = courseRepository.findByDepartmentId(department.getId()).stream()
-                .filter(c -> c.getName().equalsIgnoreCase(courseName))
-                .findFirst();
+        // Faculty may type a subject code manually alongside the credits. When
+        // omitted, a code is generated from the department and subject name.
+        String requestedCode = request.getCourseCode() != null ? request.getCourseCode().trim() : "";
+        if (!requestedCode.isBlank() && !requestedCode.matches("[A-Za-z0-9_\\-]+")) {
+            throw new BadRequestException("Subject code may contain only letters, numbers, '-' and '_'.");
+        }
+        String finalCode = requestedCode.isBlank() ? null : requestedCode.toUpperCase(Locale.ROOT);
+
+        Optional<Course> existingCourse;
+        if (finalCode != null) {
+            Optional<Course> byCode = courseRepository.findByCode(finalCode);
+            if (byCode.isPresent() && (byCode.get().getDepartment() == null
+                    || !Objects.equals(byCode.get().getDepartment().getId(), department.getId()))) {
+                throw new BadRequestException("Subject code already in use: " + finalCode);
+            }
+            existingCourse = byCode;
+        } else {
+            existingCourse = courseRepository.findByDepartmentId(department.getId()).stream()
+                    .filter(c -> c.getName().equalsIgnoreCase(courseName))
+                    .findFirst();
+        }
 
         Course course;
         if (existingCourse.isPresent()) {
             course = existingCourse.get();
             // The assigning faculty can correct the credit value for the subject.
-            if (request.getCredits() != null && !Objects.equals(course.getCredits(), credits)) {
+            if (!Objects.equals(course.getCredits(), credits)) {
                 course.setCredits(credits);
                 course = courseRepository.save(course);
             }
         } else {
             course = courseRepository.save(Course.builder()
                     .name(courseName)
-                    .code(generateCourseCode(department, courseName))
+                    .code(finalCode != null ? finalCode : generateCourseCode(department, courseName))
                     .credits(credits)
                     .department(department)
                     .description(courseName + " (added by faculty)")
@@ -1436,7 +1248,7 @@ public class FacultyPortalService {
                 sectionRepository.save(section);
             });
         } else if (sections.stream().noneMatch(s -> isOwnedBy(s, faculty))) {
-            // Every existing section is already taken by another faculty member —
+            // Every existing section is already taken by another faculty member â€”
             // create a fresh pair of sections for this faculty.
             int created = 0;
             for (String name : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
@@ -1789,3 +1601,4 @@ public class FacultyPortalService {
                 .build();
     }
 }
+

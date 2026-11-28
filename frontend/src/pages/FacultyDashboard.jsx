@@ -4,14 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, ClipboardCheck, ClipboardList, FileText,
   Megaphone, ChevronRight, GraduationCap, Users, BookMarked,
-  BarChart3, FolderOpen, Plus, CheckCircle2, X, Send,
-  ArrowLeft, Clock, Upload, Download, RefreshCw, Zap, Layers, Award,
+  FolderOpen, Plus, CheckCircle2, X, Send,
+  ArrowLeft, Clock, Upload, Download, RefreshCw, Layers,
   BookUser, Settings, HelpCircle, CalendarDays, Eye, Paperclip, Trash2,
-  Crown, CalendarOff, Briefcase, ListTodo
+  Crown, CalendarOff, Briefcase, ListTodo, ShieldCheck, Newspaper
 } from 'lucide-react'
-import {
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
-} from 'recharts'
 import { authService } from '../services/authService'
 import api from '../services/api'
 import { downloadFile, fileObjectUrl, previewFile } from '../lib/download'
@@ -24,15 +21,15 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import {
   PortalSidebar, PortalTopbar, Toast, StatCard, Panel, PageTitle,
-  WelcomeBanner, ChartTooltip, EmptyState, Spinner, ACCENTS, FadedImage, ImageStrip,
+  WelcomeBanner, EmptyState, Spinner, ACCENTS, FadedImage, ImageStrip,
 } from '../components/dashboard/PortalUI'
 import { uiImages } from '../assets/uiImages'
 import welcomeFaculty from '../assets/ui/welcome-faculty.webp'
 import { timeAgo } from '../lib/time'
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
-const fmtNum = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'â€”'
+const fmtNum = (n, dp = 2) => (n == null ? 'â€”' : Number(n).toFixed(dp))
 const PIE_COLORS = ['#4f46e5', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
 const TARGET_YEAR_OPTIONS = [
   { value: '1', label: 'I Year' },
@@ -71,7 +68,7 @@ function AttBadge({ pct }) {
   return <Badge variant="destructive">{pct}%</Badge>
 }
 
-// ─── Nav config ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Nav config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const GLOBAL_NAV = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'subjectAssignments', label: 'My Subject Assignments', icon: BookUser },
@@ -80,6 +77,7 @@ const GLOBAL_NAV = [
   { id: 'placements', label: 'Upcoming Placements', icon: Briefcase },
   { id: 'invigilations', label: 'Invigilation Duties', icon: CalendarDays },
   { id: 'notices', label: 'Notices', icon: Megaphone },
+  { id: 'newsletters', label: 'Newsletters', icon: Newspaper },
   { id: 'reminders', label: 'My Reminders', icon: ListTodo },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'help', label: 'Help & Support', icon: HelpCircle },
@@ -94,14 +92,13 @@ const SECTION_TABS = [
   { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
   { id: 'studentDetails', label: 'Student Details', icon: Users },
   { id: 'internalMarks', label: 'Internal Marks', icon: BookMarked },
-  { id: 'semesterMarks', label: 'Semester Marks', icon: GraduationCap },
   { id: 'studentPerformance', label: 'Student Performance', icon: Users },
   { id: 'assignments', label: 'Assignments', icon: BookOpen },
   { id: 'assignmentMarks', label: 'Assignment Marks', icon: ClipboardList },
   { id: 'materials', label: 'Materials', icon: FolderOpen },
 ]
 
-// ─── Overview ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function OverviewTab({ sections, overviewData, onSectionSelect }) {
   const now = new Date()
   const hour = now.getHours()
@@ -206,13 +203,12 @@ function OverviewTab({ sections, overviewData, onSectionSelect }) {
   )
 }
 
-// ─── Section Header ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Section Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function SectionHeader({ section, activeTab, onTabChange, onBack }) {
   const headerImage = {
     attendance: uiImages.classroom,
     studentDetails: uiImages.groupStudy,
     internalMarks: uiImages.graduation,
-    semesterMarks: uiImages.graduation,
     studentPerformance: uiImages.groupStudy,
     assignments: uiImages.groupStudy,
     materials: uiImages.library,
@@ -226,7 +222,7 @@ function SectionHeader({ section, activeTab, onTabChange, onBack }) {
         </button>
         <h2 className="text-lg font-bold text-slate-900">{section.courseName}</h2>
         <Badge variant="purple" className="text-[10px] px-2.5 py-0.5">{section.courseCode}</Badge>
-        <p className="text-xs text-slate-400 ml-3 hidden sm:block">{section.sectionName} · {section.semesterName} · {section.enrolledStudents} students</p>
+        <p className="text-xs text-slate-400 ml-3 hidden sm:block">{section.sectionName} Â· {section.semesterName} Â· {section.enrolledStudents} students</p>
         {headerImage && (
           <div className="hidden md:block ml-auto h-12 w-44 shrink-0 opacity-75 pointer-events-none" aria-hidden="true">
             <FadedImage src={headerImage} alt="" className="h-full w-full" fade={24} />
@@ -254,7 +250,7 @@ function SectionHeader({ section, activeTab, onTabChange, onBack }) {
   )
 }
 
-// ─── Attendance Tab ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Attendance Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AttendanceTab({
   attendanceDate, setAttendanceDate, attendanceRecords, toggleAttendance, onSubmit, loading,
   holiday, holidays = [], holidayBusy, onDeclareHoliday, onRemoveHoliday,
@@ -297,7 +293,7 @@ function AttendanceTab({
             <p className="text-xs text-amber-700 mt-0.5">
               Attendance is not counted for this day.
               {holiday.note ? ` ${holiday.note}` : ''}
-              {holiday.declaredBy ? ` · Declared by ${holiday.declaredBy}` : ''}
+              {holiday.declaredBy ? ` Â· Declared by ${holiday.declaredBy}` : ''}
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => onRemoveHoliday(holiday.id)} disabled={holidayBusy}>
@@ -339,7 +335,7 @@ function AttendanceTab({
                               : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
                           )}
                         >
-                          {r.status === 'PRESENT' ? '✓ Present' : '✗ Absent'}
+                          {r.status === 'PRESENT' ? 'âœ“ Present' : 'âœ— Absent'}
                         </button>
                       </td>
                     </tr>
@@ -372,7 +368,7 @@ function AttendanceTab({
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800">{fmtDate(h.date)}</p>
                   <p className="text-[11px] text-slate-500 truncate">
-                    {h.note || 'Declared as a holiday'}{h.declaredBy ? ` · ${h.declaredBy}` : ''}
+                    {h.note || 'Declared as a holiday'}{h.declaredBy ? ` Â· ${h.declaredBy}` : ''}
                   </p>
                 </div>
                 <button onClick={() => onRemoveHoliday(h.id)} disabled={holidayBusy}
@@ -386,7 +382,7 @@ function AttendanceTab({
   )
 }
 
-// ─── Internal Marks Tab ──────────────────────────────────────────────────────
+// â”€â”€â”€ Internal Marks Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StudentDetailsTab({ section, onDownload, loading }) {
   return (
     <div className="space-y-6">
@@ -395,7 +391,7 @@ function StudentDetailsTab({ section, onDownload, loading }) {
           <Users size={24} />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-bold text-slate-900">Student details — {section.courseName}</h3>
+          <h3 className="text-base font-bold text-slate-900">Student details â€” {section.courseName}</h3>
           <p className="text-sm text-slate-500 mt-1">
             Download the PDF roster for Section {section.sectionName} ({section.semesterName}, {section.enrolledStudents} students).
           </p>
@@ -470,12 +466,12 @@ function UpcomingPlacementsTab({ placements, loading, onRefresh }) {
             <tbody>
               {placements.map((drive, index) => (
                 <tr key={`${drive.companyName}-${drive.driveDate}-${index}`} className="hover:bg-white/30 transition-colors">
-                  <td className="font-medium text-slate-800">{drive.title || '—'}</td>
-                  <td className="text-slate-700">{drive.companyName || '—'}</td>
-                  <td className="text-slate-700">{drive.packageOffered || '—'}</td>
-                  <td className="text-slate-700 whitespace-nowrap">{drive.driveDate ? fmtDate(drive.driveDate) : '—'}</td>
+                  <td className="font-medium text-slate-800">{drive.title || 'â€”'}</td>
+                  <td className="text-slate-700">{drive.companyName || 'â€”'}</td>
+                  <td className="text-slate-700">{drive.packageOffered || 'â€”'}</td>
+                  <td className="text-slate-700 whitespace-nowrap">{drive.driveDate ? fmtDate(drive.driveDate) : 'â€”'}</td>
                   <td><Badge variant="info">{drive.departmentName || 'All Departments'}</Badge></td>
-                  <td className="text-slate-600 max-w-[300px] whitespace-normal">{drive.eligibilityCriteria || '—'}</td>
+                  <td className="text-slate-600 max-w-[300px] whitespace-normal">{drive.eligibilityCriteria || 'â€”'}</td>
                 </tr>
               ))}
               {!loading && placements.length === 0 && (
@@ -521,7 +517,7 @@ function InternalMarksTab({ examName, setExamName, maxMarks, setMaxMarks, marksE
                     <td style={{ textAlign: 'center' }}>
                       <input type="number" value={entry.obtainedMarks} min="0" max={maxMarks}
                         onChange={e => setMarksEntries(prev => prev.map((m, j) => j === i ? { ...m, obtainedMarks: e.target.value } : m))}
-                        className="w-20 text-center collego-input py-1 text-sm" placeholder="—" />
+                        className="w-20 text-center collego-input py-1 text-sm" placeholder="â€”" />
                     </td>
                   </tr>
                 ))}
@@ -558,66 +554,7 @@ function InternalMarksTab({ examName, setExamName, maxMarks, setMaxMarks, marksE
   )
 }
 
-// ─── Semester Marks Tab ──────────────────────────────────────────────────────
-function SemesterMarksTab({ semMaxMarks, setSemMaxMarks, semMarksEntries, setSemMarksEntries, onSubmit, sectionMarks, loading }) {
-  return (
-    <div className="space-y-6">
-      <div className="glass-card p-6 border border-white/60">
-        <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><GraduationCap size={14} className="text-blue-500" /> Upload Semester Marks</h3>
-        <div className="mb-5">
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Max Marks</label>
-          <input type="number" value={semMaxMarks} onChange={e => setSemMaxMarks(e.target.value)} className="collego-input !w-32" min="1" />
-        </div>
-        <div className="rounded-xl overflow-hidden border border-white/60 mb-5">
-          <div className="overflow-x-auto">
-            <table className="collego-table">
-              <thead><tr><th>Enrollment</th><th>Student</th><th style={{ textAlign: 'center' }}>Marks / {semMaxMarks}</th></tr></thead>
-              <tbody>
-                {semMarksEntries.map((entry, i) => (
-                  <tr key={entry.studentId} className="hover:bg-white/30 transition-colors">
-                    <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{entry.enrollmentNumber}</code></td>
-                    <td className="text-slate-800">{entry.studentName}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <input type="number" value={entry.obtainedMarks} min="0" max={semMaxMarks}
-                        onChange={e => setSemMarksEntries(prev => prev.map((m, j) => j === i ? { ...m, obtainedMarks: e.target.value } : m))}
-                        className="w-20 text-center collego-input py-1 text-sm" placeholder="—" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <Button variant="gradient" onClick={onSubmit} disabled={loading} className="px-6">
-          {loading ? <><RefreshCw size={14} className="animate-spin" /> Saving...</> : <><Upload size={14} /> Upload Semester Marks</>}
-        </Button>
-      </div>
-
-      {sectionMarks.length > 0 && (
-        <div className="glass-card overflow-hidden border border-white/60">
-          <div className="px-5 py-4 border-b border-white/50"><h3 className="text-sm font-semibold text-slate-800">Recorded Marks</h3></div>
-          <div className="overflow-x-auto">
-            <table className="collego-table">
-              <thead><tr><th>Student</th><th style={{ textAlign: 'center' }}>Obtained</th><th style={{ textAlign: 'center' }}>Max</th><th style={{ textAlign: 'center' }}>Grade</th></tr></thead>
-              <tbody>
-                {sectionMarks.map(m => (
-                  <tr key={m.id} className="hover:bg-white/30 transition-colors">
-                    <td><p className="text-slate-800">{m.studentName}</p><code className="text-[10px] text-slate-400">{m.enrollmentNumber}</code></td>
-                    <td style={{ textAlign: 'center', color: '#2563eb', fontWeight: 600 }}>{m.obtainedMarks}</td>
-                    <td style={{ textAlign: 'center', color: '#64748b' }}>{m.maxMarks}</td>
-                    <td style={{ textAlign: 'center' }}><Badge variant="secondary">{m.grade || '—'}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Assignment Marks Tab ────────────────────────────────────────────────────
+// â”€â”€â”€ Assignment Marks Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AssignmentMarksTab({
   assignments, selectedAssignmentId, setSelectedAssignmentId, entries, setEntries,
   onSubmit, sectionMarks, loading,
@@ -667,7 +604,7 @@ function AssignmentMarksTab({
                             <td style={{ textAlign: 'center' }}>
                               <input type="number" value={entry.marks} min="0" max={selectedAssignment?.maxMarks ?? 10}
                                 onChange={e => setEntries(prev => prev.map((m, j) => j === i ? { ...m, marks: e.target.value } : m))}
-                                className="w-20 text-center collego-input py-1 text-sm" placeholder="—" />
+                                className="w-20 text-center collego-input py-1 text-sm" placeholder="â€”" />
                             </td>
                           </tr>
                         ))}
@@ -711,7 +648,7 @@ function AssignmentMarksTab({
   )
 }
 
-// ─── Student Performance Tab ─────────────────────────────────────────────────
+// â”€â”€â”€ Student Performance Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StudentPerformanceTab({ data, loading }) {
   return (
     <div className="space-y-6">
@@ -730,9 +667,9 @@ function StudentPerformanceTab({ data, loading }) {
                     <tr key={s.studentId} className="hover:bg-white/30 transition-colors">
                       <td className="text-slate-800 font-medium">{s.studentName}</td>
                       <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.enrollmentNumber}</code></td>
-                      <td style={{ textAlign: 'center' }}>{attPct != null ? <AttBadge pct={attPct} /> : <span className="text-slate-300">—</span>}</td>
-                      <td style={{ textAlign: 'center', color: '#7c3aed' }}>{s.ia1ObtainedMarks ?? '—'}</td>
-                      <td style={{ textAlign: 'center', color: '#7c3aed' }}>{s.ia2ObtainedMarks ?? '—'}</td>
+                      <td style={{ textAlign: 'center' }}>{attPct != null ? <AttBadge pct={attPct} /> : <span className="text-slate-300">â€”</span>}</td>
+                      <td style={{ textAlign: 'center', color: '#7c3aed' }}>{s.ia1ObtainedMarks ?? 'â€”'}</td>
+                      <td style={{ textAlign: 'center', color: '#7c3aed' }}>{s.ia2ObtainedMarks ?? 'â€”'}</td>
                     </tr>
                   )
                 })}
@@ -746,7 +683,7 @@ function StudentPerformanceTab({ data, loading }) {
   )
 }
 
-// ─── Assignments Tab ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Assignments Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, maxMarks, setMaxMarks, targetYear, setTargetYear, onSubmit, assignments, loading, onDownload, showMsg }) {
   const fileRef = useRef(null)
   const [pendingFile, setPendingFile] = useState(null)
@@ -824,7 +761,7 @@ function AssignmentsTab({ title, setTitle, desc, setDesc, dueDate, setDueDate, m
   )
 }
 
-// ─── Assignment Submissions ──────────────────────────────────────────────────
+// â”€â”€â”€ Assignment Submissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AssignmentSubmissions({ assignment, showMsg }) {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState([])
@@ -857,7 +794,7 @@ function AssignmentSubmissions({ assignment, showMsg }) {
   return (
     <div className="mt-3">
       <button onClick={() => setOpen(o => !o)} className="text-xs font-medium text-indigo-600 hover:underline flex items-center gap-1">
-        <Users size={12} /> Submissions ({assignment.submissionCount ?? 0}){graded > 0 ? ` · ${graded} graded` : ''}
+        <Users size={12} /> Submissions ({assignment.submissionCount ?? 0}){graded > 0 ? ` Â· ${graded} graded` : ''}
       </button>
       {open && (
         <div className="mt-3 rounded-xl border border-white/60 bg-white/40 overflow-hidden">
@@ -911,9 +848,9 @@ function SubmissionRow({ row, onGraded, onDownload, showMsg }) {
               ? (row.submittedAt ? `Submitted ${fmtDate(row.submittedAt)}` : 'Submitted')
               : (row.gradedAt ? `Marks recorded ${fmtDate(row.gradedAt)}` : 'No file submitted')}
             {row.late && <span className="ml-2 text-amber-600">Late</span>}
-            {row.fileName && <span className="ml-2">· {row.fileName}</span>}
+            {row.fileName && <span className="ml-2">Â· {row.fileName}</span>}
           </p>
-          {row.note && <p className="text-xs text-slate-500 mt-1">“{row.note}”</p>}
+          {row.note && <p className="text-xs text-slate-500 mt-1">â€œ{row.note}â€</p>}
         </div>
         <div className="flex items-center gap-2">
           {row.hasFile && (
@@ -943,7 +880,7 @@ function SubmissionRow({ row, onGraded, onDownload, showMsg }) {
   )
 }
 
-// ─── Materials Tab ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Materials Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, targetYear, setTargetYear, onSubmit, materials, loading, onDownload }) {
   const MATERIAL_TYPES = ['NOTES', 'SLIDES', 'REFERENCE', 'VIDEO', 'ASSIGNMENT', 'OTHER']
   const fileRef = useRef(null)
@@ -1003,7 +940,7 @@ function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, targetYea
                     <td className="text-slate-800 font-medium">{m.title}</td>
                     <td><Badge variant="info">{m.materialType}</Badge></td>
                     <td><Badge variant="secondary">{targetYearLabel(m.targetYear)}</Badge></td>
-                    <td className="text-slate-500 text-xs max-w-xs truncate">{m.description || '—'}</td>
+                    <td className="text-slate-500 text-xs max-w-xs truncate">{m.description || 'â€”'}</td>
                     <td style={{ textAlign: 'center' }}>
                       {m.hasFile && (
                         <Button variant="outline" size="sm" onClick={() => onDownload(`/api/faculty/materials/${m.id}/file`, m.fileName || `material-${m.id}`)}>
@@ -1022,56 +959,7 @@ function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, targetYea
   )
 }
 
-// ─── Analytics Tab ───────────────────────────────────────────────────────────
-function AnalyticsTab({ analytics, loading }) {
-  const attData = analytics ? [
-    { name: '<50%', value: analytics.studentsBelow50 || 0 },
-    { name: '50-75%', value: (analytics.studentsBelow75 || 0) - (analytics.studentsBelow50 || 0) },
-    { name: '>75%', value: analytics.studentsAbove75 || 0 },
-  ] : []
-
-  return (
-    <div className="space-y-6">
-      {loading ? (
-        <div className="flex justify-center py-16"><Spinner color="violet" /></div>
-      ) : !analytics ? (
-        <div className="glass-card p-12 border border-white/60"><EmptyState icon={BarChart3} title="No analytics data" accent="violet" description="Analytics will appear once attendance and marks are recorded." /></div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Panel title="Attendance Distribution" icon={BarChart3} accent="violet">
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={attData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={entry => `${entry.name}: ${entry.value}`} labelLine={false}>
-                  {['#ef4444', '#f59e0b', '#10b981'].map((c, i) => <Cell key={i} fill={c} />)}
-                </Pie>
-                <Tooltip content={<ChartTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </Panel>
-          <Panel title="Section Summary" icon={Award} accent="emerald">
-            <div className="space-y-3">
-              {[
-                { label: 'Average Attendance', value: `${fmtNum(analytics.averageAttendancePercentage, 1)}%`, color: 'text-emerald-600' },
-                { label: 'Students > 75%', value: analytics.studentsAbove75 || 0, color: 'text-emerald-600' },
-                { label: 'Students 50-75%', value: (analytics.studentsBelow75 || 0) - (analytics.studentsBelow50 || 0), color: 'text-amber-600' },
-                { label: 'Students < 50%', value: analytics.studentsBelow50 || 0, color: 'text-red-500' },
-                { label: 'Avg Internal Marks', value: fmtNum(analytics.averageInternalMarks), color: 'text-violet-600' },
-                { label: 'Pass Rate', value: `${fmtNum(analytics.passPercentage, 1)}%`, color: 'text-blue-600' },
-              ].map(item => (
-                <div key={item.label} className="flex justify-between items-center py-2">
-                  <span className="text-xs text-slate-500">{item.label}</span>
-                  <span className={cn('text-sm font-bold', item.color)}>{item.value}</span>
-                </div>
-              ))}
-            </div>
-          </Panel>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Question Papers Tab ─────────────────────────────────────────────────────
+// â”€â”€â”€ Question Papers Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function QuestionPapersTab({ sections, examType, setExamType, year, setYear, targetYear, setTargetYear, fileName, setFileName, selectedSectionId, setSelectedSectionId, onSubmit, papers, loading, uploadFileLoading }) {
   const [pendingFile, setPendingFile] = useState(null)
   const fileRef = useRef(null)
@@ -1155,7 +1043,7 @@ function QuestionPapersTab({ sections, examType, setExamType, year, setYear, tar
   )
 }
 
-// ─── Notices Tab ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Notices Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function NoticesTab({ title, setTitle, message, setMessage, type, setType, targetYear, setTargetYear, departmentName, onSubmit, sentNotices, loading, inbox = [] }) {
   const TYPE_OPTIONS = ['GENERAL', 'ACADEMIC', 'PLACEMENT', 'EXAM']
   const [attachmentError, setAttachmentError] = useState('')
@@ -1259,8 +1147,8 @@ function NoticesTab({ title, setTitle, message, setMessage, type, setType, targe
   )
 }
 
-// ─── Subject Assignments Tab ─────────────────────────────────────────────────────
-function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove, selectedSemesterId, setSelectedSemesterId, courseName, setCourseName, credits, setCredits, divisionFilter, setDivisionFilter, loadFromAllDepartments, setLoadFromAllDepartments, onOpenElective, openElectiveLoading }) {
+// â”€â”€â”€ Subject Assignments Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onAssign, onRemove, selectedSemesterId, setSelectedSemesterId, courseName, setCourseName, courseCode, setCourseCode, credits, setCredits, divisionFilter, setDivisionFilter, loadFromAllDepartments, setLoadFromAllDepartments, onOpenElective, openElectiveLoading }) {
   const selectedSemester = semesters.find(s => String(s.id) === String(selectedSemesterId))
   const selectedYear = semesterYear(selectedSemester?.number)
   const [oeCourseName, setOeCourseName] = useState('')
@@ -1300,7 +1188,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
 
       <div className="glass-card p-6 border border-white/60">
         <h3 className="text-sm font-semibold text-slate-800 mb-5 flex items-center gap-2"><Plus size={14} className="text-violet-500" /> Assign New Subject</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Course Name (type any course)</label>
             <input
@@ -1309,6 +1197,17 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
               placeholder="e.g., UI/UX Design, Prompt Engineering, Machine Learning, etc."
               className="collego-input"
             />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Subject Code (optional)</label>
+            <input
+              value={courseCode}
+              onChange={e => setCourseCode(e.target.value.toUpperCase())}
+              placeholder="e.g., CSE301"
+              maxLength={30}
+              className="collego-input"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">Leave blank to generate automatically.</p>
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Number of Credits</label>
@@ -1322,7 +1221,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
               placeholder="e.g., 4"
               className="collego-input"
             />
-            <p className="text-[10px] text-slate-400 mt-1">Credit value saved on the subject (1–12).</p>
+            <p className="text-[10px] text-slate-400 mt-1">Credit value saved on the subject (1â€“12).</p>
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Division</label>
@@ -1356,7 +1255,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
               <option value="">Select semester</option>
               {semesters.map(s => {
                 const year = semesterYear(s.number)
-                return <option key={s.id} value={s.id}>{s.name} · {targetYearLabel(year)} ({s.academicYear})</option>
+                return <option key={s.id} value={s.id}>{s.name} Â· {targetYearLabel(year)} ({s.academicYear})</option>
               })}
             </select>
             {selectedSemester && (
@@ -1371,7 +1270,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
         </div>
 
         <div className="mt-5 rounded-xl border border-white/60 bg-white/50 p-3">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Semester → Academic Year</p>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Semester â†’ Academic Year</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {SEMESTER_YEAR_MAP.map(item => (
               <div key={item.year} className={cn(
@@ -1400,7 +1299,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
               <div key={a.id} className="px-5 py-4 hover:bg-white/30 transition-colors flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800 truncate">{a.courseName}</p>
-                  <p className="text-xs text-slate-400 mt-1">{a.courseCode} · {a.credits ?? 4} credits</p>
+                  <p className="text-xs text-slate-400 mt-1">{a.courseCode} Â· {a.credits ?? 4} credits</p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <Badge variant="secondary">{a.yearLabel || targetYearLabel(a.year || semesterYear(a.semesterNumber))}</Badge>
@@ -1429,12 +1328,12 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
           <Layers size={15} className="text-violet-500" /> Open Elective Subject
         </h3>
         <p className="text-[11px] text-slate-400 mb-5">
-          Add an elective subject and hand-pick students from any department — useful for backlog and open-elective batches.
+          Add an elective subject and hand-pick students from any department â€” useful for backlog and open-elective batches.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Subject Name</label>
-            <input value={oeCourseName} onChange={e => setOeCourseName(e.target.value)} placeholder="e.g. Open Elective — Cyber Security" className="collego-input" />
+            <input value={oeCourseName} onChange={e => setOeCourseName(e.target.value)} placeholder="e.g. Open Elective â€” Cyber Security" className="collego-input" />
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Credits</label>
@@ -1464,7 +1363,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
                 <input type="checkbox" checked={oeSelected.includes(s.studentId)} onChange={() => toggleOeStudent(s.studentId)} className="rounded w-4 h-4 cursor-pointer" />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-slate-700 truncate">{s.name}</p>
-                  <p className="text-[10px] text-slate-400">{s.enrollmentNumber} · {s.departmentName} · {s.section ? `Sec ${s.section}` : `Year ${s.year || '—'}`}</p>
+                  <p className="text-[10px] text-slate-400">{s.enrollmentNumber} Â· {s.departmentName} Â· {s.section ? `Sec ${s.section}` : `Year ${s.year || 'â€”'}`}</p>
                 </div>
               </label>
             ))}
@@ -1481,7 +1380,7 @@ function SubjectAssignmentsTab({ courses, semesters, myAssignments, loading, onA
   )
 }
 
-// ─── HoD Class Representatives ───────────────────────────────────────────────
+// â”€â”€â”€ HoD Class Representatives â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function HodClassRepresentativesTab({ showMsg }) {
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1518,7 +1417,7 @@ function HodClassRepresentativesTab({ showMsg }) {
     setBusyId(student.studentId)
     try {
       await api.put(`/api/faculty/hod/cr/${student.studentId}`)
-      showMsg(`${student.name} is now the CR for ${student.yearLabel} · Section ${student.section}`)
+      showMsg(`${student.name} is now the CR for ${student.yearLabel} Â· Section ${student.section}`)
       await load()
     } catch (err) {
       showMsg(err.response?.data?.message || 'Could not choose CR', 'error')
@@ -1589,11 +1488,11 @@ function HodClassRepresentativesTab({ showMsg }) {
                 {filtered.map(s => (
                   <tr key={s.studentId} className="hover:bg-white/30 transition-colors">
                     <td><Badge variant="secondary">{s.yearLabel || targetYearLabel(s.year)}</Badge></td>
-                    <td className="text-slate-600 font-medium">Section {s.section || '—'}</td>
+                    <td className="text-slate-600 font-medium">Section {s.section || 'â€”'}</td>
                     <td className="text-slate-800 font-medium">{s.name}</td>
-                    <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.enrollmentNumber || '—'}</code></td>
+                    <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.enrollmentNumber || 'â€”'}</code></td>
                     <td style={{ textAlign: 'center' }}>
-                      {s.isCr ? <Badge variant="purple">CR</Badge> : <span className="text-slate-300">—</span>}
+                      {s.isCr ? <Badge variant="purple">CR</Badge> : <span className="text-slate-300">â€”</span>}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       {s.isCr ? (
@@ -1619,7 +1518,7 @@ function HodClassRepresentativesTab({ showMsg }) {
   )
 }
 
-// ─── HoD Class Timetables ────────────────────────────────────────────────────
+// â”€â”€â”€ HoD Class Timetables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function HodTimetablesTab({ showMsg }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1673,7 +1572,7 @@ function HodTimetablesTab({ showMsg }) {
         URL.revokeObjectURL(preview.url)
         setPreview(null)
       }
-      showMsg(`Timetable uploaded for ${row.yearLabel} · Section ${row.sectionName}`)
+      showMsg(`Timetable uploaded for ${row.yearLabel} Â· Section ${row.sectionName}`)
       await load()
     } catch (err) {
       showMsg(err.response?.data?.message || 'Timetable upload failed', 'error')
@@ -1691,7 +1590,7 @@ function HodTimetablesTab({ showMsg }) {
     try {
       const file = await fileObjectUrl(`/api/faculty/hod/timetables/${row.id}/file`)
       if (preview?.url) URL.revokeObjectURL(preview.url)
-      setPreview({ id: row.id, url: file.url, title: `${row.yearLabel} · Section ${row.sectionName}` })
+      setPreview({ id: row.id, url: file.url, title: `${row.yearLabel} Â· Section ${row.sectionName}` })
     } catch (err) {
       showMsg(err.response?.data?.message || 'Could not preview the timetable', 'error')
     }
@@ -1706,7 +1605,7 @@ function HodTimetablesTab({ showMsg }) {
   }
 
   const removeRow = async (row) => {
-    if (!window.confirm(`Remove the timetable for ${row.yearLabel} · Section ${row.sectionName}?`)) return
+    if (!window.confirm(`Remove the timetable for ${row.yearLabel} Â· Section ${row.sectionName}?`)) return
     setBusyKey(`${row.year}-${row.sectionName}`)
     try {
       await api.delete(`/api/faculty/hod/timetables/${row.id}`)
@@ -1765,7 +1664,7 @@ function HodTimetablesTab({ showMsg }) {
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-slate-800">Section {row.sectionName}</p>
-                            <p className="text-[10px] text-slate-400 truncate">{row.hasFile ? `${row.fileName} · ${fmtDate(row.uploadedAt)}` : 'No timetable uploaded'}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{row.hasFile ? `${row.fileName} Â· ${fmtDate(row.uploadedAt)}` : 'No timetable uploaded'}</p>
                           </div>
                         </div>
                         <Badge variant={row.hasFile ? 'success' : 'secondary'} className="text-[9px] px-2 py-0.5 shrink-0">{row.hasFile ? 'Uploaded' : 'Pending'}</Badge>
@@ -1795,7 +1694,7 @@ function HodTimetablesTab({ showMsg }) {
       {preview && (
         <div className="glass-card overflow-hidden border border-white/60">
           <div className="px-5 py-3 border-b border-white/50 flex items-center justify-between">
-            <p className="text-sm font-semibold text-slate-800">Preview · {preview.title}</p>
+            <p className="text-sm font-semibold text-slate-800">Preview Â· {preview.title}</p>
             <button onClick={() => { URL.revokeObjectURL(preview.url); setPreview(null) }} className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white transition-colors" title="Close preview"><X size={15} /></button>
           </div>
           <iframe src={preview.url} title="Class timetable preview" className="w-full h-[70vh] bg-white" />
@@ -1805,7 +1704,168 @@ function HodTimetablesTab({ showMsg }) {
   )
 }
 
-// ─── Personal Reminders ──────────────────────────────────────────────────────
+// â”€â”€â”€ Personal Reminders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function FacultyNewslettersTab({ showMsg, isHod, onDownload }) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [title, setTitle] = useState('')
+  const [file, setFile] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await api.get('/api/faculty/newsletters')
+      setItems(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Could not load newsletters', 'error')
+    } finally { setLoading(false) }
+  }, [showMsg])
+
+  useEffect(() => { load() }, [load])
+
+  const upload = async (e) => {
+    e.preventDefault()
+    if (!title.trim() || !file || busy) return
+    setBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('title', title.trim())
+      fd.append('file', file)
+      await api.post('/api/faculty/hod/newsletters', fd)
+      showMsg('Newsletter uploaded and shared with your department')
+      setTitle('')
+      setFile(null)
+      await load()
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Could not upload newsletter', 'error')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={Newspaper} title="Department Newsletters" accent="emerald"
+        subtitle="Newsletters shared by your Head of Department for this department." />
+
+      {isHod && (
+        <div className="glass-card p-6 border border-white/60">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
+            <Plus size={15} className="text-emerald-500" /> Upload Newsletter
+          </h3>
+          <form onSubmit={upload} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div className="sm:col-span-1">
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Title</label>
+              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Quarterly Department Newsletter" className="collego-input" />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">File (PDF / Word)</label>
+              <input type="file" accept=".pdf,.doc,.docx" onChange={e => setFile(e.target.files?.[0] || null)} className="collego-input" />
+            </div>
+            <Button type="submit" variant="gradient" disabled={busy || !title.trim() || !file}>
+              {busy ? <><RefreshCw size={14} className="animate-spin" /> Uploading...</> : <><Upload size={14} /> Upload &amp; Share</>}
+            </Button>
+          </form>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16"><Spinner color="emerald" /></div>
+      ) : items.length === 0 ? (
+        <div className="glass-card p-12 border border-white/60">
+          <EmptyState icon={Newspaper} title="No newsletters yet" accent="emerald" description="Department newsletters will appear here once uploaded." />
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {items.map(n => (
+            <div key={n.id} className="glass-card p-5 border border-white/60 flex flex-wrap items-center gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-800">{n.title}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {fmtDate(n.createdAt)} · {n.uploadedByName} · {n.fileName}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => onDownload(`/api/newsletters/${n.id}/file`, n.fileName || 'newsletter.pdf')}>
+                <Download size={13} /> Download
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function HodResumeApprovalsTab({ showMsg }) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState(null)
+  const [notes, setNotes] = useState({})
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await api.get('/api/faculty/hod/resumes/pending')
+      setItems(Array.isArray(res.data) ? res.data : [])
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Could not load pending resumes', 'error')
+    } finally { setLoading(false) }
+  }, [showMsg])
+
+  useEffect(() => { load() }, [load])
+
+  const review = async (facultyId, approve) => {
+    setBusyId(facultyId)
+    try {
+      await api.put(`/api/faculty/hod/resumes/${facultyId}/${approve ? 'approve' : 'reject'}`,
+        approve ? undefined : { note: notes[facultyId] || '' })
+      showMsg(approve ? 'Resume approved' : 'Resume rejected')
+      await load()
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Could not review resume', 'error')
+    } finally { setBusyId(null) }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle icon={ShieldCheck} title="Resume Approvals" accent="violet"
+        subtitle="Review resumes uploaded by faculty members of your department." />
+      {loading ? (
+        <div className="flex items-center justify-center py-16"><Spinner color="violet" /></div>
+      ) : items.length === 0 ? (
+        <div className="glass-card p-12 border border-white/60">
+          <EmptyState icon={ShieldCheck} title="No resumes pending" accent="violet" description="Faculty uploads will appear here for your review." />
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {items.map(f => (
+            <div key={f.id} className="glass-card p-5 border border-white/60 flex flex-wrap items-center gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-800">{f.name}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{f.email} · {f.departmentName}</p>
+                {f.resumeFileName && <p className="text-[11px] text-slate-500 mt-1 truncate">{f.resumeFileName}</p>}
+                <input
+                  value={notes[f.id] || ''}
+                  onChange={e => setNotes(prev => ({ ...prev, [f.id]: e.target.value }))}
+                  placeholder="Optional rejection note"
+                  className="collego-input mt-2 !max-w-md"
+                />
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="success" size="sm" disabled={busyId === f.id} onClick={() => review(f.id, true)}>
+                  <CheckCircle2 size={13} /> Approve
+                </Button>
+                <Button variant="destructive" size="sm" disabled={busyId === f.id} onClick={() => review(f.id, false)}>
+                  <X size={13} /> Reject
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RemindersTab({ facultyReminders = [], loading, onCreate, onToggle, onDelete }) {
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState(false)
@@ -1860,7 +1920,7 @@ function RemindersTab({ facultyReminders = [], loading, onCreate, onToggle, onDe
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className={cn('text-sm', r.completed ? 'line-through text-slate-400' : 'text-slate-700')}>{r.title}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Added {fmtDate(r.createdAt)}{r.completedAt ? ` · Completed ${fmtDate(r.completedAt)}` : ''}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Added {fmtDate(r.createdAt)}{r.completedAt ? ` Â· Completed ${fmtDate(r.completedAt)}` : ''}</p>
                 </div>
                 <button type="button" onClick={() => onDelete(r.id)} aria-label="Delete reminder" className="text-slate-300 hover:text-red-500 transition-colors p-1">
                   <Trash2 size={15} />
@@ -1874,7 +1934,7 @@ function RemindersTab({ facultyReminders = [], loading, onCreate, onToggle, onDe
   )
 }
 
-// ─── Main Faculty Dashboard ──────────────────────────────────────────────────
+// â”€â”€â”€ Main Faculty Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function FacultyDashboard() {
   const navigate = useNavigate()
   const email = authService.getEmail()
@@ -1899,9 +1959,6 @@ export default function FacultyDashboard() {
   const [maxMarks, setMaxMarks] = useState(50)
   const [marksEntries, setMarksEntries] = useState([])
   const [sectionMarks, setSectionMarks] = useState([])
-  const [semMaxMarks, setSemMaxMarks] = useState(100)
-  const [semMarksEntries, setSemMarksEntries] = useState([])
-  const [semesterMarks, setSemesterMarks] = useState([])
   const [studentPerformance, setStudentPerformance] = useState([])
 
   // Assignment Marks
@@ -1946,15 +2003,13 @@ export default function FacultyDashboard() {
   const [unreadCounts, setUnreadCounts] = useState({})
   const [notifications, setNotifications] = useState([])
 
-  // Analytics
-  const [analytics, setAnalytics] = useState(null)
-
   // Subject Assignments
   const [mySubjectAssignments, setMySubjectAssignments] = useState([])
   const [availableCourses, setAvailableCourses] = useState([])
   const [availableSemesters, setAvailableSemesters] = useState([])
   const [selectedSemesterId, setSelectedSemesterId] = useState('')
   const [newCourseName, setNewCourseName] = useState('')
+  const [newCourseCode, setNewCourseCode] = useState('')
   const [newCourseCredits, setNewCourseCredits] = useState('4')
   const [divisionFilter, setDivisionFilter] = useState('')
   const [loadFromAllDepartments, setLoadFromAllDepartments] = useState(false)
@@ -2093,7 +2148,7 @@ export default function FacultyDashboard() {
     try {
       const res = await api.post('/api/faculty/career-profile/resume', fd)
       setCareerProfile(res.data)
-      showMsg('Resume submitted — waiting for admin approval')
+      showMsg('Resume submitted â€” waiting for admin approval')
     } catch (err) {
       showMsg(err.response?.data?.message || 'Failed to upload resume', 'error')
       throw err
@@ -2121,9 +2176,7 @@ export default function FacultyDashboard() {
   const handleSectionSelect = (section) => {
     setSelectedSection(section)
     setActiveTab('attendance')
-    setAnalytics(null)
     setSectionMarks([])
-    setSemesterMarks([])
     setAssignmentMarksAssignmentId('')
     setAssignmentMarksEntries([])
     setAssignmentMarksRecorded([])
@@ -2141,7 +2194,6 @@ export default function FacultyDashboard() {
       const students = res.data
       setAttendanceRecords(students.map(s => ({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, status: 'PRESENT' })))
       setMarksEntries(students.map(s => ({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, obtainedMarks: '' })))
-      setSemMarksEntries(students.map(s => ({ studentId: s.studentId, studentName: s.studentName, enrollmentNumber: s.enrollmentNumber, obtainedMarks: '' })))
     } catch { showMsg('Failed to load student data', 'error') }
   }
 
@@ -2193,8 +2245,6 @@ export default function FacultyDashboard() {
     if (!selectedSection) return
     if (tabId === 'assignments') loadAssignments()
     if (tabId === 'materials') loadMaterials()
-    if (tabId === 'analytics') loadAnalytics()
-    if (tabId === 'semesterMarks') loadSemesterMarks()
     if (tabId === 'assignmentMarks') loadAssignmentMarks()
     if (tabId === 'studentPerformance') loadStudentPerformance()
   }
@@ -2235,32 +2285,6 @@ export default function FacultyDashboard() {
       setMarksEntries(prev => prev.map(entry => {
         const existing = rows.find(m => m.studentId === entry.studentId && m.examName === examName)
         return { ...entry, obtainedMarks: existing ? existing.obtainedMarks : '' }
-      }))
-    } catch { /* ignore */ } finally { setTabLoading(false) }
-  }
-
-  const handleUploadSemesterMarks = async () => {
-    const entries = semMarksEntries.filter(e => e.obtainedMarks !== '' && e.obtainedMarks !== null).map(e => ({ studentId: e.studentId, obtainedMarks: parseFloat(e.obtainedMarks) }))
-    if (!entries.length) { showMsg('Enter marks for at least one student', 'error'); return }
-    setLoading(true)
-    try {
-      const res = await api.post('/api/faculty/marks/semester', { sectionId: selectedSection.sectionId, maxMarks: parseFloat(semMaxMarks), entries })
-      showMsg(`Semester marks saved: ${res.data.created} created, ${res.data.updated} updated`)
-      await loadSemesterMarks()
-    } catch (err) { showMsg(err.response?.data?.message || 'Failed to upload semester marks', 'error') }
-    finally { setLoading(false) }
-  }
-
-  const loadSemesterMarks = async () => {
-    if (!selectedSection) return
-    setTabLoading(true)
-    try {
-      const res = await api.get(`/api/faculty/marks/semester/${selectedSection.sectionId}`)
-      const rows = Array.isArray(res.data) ? res.data : []
-      setSemesterMarks(rows)
-      setSemMarksEntries(prev => prev.map(entry => {
-        const existing = rows.find(m => m.studentId === entry.studentId)
-        return existing ? { ...entry, obtainedMarks: existing.obtainedMarks } : entry
       }))
     } catch { /* ignore */ } finally { setTabLoading(false) }
   }
@@ -2492,12 +2516,6 @@ export default function FacultyDashboard() {
     finally { setLoading(false) }
   }
 
-  const loadAnalytics = async () => {
-    setTabLoading(true)
-    try { const res = await api.get(`/api/faculty/analytics/${selectedSection.sectionId}`); setAnalytics(res.data) }
-    catch { /* ignore */ } finally { setTabLoading(false) }
-  }
-
   const loadAvailableCourses = async () => {
     try { const res = await api.get('/api/faculty/courses'); setAvailableCourses(res.data) } catch { /* ignore */ }
   }
@@ -2516,23 +2534,24 @@ export default function FacultyDashboard() {
     if (!newCourseName.trim() || !selectedSemesterId) return
     const credits = Number(newCourseCredits)
     if (!Number.isInteger(credits) || credits < 1 || credits > 12) {
-      showMsg('Enter a valid number of credits (1–12)', 'error')
+      showMsg('Enter a valid number of credits (1â€“12)', 'error')
       return
     }
     setSubjectAssignmentsLoading(true)
     try {
-      const res = await api.post('/api/faculty/subject-assignments', { courseName: newCourseName.trim(), semesterId: parseInt(selectedSemesterId), credits, divisionFilter, loadFromAllDepartments })
+      const res = await api.post('/api/faculty/subject-assignments', { courseName: newCourseName.trim(), courseCode: newCourseCode.trim(), semesterId: parseInt(selectedSemesterId), credits, divisionFilter, loadFromAllDepartments })
       const studentCount = res.data?.studentCount ?? 0
       const yearLabel = res.data?.yearLabel || targetYearLabel(res.data?.year)
       const sectionCount = res.data?.sectionCount ?? 0
       setNewCourseName('')
+      setNewCourseCode('')
       setNewCourseCredits('4')
       setSelectedSemesterId('')
       await Promise.all([loadMySubjectAssignments(), fetchSections()])
       showMsg(studentCount > 0
-        ? `Subject assigned — ${studentCount} ${yearLabel} students loaded into ${sectionCount} section${sectionCount === 1 ? '' : 's'}. Open the subject under My Sections to manage them.`
+        ? `Subject assigned â€” ${studentCount} ${yearLabel} students loaded into ${sectionCount} section${sectionCount === 1 ? '' : 's'}. Open the subject under My Sections to manage them.`
         : loadFromAllDepartments
-          ? `Subject assigned from all departments — no students found across all departments.`
+          ? `Subject assigned from all departments â€” no students found across all departments.`
           : `Subject assigned, but no ${yearLabel} students were found in your department yet.`)
     } catch (err) { showMsg(err.response?.data?.message || 'Failed to assign subject', 'error') }
     finally { setSubjectAssignmentsLoading(false) }
@@ -2554,7 +2573,7 @@ export default function FacultyDashboard() {
     try {
       const res = await api.post('/api/faculty/open-elective', payload)
       const count = res.data?.studentCount ?? 0
-      showMsg(`Open elective created — ${count} cross-department student${count === 1 ? '' : 's'} added.`)
+      showMsg(`Open elective created â€” ${count} cross-department student${count === 1 ? '' : 's'} added.`)
       await Promise.all([loadMySubjectAssignments(), fetchSections()])
     } catch (err) {
       showMsg(err.response?.data?.message || 'Failed to create open elective', 'error')
@@ -2575,6 +2594,7 @@ export default function FacultyDashboard() {
       ? [
           { id: 'classRepresentatives', label: 'Class Representatives', icon: Crown },
           { id: 'hodTimetables', label: 'Class Timetables', icon: CalendarDays },
+          { id: 'resumeApprovals', label: 'Resume Approvals', icon: ShieldCheck },
         ]
       : []),
   ]
@@ -2587,7 +2607,7 @@ export default function FacultyDashboard() {
     },
     {
       title: 'My Sections',
-      items: sections.map(sec => ({ id: `section-${sec.sectionId}`, label: sec.courseName, icon: Layers, meta: `Sec ${sec.sectionName} · ${targetYearLabel(sec.year)}` })),
+      items: sections.map(sec => ({ id: `section-${sec.sectionId}`, label: sec.courseName, icon: Layers, meta: `Sec ${sec.sectionName} Â· ${targetYearLabel(sec.year)}` })),
     },
   ]
   const sidebarActive = selectedSection ? `section-${selectedSection.sectionId}` : activeTab
@@ -2605,7 +2625,7 @@ export default function FacultyDashboard() {
     if (!selectedSection) {
       switch (activeTab) {
         case 'overview': return <OverviewTab sections={sections} overviewData={overviewData} onSectionSelect={handleSectionSelect} />
-        case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} credits={newCourseCredits} setCredits={setNewCourseCredits} divisionFilter={divisionFilter} setDivisionFilter={setDivisionFilter} loadFromAllDepartments={loadFromAllDepartments} setLoadFromAllDepartments={setLoadFromAllDepartments} onOpenElective={handleOpenElective} openElectiveLoading={subjectAssignmentsLoading} />
+        case 'subjectAssignments': return <SubjectAssignmentsTab courses={availableCourses} semesters={availableSemesters} myAssignments={mySubjectAssignments} loading={subjectAssignmentsLoading} onAssign={handleAssignSubject} onRemove={handleRemoveSubjectAssignment} selectedSemesterId={selectedSemesterId} setSelectedSemesterId={setSelectedSemesterId} courseName={newCourseName} setCourseName={setNewCourseName} courseCode={newCourseCode} setCourseCode={setNewCourseCode} credits={newCourseCredits} setCredits={setNewCourseCredits} divisionFilter={divisionFilter} setDivisionFilter={setDivisionFilter} loadFromAllDepartments={loadFromAllDepartments} setLoadFromAllDepartments={setLoadFromAllDepartments} onOpenElective={handleOpenElective} openElectiveLoading={subjectAssignmentsLoading} />
         case 'questionPapers': return <QuestionPapersTab sections={sections} examType={qpExamType} setExamType={setQpExamType} year={qpYear} setYear={setQpYear} targetYear={qpTargetYear} setTargetYear={setQpTargetYear} fileName={qpFileName} setFileName={setQpFileName} selectedSectionId={qpSelectedSectionId} setSelectedSectionId={setQpSelectedSectionId} onSubmit={handleUploadQP} papers={myQuestionPapers} loading={loading} uploadFileLoading={uploadFileLoading} />
         case 'careerProfile': return <CareerProfileTab profile={careerProfile} loading={careerLoading} onUpload={handleUploadCareerResume} onRemove={handleRemoveCareerResume} onDownload={handleDownload} />
         case 'placements': return <UpcomingPlacementsTab placements={upcomingPlacements} loading={placementsLoading} onRefresh={loadUpcomingPlacements} />
@@ -2615,6 +2635,8 @@ export default function FacultyDashboard() {
         case 'settings': return <SettingsTab showMsg={showMsg} accent="violet" />
         case 'help': return <HelpTab accent="violet" />
 case 'reminders': return <RemindersTab facultyReminders={facultyReminders} loading={facultyRemindersLoading} onCreate={handleCreateReminder} onToggle={handleToggleReminder} onDelete={handleDeleteReminder} />
+        case 'resumeApprovals': return <HodResumeApprovalsTab showMsg={showMsg} />
+        case 'newsletters': return <FacultyNewslettersTab showMsg={showMsg} isHod={careerProfile?.isHod} onDownload={handleDownload} />
         case 'invigilations': return <InvigilationsTab showMsg={showMsg} />
         default: return null
       }
@@ -2636,7 +2658,6 @@ case 'reminders': return <RemindersTab facultyReminders={facultyReminders} loadi
         onRemoveHoliday={handleRemoveHoliday}
       />
       case 'internalMarks': return <InternalMarksTab examName={examName} setExamName={setExamName} maxMarks={maxMarks} setMaxMarks={setMaxMarks} marksEntries={marksEntries} setMarksEntries={setMarksEntries} onSubmit={handleUploadInternalMarks} sectionMarks={sectionMarks} loading={loading} />
-      case 'semesterMarks': return <SemesterMarksTab semMaxMarks={semMaxMarks} setSemMaxMarks={setSemMaxMarks} semMarksEntries={semMarksEntries} setSemMarksEntries={setSemMarksEntries} onSubmit={handleUploadSemesterMarks} sectionMarks={semesterMarks} loading={loading} />
       case 'studentPerformance': return <StudentPerformanceTab data={studentPerformance} loading={tabLoading} />
       case 'assignments': return <AssignmentsTab title={assignmentTitle} setTitle={setAssignmentTitle} desc={assignmentDesc} setDesc={setAssignmentDesc} dueDate={assignmentDueDate} setDueDate={setAssignmentDueDate} maxMarks={assignmentMaxMarks} setMaxMarks={setAssignmentMaxMarks} targetYear={assignmentTargetYear} setTargetYear={setAssignmentTargetYear} onSubmit={handleCreateAssignment} assignments={sectionAssignments} loading={loading} onDownload={handleDownload} showMsg={showMsg} />
       case 'assignmentMarks': return <AssignmentMarksTab assignments={sectionAssignments} selectedAssignmentId={assignmentMarksAssignmentId} setSelectedAssignmentId={handleAssignmentMarksSelect} entries={assignmentMarksEntries} setEntries={setAssignmentMarksEntries} onSubmit={handleUploadAssignmentMarks} sectionMarks={assignmentMarksRecorded} loading={loading} />
@@ -2652,14 +2673,14 @@ case 'reminders': return <RemindersTab facultyReminders={facultyReminders} loadi
         collapsed={collapsed} onToggle={() => setCollapsed(c => !c)}
         navSections={navSections} activeTab={sidebarActive} onTabChange={handleSidebarNav}
         accent="violet" portalLabel="Faculty Portal"
-        note={sections.length > 0 ? `${sections.length} sections · ${totalStudents} students assigned` : 'No sections assigned yet'}
+        note={sections.length > 0 ? `${sections.length} sections Â· ${totalStudents} students assigned` : 'No sections assigned yet'}
       />
       <PortalTopbar
         sidebarWidth={sidebarWidth} accent="violet"
         user={{
           name: careerProfile?.name || 'Faculty',
           role: careerProfile?.departmentName
-            ? `${careerProfile.designation ? `${careerProfile.designation} · ` : ''}${careerProfile.departmentName}`
+            ? `${careerProfile.designation ? `${careerProfile.designation} Â· ` : ''}${careerProfile.departmentName}`
             : 'Faculty',
           email,
         }}
@@ -2694,3 +2715,5 @@ case 'reminders': return <RemindersTab facultyReminders={facultyReminders} loadi
     </div>
   )
 }
+
+

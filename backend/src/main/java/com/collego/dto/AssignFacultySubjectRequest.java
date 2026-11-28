@@ -4,12 +4,17 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class AssignFacultySubjectRequest {
     @NotBlank(message = "Course name is required")
     private String courseName;
+
+    /** Optional manually entered subject code; generated when omitted. */
+    @Size(max = 30, message = "Subject code must be 30 characters or fewer")
+    private String courseCode;
 
     @NotNull(message = "Semester ID is required")
     private Long semesterId;
