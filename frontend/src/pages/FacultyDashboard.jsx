@@ -2618,6 +2618,13 @@ export default function FacultyDashboard() {
 
   const handleAssignSubject = async (payload) => {
     if (!payload.courseName || !payload.semesterId) return
+    const ok = await confirmAction({
+      title: 'Are you sure you want to assign this subject?',
+      message: `"${payload.courseName}" will be assigned to you and students will be loaded into its sections.`,
+      confirmLabel: 'Assign Subject',
+      tone: 'info',
+    })
+    if (!ok) return
     setSubjectAssignmentsLoading(true)
     try {
       const res = await api.post('/api/faculty/subject-assignments', payload)
@@ -2638,6 +2645,13 @@ export default function FacultyDashboard() {
   }
 
   const handleRemoveSubjectAssignment = async (assignmentId) => {
+    const assignment = mySubjectAssignments.find(a => a.id === assignmentId)
+    const ok = await confirmAction({
+      title: 'Are you sure you want to remove this subject?',
+      message: `"${assignment?.courseName || 'This subject'}" will be unassigned and its sections/students released.`,
+      confirmLabel: 'Remove Subject',
+    })
+    if (!ok) return
     setSubjectAssignmentsLoading(true)
     try {
       await api.delete(`/api/faculty/subject-assignments/${assignmentId}`)
