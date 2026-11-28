@@ -503,7 +503,7 @@ resource "aws_budgets_budget" "monthly" {
 # pg_dump cron on the EC2 host. This avoids the NAT Gateway and VPC Lambda cost.
 
 # ─── Nightly power schedule (IST) ─────────────────────────────────────────────
-# Stops EC2/RDS at 01:00 IST and starts them again at 07:00/07:15 IST.
+# Stops EC2/RDS at 00:30/00:35 IST and starts them again at 07:25/07:30 IST.
 # EventBridge Scheduler universal targets call the AWS APIs directly, so this
 # does not need a Lambda function or a NAT Gateway.
 
@@ -546,8 +546,8 @@ resource "aws_iam_role_policy" "scheduler" {
 
 resource "aws_scheduler_schedule" "stop_ec2" {
   name                         = "collego-stop-ec2"
-  description                  = "Stop Collego EC2 at 01:00 IST"
-  schedule_expression          = "cron(0 1 * * ? *)"
+  description                  = "Stop Collego EC2 at 00:30 IST"
+  schedule_expression          = "cron(30 0 * * ? *)"
   schedule_expression_timezone = "Asia/Kolkata"
   state                        = "ENABLED"
 
@@ -564,8 +564,8 @@ resource "aws_scheduler_schedule" "stop_ec2" {
 
 resource "aws_scheduler_schedule" "stop_rds" {
   name                         = "collego-stop-rds"
-  description                  = "Stop Collego RDS at 01:05 IST"
-  schedule_expression          = "cron(5 1 * * ? *)"
+  description                  = "Stop Collego RDS at 00:35 IST"
+  schedule_expression          = "cron(35 0 * * ? *)"
   schedule_expression_timezone = "Asia/Kolkata"
   state                        = "ENABLED"
 
@@ -582,8 +582,8 @@ resource "aws_scheduler_schedule" "stop_rds" {
 
 resource "aws_scheduler_schedule" "start_rds" {
   name                         = "collego-start-rds"
-  description                  = "Start Collego RDS at 07:00 IST"
-  schedule_expression          = "cron(0 7 * * ? *)"
+  description                  = "Start Collego RDS at 07:25 IST"
+  schedule_expression          = "cron(25 7 * * ? *)"
   schedule_expression_timezone = "Asia/Kolkata"
   state                        = "ENABLED"
 
@@ -600,8 +600,8 @@ resource "aws_scheduler_schedule" "start_rds" {
 
 resource "aws_scheduler_schedule" "start_ec2" {
   name                         = "collego-start-ec2"
-  description                  = "Start Collego EC2 at 07:15 IST"
-  schedule_expression          = "cron(15 7 * * ? *)"
+  description                  = "Start Collego EC2 at 07:30 IST"
+  schedule_expression          = "cron(30 7 * * ? *)"
   schedule_expression_timezone = "Asia/Kolkata"
   state                        = "ENABLED"
 
