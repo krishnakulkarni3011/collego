@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { confirmAction } from '../common/ConfirmDialog.jsx'
 import {
   BookMarked, Plus, RefreshCw, Trash2, CalendarDays, MapPin,
   Users, ChevronDown, ChevronUp, CheckCircle2, XCircle,
@@ -101,7 +102,7 @@ export function ExamsAdminTab({ showMsg }) {
   }
 
   const deleteExam = async (exam) => {
-    if (!window.confirm(`Delete "${exam.name}" and all its papers?`)) return
+    if (!await confirmAction({ title: 'Are you sure?', message: `Delete "${exam.name}" and all its papers?`, confirmLabel: 'Confirm' })) return
     try {
       await api.delete(`/api/admin/exams/${exam.id}`)
       showMsg?.('Exam deleted')
@@ -162,7 +163,7 @@ export function ExamsAdminTab({ showMsg }) {
   }
 
   const removeSchedule = async (schedule) => {
-    if (!window.confirm('Remove this paper from the exam?')) return
+    if (!await confirmAction({ title: 'Are you sure?', message: 'Remove this paper from the exam?', confirmLabel: 'Confirm' })) return
     try {
       await api.delete(`/api/admin/exams/schedules/${schedule.id}`)
       const res = await api.get(`/api/admin/exams/${activeExam.id}/schedules`)
@@ -227,7 +228,7 @@ export function ExamsAdminTab({ showMsg }) {
 
   const runPromotion = async () => {
     if (!promotion.preview) return
-    if (!window.confirm(`Promote ${promotion.preview.eligibleCount} students from ${promotion.preview.fromSemester} to ${promotion.preview.toSemester}? This updates their semester and enrolments.`)) return
+    if (!await confirmAction({ title: 'Are you sure?', message: `Promote ${promotion.preview.eligibleCount} students from ${promotion.preview.fromSemester} to ${promotion.preview.toSemester}? This updates their semester and enrolments.`, confirmLabel: 'Confirm' })) return
     try {
       const res = await api.post('/api/admin/exams/promotion', null, {
         params: { fromSemesterId: promotion.fromSemesterId, toSemesterId: promotion.toSemesterId },

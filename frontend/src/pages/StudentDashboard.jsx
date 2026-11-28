@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useId, useRef } from 'react'
+import { confirmAction } from '../components/common/ConfirmDialog.jsx'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -1572,7 +1573,7 @@ export default function StudentDashboard() {
   }, [showMsg])
 
   const handleDeleteReminder = useCallback(async (id) => {
-    if (!window.confirm('Delete this reminder?')) return
+    if (!await confirmAction({ title: 'Are you sure?', message: 'Delete this reminder?', confirmLabel: 'Confirm' })) return
     try {
       await api.delete(`/api/student/reminders/${id}`)
       setReminders(prev => prev.filter(r => r.id !== id))

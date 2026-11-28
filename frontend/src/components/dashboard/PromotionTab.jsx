@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { confirmAction } from '../common/ConfirmDialog.jsx'
 import { GraduationCap, RefreshCw, ArrowUpRight, Check, AlertTriangle } from 'lucide-react'
 import { PageTitle, Panel, EmptyState, Spinner } from './PortalUI'
 import { Badge } from '../ui/badge'
@@ -60,7 +61,7 @@ export function PromotionTab({ semesters = [], showMsg }) {
     const graduating = students[0]?.defaultOutcome === 'GRADUATE'
     const action = graduating ? 'graduate' : 'promote'
     const count = graduating ? students.length - heldBack.length : students.length - heldBack.length
-    if (!window.confirm(`${count} student(s) will ${action}. ${heldBack.length} held back. Continue?`)) return
+    if (!await confirmAction({ title: 'Are you sure?', message: `${count} student(s) will ${action}. ${heldBack.length} held back. Continue?`, confirmLabel: 'Confirm' })) return
     setBusy(true)
     try {
       const res = await api.post('/api/admin/exams/promotion/run', {

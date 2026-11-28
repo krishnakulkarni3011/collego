@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { confirmAction } from '../components/common/ConfirmDialog.jsx'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -1483,7 +1484,7 @@ function HodClassRepresentativesTab({ showMsg }) {
   }
 
   const remove = async (student) => {
-    if (!window.confirm(`Remove ${student.name} as class representative?`)) return
+    if (!await confirmAction({ title: 'Are you sure?', message: `Remove ${student.name} as class representative?`, confirmLabel: 'Confirm' })) return
     setBusyId(student.studentId)
     try {
       await api.delete(`/api/faculty/hod/cr/${student.studentId}`)
@@ -1661,7 +1662,7 @@ function HodTimetablesTab({ showMsg }) {
   }
 
   const removeRow = async (row) => {
-    if (!window.confirm(`Remove the timetable for ${row.yearLabel} Â· Section ${row.sectionName}?`)) return
+    if (!await confirmAction({ title: 'Are you sure?', message: `Remove the timetable for ${row.yearLabel} Â· Section ${row.sectionName}?`, confirmLabel: 'Confirm' })) return
     setBusyKey(`${row.year}-${row.sectionName}`)
     try {
       await api.delete(`/api/faculty/hod/timetables/${row.id}`)
@@ -2282,7 +2283,7 @@ export default function FacultyDashboard() {
   }
 
   const handleRemoveHoliday = async (holidayId) => {
-    if (!window.confirm('Remove this holiday? You can then mark attendance for that day.')) return
+    if (!await confirmAction({ title: 'Are you sure?', message: 'Remove this holiday? You can then mark attendance for that day.', confirmLabel: 'Confirm' })) return
     setHolidayBusy(true)
     try {
       await api.delete(`/api/faculty/attendance/holidays/${holidayId}`)
