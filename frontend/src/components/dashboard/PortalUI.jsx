@@ -9,7 +9,7 @@ import heroImg from '../../assets/hero.png'
 import welcomeCampus from '../../assets/ui/welcome-campus.webp'
 import collegoLockupWhite from '../../assets/brand/collego-lockup-white.png'
 
-// ─── Premium accent token sets (per portal) ────────────────────────────────────
+// --- Premium accent token sets (per portal) ------------------------------------
 export const ACCENTS = {
   indigo: {
     grad: 'from-indigo-500 to-blue-600',
@@ -73,7 +73,7 @@ export const ACCENTS = {
   },
 }
 
-// ─── Animated number (premium counter) ─────────────────────────────────────────
+// --- Animated number (premium counter) -----------------------------------------
 export function AnimatedNumber({ value, duration = 1100, decimals = 0, prefix = '', suffix = '', className }) {
   const [display, setDisplay] = useState(0)
   const fromRef = useRef(0)
@@ -96,11 +96,11 @@ export function AnimatedNumber({ value, duration = 1100, decimals = 0, prefix = 
     return () => cancelAnimationFrame(frame)
   }, [value, duration])
 
-  const shown = Number.isFinite(display) ? display.toFixed(decimals) : '—'
+  const shown = Number.isFinite(display) ? display.toFixed(decimals) : '-'
   return <span className={className}>{prefix}{Number(shown).toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}</span>
 }
 
-// ─── Toast (premium) ───────────────────────────────────────────────────────────
+// --- Toast (premium) -----------------------------------------------------------
 export function Toast({ message, onClose }) {
   useEffect(() => {
     if (message?.text) {
@@ -133,7 +133,7 @@ export function Toast({ message, onClose }) {
   )
 }
 
-// ─── Spinner / Empty state ─────────────────────────────────────────────────────
+// --- Spinner / Empty state -----------------------------------------------------
 export function Spinner({ className, color = 'indigo' }) {
   const c = { indigo: '#4f46e5', violet: '#8b5cf6', emerald: '#10b981', amber: '#f59e0b', blue: '#3b82f6' }[color] || '#4f46e5'
   return (
@@ -156,7 +156,7 @@ export function EmptyState({ icon: Icon, title, description, accent = 'indigo', 
   )
 }
 
-// ─── Static image with softly faded edges and corners ─────────────────────────
+// --- Static image with softly faded edges and corners -------------------------
 export function FadedImage({ src, alt = '', className, imgClassName, fade = 18 }) {
   const horizontal = `linear-gradient(to right, transparent 0%, #000 ${fade}%, #000 ${100 - fade}%, transparent 100%)`
   const vertical = `linear-gradient(to bottom, transparent 0%, #000 ${fade}%, #000 ${100 - fade}%, transparent 100%)`
@@ -187,7 +187,7 @@ export function FadedImage({ src, alt = '', className, imgClassName, fade = 18 }
   )
 }
 
-// ─── Faded image strip (dashboard moments) ────────────────────────────────────
+// --- Faded image strip (dashboard moments) ------------------------------------
 export function ImageStrip({ items = [], title, subtitle, className }) {
   if (!items.length) return null
   return (
@@ -219,7 +219,7 @@ export function ImageStrip({ items = [], title, subtitle, className }) {
   )
 }
 
-// ─── Page title (premium) ──────────────────────────────────────────────────────
+// --- Page title (premium) ------------------------------------------------------
 export function PageTitle({ icon: Icon, title, subtitle, accent = 'indigo', actions, image, imageAlt = '' }) {
   const a = ACCENTS[accent] || ACCENTS.indigo
   return (
@@ -245,7 +245,7 @@ export function PageTitle({ icon: Icon, title, subtitle, accent = 'indigo', acti
   )
 }
 
-// ─── Panel (premium section card) ──────────────────────────────────────────────
+// --- Panel (premium section card) ----------------------------------------------
 export function Panel({ title, icon: Icon, accent = 'indigo', action, children, className, bodyClassName, hover }) {
   const a = ACCENTS[accent] || ACCENTS.indigo
   return (
@@ -273,7 +273,7 @@ export function Panel({ title, icon: Icon, accent = 'indigo', action, children, 
   )
 }
 
-// ─── Stat card (premium bento) ─────────────────────────────────────────────────
+// --- Stat card (premium bento) -------------------------------------------------
 export function StatCard({
   label, value, icon: Icon, accent = 'indigo', sub, trend, trendLabel,
   onClick, index = 0, decimals = 0, suffix = '', prefix = '', spark, glow,
@@ -321,7 +321,7 @@ export function StatCard({
   )
 }
 
-// ─── Chart tooltip (premium) ───────────────────────────────────────────────────
+// --- Chart tooltip (premium) ---------------------------------------------------
 export function ChartTooltip({ active, payload, label, unit = '' }) {
   if (!active || !payload?.length) return null
   return (
@@ -337,7 +337,7 @@ export function ChartTooltip({ active, payload, label, unit = '' }) {
   )
 }
 
-// ─── Sidebar (premium) ─────────────────────────────────────────────────────────
+// --- Sidebar (premium) ---------------------------------------------------------
 export function PortalSidebar({
   collapsed, onToggle, navSections, activeTab, onTabChange,
   brand = 'COLLEGO', portalLabel = 'College ERP', accent = 'indigo', note,
@@ -370,7 +370,7 @@ export function PortalSidebar({
             >
               <img
                 src={collegoLockupWhite}
-                alt={`${brand} — ${portalLabel}`}
+                alt={`${brand} - ${portalLabel}`}
                 className="h-[55px] w-auto select-none drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)]"
                 draggable={false}
               />
@@ -463,7 +463,7 @@ export function PortalSidebar({
   )
 }
 
-// ─── Topbar (premium) ──────────────────────────────────────────────────────────
+// --- Topbar (premium) ----------------------------------------------------------
 export function PortalTopbar({
   sidebarWidth, accent = 'indigo', user = {},
   notificationCount = 0, notifications = [], onLogout,
@@ -569,7 +569,7 @@ export function PortalTopbar({
   )
 }
 
-// ─── Welcome banner (premium) ──────────────────────────────────────────────────
+// --- Welcome banner (premium) --------------------------------------------------
 export function WelcomeBanner({ greeting, name, subtitle, quote, accent = 'indigo', image = welcomeCampus, badge = null }) {
   const a = ACCENTS[accent] || ACCENTS.indigo
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })

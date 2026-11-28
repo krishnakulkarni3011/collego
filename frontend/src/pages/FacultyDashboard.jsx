@@ -31,8 +31,8 @@ import welcomeFaculty from '../assets/ui/welcome-faculty.webp'
 import { timeAgo } from '../lib/time'
 
 // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'â€”'
-const fmtNum = (n, dp = 2) => (n == null ? 'â€”' : Number(n).toFixed(dp))
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
+const fmtNum = (n, dp = 2) => (n == null ? '-' : Number(n).toFixed(dp))
 const PIE_COLORS = ['#4f46e5', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
 const TARGET_YEAR_OPTIONS = [
   { value: '1', label: 'I Year' },
@@ -196,7 +196,7 @@ function OverviewTab({ sections, overviewData, onSectionSelect, reminders = [], 
               </div>
             ))}
             <p className="text-[10px] text-slate-400">
-              {reminders.filter(r => !r.completed).length} pending · {reminders.filter(r => r.completed).length} completed
+              {reminders.filter(r => !r.completed).length} pending - {reminders.filter(r => r.completed).length} completed
             </p>
           </div>
         )}
@@ -236,7 +236,7 @@ function SectionHeader({ section, activeTab, onTabChange, onBack }) {
         </button>
         <h2 className="text-lg font-bold text-slate-900">{section.courseName}</h2>
         <Badge variant="purple" className="text-[10px] px-2.5 py-0.5">{section.courseCode}</Badge>
-        <p className="text-xs text-slate-400 ml-3 hidden sm:block">{section.sectionName} Â· {section.semesterName} Â· {section.enrolledStudents} students</p>
+        <p className="text-xs text-slate-400 ml-3 hidden sm:block">{section.sectionName} - {section.semesterName} - {section.enrolledStudents} students</p>
         {headerImage && (
           <div className="hidden md:block ml-auto h-12 w-44 shrink-0 opacity-75 pointer-events-none" aria-hidden="true">
             <FadedImage src={headerImage} alt="" className="h-full w-full" fade={24} />
@@ -307,7 +307,7 @@ function AttendanceTab({
             <p className="text-xs text-amber-700 mt-0.5">
               Attendance is not counted for this day.
               {holiday.note ? ` ${holiday.note}` : ''}
-              {holiday.declaredBy ? ` Â· Declared by ${holiday.declaredBy}` : ''}
+              {holiday.declaredBy ? ` - Declared by ${holiday.declaredBy}` : ''}
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => onRemoveHoliday(holiday.id)} disabled={holidayBusy}>
@@ -349,7 +349,7 @@ function AttendanceTab({
                               : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
                           )}
                         >
-                          {r.status === 'PRESENT' ? 'âœ“ Present' : 'âœ— Absent'}
+                          {r.status === 'PRESENT' ? 'âœ“ Present' : 'âœ- Absent'}
                         </button>
                       </td>
                     </tr>
@@ -382,7 +382,7 @@ function AttendanceTab({
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800">{fmtDate(h.date)}</p>
                   <p className="text-[11px] text-slate-500 truncate">
-                    {h.note || 'Declared as a holiday'}{h.declaredBy ? ` Â· ${h.declaredBy}` : ''}
+                    {h.note || 'Declared as a holiday'}{h.declaredBy ? ` - ${h.declaredBy}` : ''}
                   </p>
                 </div>
                 <button onClick={() => onRemoveHoliday(h.id)} disabled={holidayBusy}
@@ -405,7 +405,7 @@ function StudentDetailsTab({ section, onDownload, loading }) {
           <Users size={24} />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-bold text-slate-900">Student details â€” {section.courseName}</h3>
+          <h3 className="text-base font-bold text-slate-900">Student details - {section.courseName}</h3>
           <p className="text-sm text-slate-500 mt-1">
             Download the PDF roster for Section {section.sectionName} ({section.semesterName}, {section.enrolledStudents} students).
           </p>
@@ -480,12 +480,12 @@ function UpcomingPlacementsTab({ placements, loading, onRefresh }) {
             <tbody>
               {placements.map((drive, index) => (
                 <tr key={`${drive.companyName}-${drive.driveDate}-${index}`} className="hover:bg-white/30 transition-colors">
-                  <td className="font-medium text-slate-800">{drive.title || 'â€”'}</td>
-                  <td className="text-slate-700">{drive.companyName || 'â€”'}</td>
-                  <td className="text-slate-700">{drive.packageOffered || 'â€”'}</td>
-                  <td className="text-slate-700 whitespace-nowrap">{drive.driveDate ? fmtDate(drive.driveDate) : 'â€”'}</td>
+                  <td className="font-medium text-slate-800">{drive.title || '-'}</td>
+                  <td className="text-slate-700">{drive.companyName || '-'}</td>
+                  <td className="text-slate-700">{drive.packageOffered || '-'}</td>
+                  <td className="text-slate-700 whitespace-nowrap">{drive.driveDate ? fmtDate(drive.driveDate) : '-'}</td>
                   <td><Badge variant="info">{drive.departmentName || 'All Departments'}</Badge></td>
-                  <td className="text-slate-600 max-w-[300px] whitespace-normal">{drive.eligibilityCriteria || 'â€”'}</td>
+                  <td className="text-slate-600 max-w-[300px] whitespace-normal">{drive.eligibilityCriteria || '-'}</td>
                 </tr>
               ))}
               {!loading && placements.length === 0 && (
@@ -531,7 +531,7 @@ function InternalMarksTab({ examName, setExamName, maxMarks, setMaxMarks, marksE
                     <td style={{ textAlign: 'center' }}>
                       <input type="number" value={entry.obtainedMarks} min="0" max={maxMarks}
                         onChange={e => setMarksEntries(prev => prev.map((m, j) => j === i ? { ...m, obtainedMarks: e.target.value } : m))}
-                        className="w-20 text-center collego-input py-1 text-sm" placeholder="â€”" />
+                        className="w-20 text-center collego-input py-1 text-sm" placeholder="-" />
                     </td>
                   </tr>
                 ))}
@@ -618,7 +618,7 @@ function AssignmentMarksTab({
                             <td style={{ textAlign: 'center' }}>
                               <input type="number" value={entry.marks} min="0" max={selectedAssignment?.maxMarks ?? 10}
                                 onChange={e => setEntries(prev => prev.map((m, j) => j === i ? { ...m, marks: e.target.value } : m))}
-                                className="w-20 text-center collego-input py-1 text-sm" placeholder="â€”" />
+                                className="w-20 text-center collego-input py-1 text-sm" placeholder="-" />
                             </td>
                           </tr>
                         ))}
@@ -681,9 +681,9 @@ function StudentPerformanceTab({ data, loading }) {
                     <tr key={s.studentId} className="hover:bg-white/30 transition-colors">
                       <td className="text-slate-800 font-medium">{s.studentName}</td>
                       <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.enrollmentNumber}</code></td>
-                      <td style={{ textAlign: 'center' }}>{attPct != null ? <AttBadge pct={attPct} /> : <span className="text-slate-300">â€”</span>}</td>
-                      <td style={{ textAlign: 'center', color: '#7c3aed' }}>{s.ia1ObtainedMarks ?? 'â€”'}</td>
-                      <td style={{ textAlign: 'center', color: '#7c3aed' }}>{s.ia2ObtainedMarks ?? 'â€”'}</td>
+                      <td style={{ textAlign: 'center' }}>{attPct != null ? <AttBadge pct={attPct} /> : <span className="text-slate-300">-</span>}</td>
+                      <td style={{ textAlign: 'center', color: '#7c3aed' }}>{s.ia1ObtainedMarks ?? '-'}</td>
+                      <td style={{ textAlign: 'center', color: '#7c3aed' }}>{s.ia2ObtainedMarks ?? '-'}</td>
                     </tr>
                   )
                 })}
@@ -808,7 +808,7 @@ function AssignmentSubmissions({ assignment, showMsg }) {
   return (
     <div className="mt-3">
       <button onClick={() => setOpen(o => !o)} className="text-xs font-medium text-indigo-600 hover:underline flex items-center gap-1">
-        <Users size={12} /> Submissions ({assignment.submissionCount ?? 0}){graded > 0 ? ` Â· ${graded} graded` : ''}
+        <Users size={12} /> Submissions ({assignment.submissionCount ?? 0}){graded > 0 ? ` - ${graded} graded` : ''}
       </button>
       {open && (
         <div className="mt-3 rounded-xl border border-white/60 bg-white/40 overflow-hidden">
@@ -862,7 +862,7 @@ function SubmissionRow({ row, onGraded, onDownload, showMsg }) {
               ? (row.submittedAt ? `Submitted ${fmtDate(row.submittedAt)}` : 'Submitted')
               : (row.gradedAt ? `Marks recorded ${fmtDate(row.gradedAt)}` : 'No file submitted')}
             {row.late && <span className="ml-2 text-amber-600">Late</span>}
-            {row.fileName && <span className="ml-2">Â· {row.fileName}</span>}
+            {row.fileName && <span className="ml-2">- {row.fileName}</span>}
           </p>
           {row.note && <p className="text-xs text-slate-500 mt-1">â€œ{row.note}â€</p>}
         </div>
@@ -954,7 +954,7 @@ function MaterialsTab({ title, setTitle, desc, setDesc, type, setType, targetYea
                     <td className="text-slate-800 font-medium">{m.title}</td>
                     <td><Badge variant="info">{m.materialType}</Badge></td>
                     <td><Badge variant="secondary">{targetYearLabel(m.targetYear)}</Badge></td>
-                    <td className="text-slate-500 text-xs max-w-xs truncate">{m.description || 'â€”'}</td>
+                    <td className="text-slate-500 text-xs max-w-xs truncate">{m.description || '-'}</td>
                     <td style={{ textAlign: 'center' }}>
                       {m.hasFile && (
                         <Button variant="outline" size="sm" onClick={() => onDownload(`/api/faculty/materials/${m.id}/file`, m.fileName || `material-${m.id}`)}>
@@ -1504,7 +1504,7 @@ function HodClassRepresentativesTab({ showMsg }) {
     setBusyId(student.studentId)
     try {
       await api.put(`/api/faculty/hod/cr/${student.studentId}`)
-      showMsg(`${student.name} is now the CR for ${student.yearLabel} Â· Section ${student.section}`)
+      showMsg(`${student.name} is now the CR for ${student.yearLabel} - Section ${student.section}`)
       await load()
     } catch (err) {
       showMsg(err.response?.data?.message || 'Could not choose CR', 'error')
@@ -1575,11 +1575,11 @@ function HodClassRepresentativesTab({ showMsg }) {
                 {filtered.map(s => (
                   <tr key={s.studentId} className="hover:bg-white/30 transition-colors">
                     <td><Badge variant="secondary">{s.yearLabel || targetYearLabel(s.year)}</Badge></td>
-                    <td className="text-slate-600 font-medium">Section {s.section || 'â€”'}</td>
+                    <td className="text-slate-600 font-medium">Section {s.section || '-'}</td>
                     <td className="text-slate-800 font-medium">{s.name}</td>
-                    <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.enrollmentNumber || 'â€”'}</code></td>
+                    <td><code className="text-[10px] text-slate-400 bg-slate-50 px-2 py-1 rounded">{s.enrollmentNumber || '-'}</code></td>
                     <td style={{ textAlign: 'center' }}>
-                      {s.isCr ? <Badge variant="purple">CR</Badge> : <span className="text-slate-300">â€”</span>}
+                      {s.isCr ? <Badge variant="purple">CR</Badge> : <span className="text-slate-300">-</span>}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       {s.isCr ? (
@@ -1659,7 +1659,7 @@ function HodTimetablesTab({ showMsg }) {
         URL.revokeObjectURL(preview.url)
         setPreview(null)
       }
-      showMsg(`Timetable uploaded for ${row.yearLabel} Â· Section ${row.sectionName}`)
+      showMsg(`Timetable uploaded for ${row.yearLabel} - Section ${row.sectionName}`)
       await load()
     } catch (err) {
       showMsg(err.response?.data?.message || 'Timetable upload failed', 'error')
@@ -1677,7 +1677,7 @@ function HodTimetablesTab({ showMsg }) {
     try {
       const file = await fileObjectUrl(`/api/faculty/hod/timetables/${row.id}/file`)
       if (preview?.url) URL.revokeObjectURL(preview.url)
-      setPreview({ id: row.id, url: file.url, title: `${row.yearLabel} Â· Section ${row.sectionName}` })
+      setPreview({ id: row.id, url: file.url, title: `${row.yearLabel} - Section ${row.sectionName}` })
     } catch (err) {
       showMsg(err.response?.data?.message || 'Could not preview the timetable', 'error')
     }
@@ -1692,7 +1692,7 @@ function HodTimetablesTab({ showMsg }) {
   }
 
   const removeRow = async (row) => {
-    if (!await confirmAction({ title: 'Are you sure?', message: `Remove the timetable for ${row.yearLabel} Â· Section ${row.sectionName}?`, confirmLabel: 'Confirm' })) return
+    if (!await confirmAction({ title: 'Are you sure?', message: `Remove the timetable for ${row.yearLabel} - Section ${row.sectionName}?`, confirmLabel: 'Confirm' })) return
     setBusyKey(`${row.year}-${row.sectionName}`)
     try {
       await api.delete(`/api/faculty/hod/timetables/${row.id}`)
@@ -1751,7 +1751,7 @@ function HodTimetablesTab({ showMsg }) {
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-slate-800">Section {row.sectionName}</p>
-                            <p className="text-[10px] text-slate-400 truncate">{row.hasFile ? `${row.fileName} Â· ${fmtDate(row.uploadedAt)}` : 'No timetable uploaded'}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{row.hasFile ? `${row.fileName} - ${fmtDate(row.uploadedAt)}` : 'No timetable uploaded'}</p>
                           </div>
                         </div>
                         <Badge variant={row.hasFile ? 'success' : 'secondary'} className="text-[9px] px-2 py-0.5 shrink-0">{row.hasFile ? 'Uploaded' : 'Pending'}</Badge>
@@ -1781,7 +1781,7 @@ function HodTimetablesTab({ showMsg }) {
       {preview && (
         <div className="glass-card overflow-hidden border border-white/60">
           <div className="px-5 py-3 border-b border-white/50 flex items-center justify-between">
-            <p className="text-sm font-semibold text-slate-800">Preview Â· {preview.title}</p>
+            <p className="text-sm font-semibold text-slate-800">Preview - {preview.title}</p>
             <button onClick={() => { URL.revokeObjectURL(preview.url); setPreview(null) }} className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white transition-colors" title="Close preview"><X size={15} /></button>
           </div>
           <iframe src={preview.url} title="Class timetable preview" className="w-full h-[70vh] bg-white" />
@@ -1868,7 +1868,7 @@ function FacultyNewslettersTab({ showMsg, isHod, onDownload }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-800">{n.title}</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  {fmtDate(n.createdAt)} · {n.uploadedByName} · {n.fileName}
+                  {fmtDate(n.createdAt)} - {n.uploadedByName} - {n.fileName}
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => onDownload(`/api/newsletters/${n.id}/file`, n.fileName || 'newsletter.pdf')}>
@@ -1928,7 +1928,7 @@ function HodResumeApprovalsTab({ showMsg }) {
             <div key={f.id} className="glass-card p-5 border border-white/60 flex flex-wrap items-center gap-4">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-800">{f.name}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">{f.email} · {f.departmentName}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{f.email} - {f.departmentName}</p>
                 {f.resumeFileName && <p className="text-[11px] text-slate-500 mt-1 truncate">{f.resumeFileName}</p>}
                 <input
                   value={notes[f.id] || ''}
@@ -2007,7 +2007,7 @@ function RemindersTab({ facultyReminders = [], loading, onCreate, onToggle, onDe
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className={cn('text-sm', r.completed ? 'line-through text-slate-400' : 'text-slate-700')}>{r.title}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Added {fmtDate(r.createdAt)}{r.completedAt ? ` Â· Completed ${fmtDate(r.completedAt)}` : ''}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Added {fmtDate(r.createdAt)}{r.completedAt ? ` - Completed ${fmtDate(r.completedAt)}` : ''}</p>
                 </div>
                 <button type="button" onClick={() => onDelete(r.id)} aria-label="Delete reminder" className="text-slate-300 hover:text-red-500 transition-colors p-1">
                   <Trash2 size={15} />
@@ -2234,7 +2234,7 @@ export default function FacultyDashboard() {
     try {
       const res = await api.post('/api/faculty/career-profile/resume', fd)
       setCareerProfile(res.data)
-      showMsg('Resume submitted â€” waiting for admin approval')
+      showMsg('Resume submitted - waiting for admin approval')
     } catch (err) {
       showMsg(err.response?.data?.message || 'Failed to upload resume', 'error')
       throw err
@@ -2754,14 +2754,14 @@ export default function FacultyDashboard() {
         collapsed={collapsed} onToggle={() => setCollapsed(c => !c)}
         navSections={navSections} activeTab={sidebarActive} onTabChange={handleSidebarNav}
         accent="violet" portalLabel="Faculty Portal"
-        note={sections.length > 0 ? `${sections.length} sections Â· ${totalStudents} students assigned` : 'No sections assigned yet'}
+        note={sections.length > 0 ? `${sections.length} sections - ${totalStudents} students assigned` : 'No sections assigned yet'}
       />
       <PortalTopbar
         sidebarWidth={sidebarWidth} accent="violet"
         user={{
           name: careerProfile?.name || 'Faculty',
           role: careerProfile?.departmentName
-            ? `${careerProfile.designation ? `${careerProfile.designation} Â· ` : ''}${careerProfile.departmentName}`
+            ? `${careerProfile.designation ? `${careerProfile.designation} - ` : ''}${careerProfile.departmentName}`
             : 'Faculty',
           email,
         }}

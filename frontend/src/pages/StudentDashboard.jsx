@@ -33,8 +33,8 @@ import { uiImages } from '../assets/uiImages'
 import welcomeStudent from '../assets/ui/welcome-student.webp'
 import { timeAgo } from '../lib/time'
 
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
-const fmtNum = (n, dp = 2) => (n == null ? '—' : Number(n).toFixed(dp))
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
+const fmtNum = (n, dp = 2) => (n == null ? '-' : Number(n).toFixed(dp))
 const sortReminders = (list = []) => [...list].sort((a, b) =>
   Number(a.completed) - Number(b.completed) ||
   new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -80,7 +80,7 @@ const NAV_SECTIONS = [
   },
 ]
 
-// ─── Sparkline (premium area) ─────────────────────────────────────────────────
+// --- Sparkline (premium area) -------------------------------------------------
 function Sparkline({ data, color }) {
   const gid = `sg${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   return (
@@ -104,7 +104,7 @@ function AttBadge({ pct }) {
   return <Badge variant="destructive">{pct}%</Badge>
 }
 
-// ─── Overview Tab ─────────────────────────────────────────────────────────────
+// --- Overview Tab -------------------------------------------------------------
 function OverviewTab({ profile, overall, subjects, cgpa, notifications, placements, reminders = [], onTabChange, onCreateReminder, onToggleReminder, onDeleteReminder }) {
   const [reminderTitle, setReminderTitle] = useState('')
   const now = new Date()
@@ -138,7 +138,7 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
         greeting={greeting}
         name={profile?.firstName || 'Student'}
         badge={profile?.isCr ? 'CR' : null}
-        subtitle={`${profile?.enrollmentNumber || ''} · ${profile?.departmentName || ''} · Semester ${profile?.currentSemester || ''} · Section ${profile?.section || ''}${profile?.isCr ? ' · Class Representative' : ''}`}
+        subtitle={`${profile?.enrollmentNumber || ''} - ${profile?.departmentName || ''} - Semester ${profile?.currentSemester || ''} - Section ${profile?.section || ''}${profile?.isCr ? ' - Class Representative' : ''}`}
         quote="Every class attended is a step closer to your goal"
         accent="emerald"
         image={welcomeStudent}
@@ -200,7 +200,7 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
                 </div>
               ))}
               <p className="text-[10px] text-slate-400">
-                {reminders.filter(r => !r.completed).length} pending · {reminders.filter(r => r.completed).length} completed
+                {reminders.filter(r => !r.completed).length} pending - {reminders.filter(r => r.completed).length} completed
               </p>
             </div>
           )}
@@ -273,7 +273,7 @@ function OverviewTab({ profile, overall, subjects, cgpa, notifications, placemen
   )
 }
 
-// ─── Attendance ──────────────────────────────────────────────────────────────
+// --- Attendance --------------------------------------------------------------
 function AttendanceTab({ overall, subjects, semesters, onSemesterChange, loading }) {
   const pct = overall?.overallPercentage || 0
   const overallAccent = pct >= 75 ? 'emerald' : pct >= 50 ? 'amber' : 'violet'
@@ -348,7 +348,7 @@ function AttendanceTab({ overall, subjects, semesters, onSemesterChange, loading
                   <div key={h.id} className="px-5 py-3 flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-800">
-                        {fmtDate(h.date)} · {h.courseCode || h.courseName}
+                        {fmtDate(h.date)} - {h.courseCode || h.courseName}
                       </p>
                       <p className="text-[11px] text-slate-500">{h.note || 'Declared as a holiday'}</p>
                     </div>
@@ -364,7 +364,7 @@ function AttendanceTab({ overall, subjects, semesters, onSemesterChange, loading
   )
 }
 
-// ─── Marks ───────────────────────────────────────────────────────────────────
+// --- Marks -------------------------------------------------------------------
 function MarksTab({ internalMarks, cgpa }) {
   const [view, setView] = useState('cgpa')
   return (
@@ -390,7 +390,7 @@ function MarksTab({ internalMarks, cgpa }) {
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/60 bg-white/30">
                 <div>
                   <p className="font-semibold text-slate-800">{sem.semesterName}</p>
-                  <p className="text-[10px] text-slate-400">{sem.academicYear} · {sem.totalCredits?.toFixed(0)} credits</p>
+                  <p className="text-[10px] text-slate-400">{sem.academicYear} - {sem.totalCredits?.toFixed(0)} credits</p>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-violet-600">{fmtNum(sem.sgpa)}</p>
@@ -405,9 +405,9 @@ function MarksTab({ internalMarks, cgpa }) {
                       <tr key={sub.sectionId} className="hover:bg-white/30 transition-colors">
                         <td><p className="text-slate-800">{sub.courseName}</p><p className="text-[10px] text-slate-400 font-mono">{sub.courseCode}</p></td>
                         <td style={{ textAlign: 'center', color: '#64748b' }}>{sub.credits}</td>
-                        <td style={{ textAlign: 'center' }}>{sub.obtainedMarks != null ? `${sub.obtainedMarks}/${sub.maxMarks}` : '—'}</td>
-                        <td style={{ textAlign: 'center' }}><span className="font-bold" style={{ color: GRADE_COLORS[sub.grade] || '#64748b' }}>{sub.grade || '—'}</span></td>
-                        <td style={{ textAlign: 'center', color: '#64748b' }}>{sub.gradePoints?.toFixed(1) ?? '—'}</td>
+                        <td style={{ textAlign: 'center' }}>{sub.obtainedMarks != null ? `${sub.obtainedMarks}/${sub.maxMarks}` : '-'}</td>
+                        <td style={{ textAlign: 'center' }}><span className="font-bold" style={{ color: GRADE_COLORS[sub.grade] || '#64748b' }}>{sub.grade || '-'}</span></td>
+                        <td style={{ textAlign: 'center', color: '#64748b' }}>{sub.gradePoints?.toFixed(1) ?? '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -426,8 +426,8 @@ function MarksTab({ internalMarks, cgpa }) {
                 {(internalMarks || []).map(m => (
                   <tr key={m.sectionId} className="hover:bg-white/30 transition-colors">
                     <td><p className="text-slate-800">{m.courseName}</p><p className="text-[10px] text-slate-400 font-mono">{m.courseCode}</p></td>
-                    <td style={{ textAlign: 'center' }}>{m.ia1ObtainedMarks != null ? <span className="text-violet-600 font-semibold">{m.ia1ObtainedMarks} / {m.ia1MaxMarks}</span> : <span className="text-slate-300">—</span>}</td>
-                    <td style={{ textAlign: 'center' }}>{m.ia2ObtainedMarks != null ? <span className="text-violet-600 font-semibold">{m.ia2ObtainedMarks} / {m.ia2MaxMarks}</span> : <span className="text-slate-300">—</span>}</td>
+                    <td style={{ textAlign: 'center' }}>{m.ia1ObtainedMarks != null ? <span className="text-violet-600 font-semibold">{m.ia1ObtainedMarks} / {m.ia1MaxMarks}</span> : <span className="text-slate-300">-</span>}</td>
+                    <td style={{ textAlign: 'center' }}>{m.ia2ObtainedMarks != null ? <span className="text-violet-600 font-semibold">{m.ia2ObtainedMarks} / {m.ia2MaxMarks}</span> : <span className="text-slate-300">-</span>}</td>
                   </tr>
                 ))}
                 {!internalMarks?.length && <tr><td colSpan={3} className="text-center text-slate-400 py-14">No internal marks found.</td></tr>}
@@ -440,7 +440,7 @@ function MarksTab({ internalMarks, cgpa }) {
   )
 }
 
-// ─── Timetable ───────────────────────────────────────────────────────────────
+// --- Timetable ---------------------------------------------------------------
 function TimetableTab({ timetable, loading }) {
   const days = timetable?.weeklySchedule ? DAY_ORDER.filter(d => timetable.weeklySchedule[d]?.length > 0) : []
   const classTimetable = timetable?.classTimetable
@@ -485,8 +485,8 @@ function TimetableTab({ timetable, loading }) {
                 <Calendar size={20} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-800">Class Timetable · {classTimetable.yearLabel} · Section {classTimetable.sectionName}</p>
-                <p className="text-xs text-slate-500 truncate">{classTimetable.fileName || 'class-timetable.pdf'} · uploaded {fmtDate(classTimetable.uploadedAt)}</p>
+                <p className="text-sm font-semibold text-slate-800">Class Timetable - {classTimetable.yearLabel} - Section {classTimetable.sectionName}</p>
+                <p className="text-xs text-slate-500 truncate">{classTimetable.fileName || 'class-timetable.pdf'} - uploaded {fmtDate(classTimetable.uploadedAt)}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -531,10 +531,10 @@ function TimetableTab({ timetable, loading }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-800 truncate">{slot.courseName}</p>
-                        <p className="text-xs text-slate-500">{slot.courseCode} · Sec {slot.sectionName}</p>
+                        <p className="text-xs text-slate-500">{slot.courseCode} - Sec {slot.sectionName}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm text-slate-600">{slot.facultyName || '—'}</p>
+                        <p className="text-sm text-slate-600">{slot.facultyName || '-'}</p>
                         <p className="text-xs text-slate-400">{slot.roomNumber}</p>
                       </div>
                     </div>
@@ -549,7 +549,7 @@ function TimetableTab({ timetable, loading }) {
   )
 }
 
-// ─── Assignments ─────────────────────────────────────────────────────────────
+// --- Assignments -------------------------------------------------------------
 function AssignmentsTab({ assignments = [], loading, onSubmit, onDownload }) {
   const list = Array.isArray(assignments) ? assignments : []
   const pending = list.filter(a => a.canSubmit !== false && !a.submissionStatus).length
@@ -612,7 +612,7 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
               {!canSubmit ? 'View only' : graded ? 'Graded' : submitted ? 'Submitted' : overdue ? 'Overdue' : 'Pending'}
             </Badge>
           </div>
-          <p className="text-[11px] text-slate-400">{a.courseName} · {a.courseCode}</p>
+          <p className="text-[11px] text-slate-400">{a.courseName} - {a.courseCode}</p>
           {a.description && <p className="text-sm text-slate-500 mt-2.5 leading-relaxed">{a.description}</p>}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-[11px] text-slate-500">
             {a.dueDate && <span className={cn('flex items-center gap-1', overdue && 'text-red-500 font-medium')}><Clock size={12} /> Due {fmtDate(a.dueDate)}</span>}
@@ -623,7 +623,7 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
           {graded && (
             <div className="mt-3 p-3 rounded-xl bg-emerald-50/70 border border-emerald-100">
               <p className="text-xs font-semibold text-emerald-700">
-                Score: {a.marks ?? '—'} / {a.maxMarks ?? '—'}
+                Score: {a.marks ?? '-'} / {a.maxMarks ?? '-'}
               </p>
               {a.feedback && <p className="text-xs text-emerald-600 mt-1">{a.feedback}</p>}
             </div>
@@ -707,7 +707,7 @@ function StudentAssignmentCard({ assignment: a, onSubmit, onDownload }) {
   )
 }
 
-// ─── Personal Reminders ──────────────────────────────────────────────────────
+// --- Personal Reminders ------------------------------------------------------
 function NewslettersTab({ newsletters = [], showMessage }) {
   return (
     <div className="space-y-6">
@@ -724,7 +724,7 @@ function NewslettersTab({ newsletters = [], showMessage }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-800">{n.title}</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  {fmtDate(n.createdAt)} · {n.uploadedByName} · {n.fileName}
+                  {fmtDate(n.createdAt)} - {n.uploadedByName} - {n.fileName}
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => downloadFile(`/api/newsletters/${n.id}/file`, n.fileName || 'newsletter.pdf').catch(() => showMessage('Download failed', 'error'))}>
@@ -818,7 +818,7 @@ function RemindersTab({ reminders = [], loading, onCreate, onToggle, onDelete })
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
                     Added {fmtDate(r.createdAt)}
-                    {r.completedAt ? ` · Completed ${fmtDate(r.completedAt)}` : ''}
+                    {r.completedAt ? ` - Completed ${fmtDate(r.completedAt)}` : ''}
                   </p>
                 </div>
                 <button
@@ -838,7 +838,7 @@ function RemindersTab({ reminders = [], loading, onCreate, onToggle, onDelete })
   )
 }
 
-// ─── Study Materials ─────────────────────────────────────────────────────────
+// --- Study Materials ---------------------------------------------------------
 function MaterialsTab({ materials = [], loading, onDownload }) {
   const list = Array.isArray(materials) ? materials : []
 
@@ -859,7 +859,7 @@ function MaterialsTab({ materials = [], loading, onDownload }) {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800">{m.title}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{m.courseName} · {m.courseCode}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{m.courseName} - {m.courseCode}</p>
                 </div>
                 <Badge variant="info">{m.materialType || 'MATERIAL'}</Badge>
               </div>
@@ -882,7 +882,7 @@ function MaterialsTab({ materials = [], loading, onDownload }) {
   )
 }
 
-// ─── Placements ──────────────────────────────────────────────────────────────
+// --- Placements --------------------------------------------------------------
 function QuestionPapersTab({ papers, onDownload }) {
   return (
     <div className="space-y-6">
@@ -899,7 +899,7 @@ function QuestionPapersTab({ papers, onDownload }) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">{qp.courseName}</p>
-                  <p className="text-[11px] text-slate-400">{qp.courseCode} · {qp.departmentName}</p>
+                  <p className="text-[11px] text-slate-400">{qp.courseCode} - {qp.departmentName}</p>
                 </div>
                 <Badge variant="info">{qp.examType}</Badge>
               </div>
@@ -975,7 +975,7 @@ function PlacementsTab({ notices, onDownload }) {
   )
 }
 
-// ─── Notifications ───────────────────────────────────────────────────────────
+// --- Notifications -----------------------------------------------------------
 const NOTIF_TYPES = { ACADEMIC: { v: 'info', label: 'Academic' }, PLACEMENT: { v: 'purple', label: 'Placement' }, EXAM: { v: 'destructive', label: 'Exam' }, GENERAL: { v: 'secondary', label: 'General' } }
 
 function NotificationsTab({ notifications, onMarkRead }) {
@@ -1038,7 +1038,7 @@ function NotificationsTab({ notifications, onMarkRead }) {
   )
 }
 
-// ─── Documents ───────────────────────────────────────────────────────────────
+// --- Documents ---------------------------------------------------------------
 function DocumentsTab({ semesters = [], showMessage }) {
   const [downloading, setDownloading] = useState(null)
   const list = Array.isArray(semesters) ? semesters : []
@@ -1079,7 +1079,7 @@ function DocumentsTab({ semesters = [], showMessage }) {
               <div>
                 <p className="font-semibold text-slate-800">{sem.name}</p>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {sem.academicYear} · Internal exam marks & attendance %
+                  {sem.academicYear} - Internal exam marks & attendance %
                 </p>
               </div>
               <Button
@@ -1107,13 +1107,13 @@ function DocumentsTab({ semesters = [], showMessage }) {
   )
 }
 
-// ─── AI Assistant ────────────────────────────────────────────────────────────
+// --- AI Assistant ------------------------------------------------------------
 // Smart Search, Performance Prediction, Attendance Risk and Placement
 // Readiness all live inside this one tab: the deterministic insights are
 // rendered as assistant replies, and natural-language questions use the
 // scoped chat tools on the backend.
 const fmtNumber = (value, digits = 2) =>
-  typeof value === 'number' ? value.toFixed(digits) : (value ?? '—')
+  typeof value === 'number' ? value.toFixed(digits) : (value ?? '-')
 
 // The model is told to answer in plain text but still slips in bold/heading
 // markers. Chat bubbles render plain text, so strip the common ones.
@@ -1121,35 +1121,35 @@ const stripMarkdown = (text) => String(text ?? '')
   .replace(/\*\*(.+?)\*\*/g, '$1')
   .replace(/`([^`]+)`/g, '$1')
   .replace(/^#{1,6}\s+/gm, '')
-  .replace(/^\s*[-*]\s+/gm, '• ')
+  .replace(/^\s*[-*]\s+/gm, '- ')
 
 const formatPerformanceInsight = (r) => [
   '📈 Performance prediction',
   '',
   `Predicted SGPA: ${fmtNumber(r.predictedSgpa)}`,
   `Predicted CGPA: ${fmtNumber(r.predictedCgpa)}`,
-  `Trend: ${r.trend || '—'}`,
-  `Risk level: ${r.riskLevel || '—'}`,
+  `Trend: ${r.trend || '-'}`,
+  `Risk level: ${r.riskLevel || '-'}`,
   `Confidence: ${Math.round((r.confidenceScore || 0) * 100)}%`,
-  ...(r.insights?.length ? ['', ...r.insights.map(i => `• ${i}`)] : []),
+  ...(r.insights?.length ? ['', ...r.insights.map(i => `- ${i}`)] : []),
 ].join('\n')
 
 const formatAttendanceRisk = (r) => [
   '⚠️ Attendance risk',
   '',
-  `Overall risk: ${r.overallRisk || '—'}`,
+  `Overall risk: ${r.overallRisk || '-'}`,
   r.summary || '',
   ...(r.riskItems?.length
     ? ['', ...r.riskItems.map(i => {
       const note = i.riskLevel === 'DEFAULTER'
-        ? ' — critical: contact your faculty'
+        ? ' - critical: contact your faculty'
         : i.classesNeededToReach75 > 0
-          ? ` — ${i.classesNeededToReach75} classes to reach 75%`
-          : i.riskLevel === 'SAFE' ? ' — on track' : ' — keep attending'
-      return `• ${i.courseCode} ${i.courseName}: ${fmtNumber(i.currentPercentage, 1)}% (${i.riskLevel})${note}`
+          ? ` - ${i.classesNeededToReach75} classes to reach 75%`
+          : i.riskLevel === 'SAFE' ? ' - on track' : ' - keep attending'
+      return `- ${i.courseCode} ${i.courseName}: ${fmtNumber(i.currentPercentage, 1)}% (${i.riskLevel})${note}`
     })]
     : []),
-  ...(r.recommendations?.length ? ['', 'Recommendations:', ...r.recommendations.map(i => `• ${i}`)] : []),
+  ...(r.recommendations?.length ? ['', 'Recommendations:', ...r.recommendations.map(i => `- ${i}`)] : []),
 ].filter(Boolean).join('\n')
 
 const formatPlacementReadiness = (r) => [
@@ -1157,10 +1157,10 @@ const formatPlacementReadiness = (r) => [
   '',
   r.advice || '',
   ...(r.recommendations?.length
-    ? ['', 'Recommended drives:', ...r.recommendations.map(c => `• ${c.companyName || c.company || c.name || 'Company'}${c.role ? ` — ${c.role}` : ''}`)]
+    ? ['', 'Recommended drives:', ...r.recommendations.map(c => `- ${c.companyName || c.company || c.name || 'Company'}${c.role ? ` - ${c.role}` : ''}`)]
     : []),
-  ...(r.skillGaps?.length ? ['', 'Skill gaps:', ...r.skillGaps.map(s => `• ${s}`)] : []),
-  ...(r.mockInterviewQuestions?.length ? ['', 'Mock interview questions:', ...r.mockInterviewQuestions.slice(0, 5).map(s => `• ${s}`)] : []),
+  ...(r.skillGaps?.length ? ['', 'Skill gaps:', ...r.skillGaps.map(s => `- ${s}`)] : []),
+  ...(r.mockInterviewQuestions?.length ? ['', 'Mock interview questions:', ...r.mockInterviewQuestions.slice(0, 5).map(s => `- ${s}`)] : []),
 ].filter(Boolean).join('\n')
 
 function AiAssistantTab({ overall, cgpa }) {
@@ -1275,7 +1275,7 @@ function AiAssistantTab({ overall, cgpa }) {
         <div className="border-t border-white/60 p-4">
           {mode === 'search' && (
             <div className="flex items-center gap-2 mb-2 text-[11px] text-violet-600">
-              <Search size={12} /> Smart search mode — searching your own college records.
+              <Search size={12} /> Smart search mode - searching your own college records.
               <button onClick={() => setMode('chat')} className="ml-auto text-slate-400 hover:text-slate-600 underline">Back to chat</button>
             </div>
           )}
@@ -1297,7 +1297,7 @@ function AiAssistantTab({ overall, cgpa }) {
   )
 }
 
-// ─── AI Resume Analyzer ──────────────────────────────────────────────────────
+// --- AI Resume Analyzer ------------------------------------------------------
 const formatBytes = (bytes) => {
   if (!bytes) return '0 KB'
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
@@ -1383,7 +1383,7 @@ function AiResumeAnalyzerTab() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-slate-800 truncate">{file.name}</p>
-                  <p className="text-[11px] text-slate-500">{formatBytes(file.size)} · ready to analyse</p>
+                  <p className="text-[11px] text-slate-500">{formatBytes(file.size)} - ready to analyse</p>
                 </div>
                 <button onClick={clearFile} className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-white transition-colors" title="Remove file">
                   <X size={15} />
@@ -1399,7 +1399,7 @@ function AiResumeAnalyzerTab() {
                   <Upload size={20} />
                 </div>
                 <p className="mt-3 text-sm font-semibold text-slate-800">Upload your resume</p>
-                <p className="mt-1 text-xs text-slate-500">PDF, DOCX, TXT or MD · maximum 10 MB</p>
+                <p className="mt-1 text-xs text-slate-500">PDF, DOCX, TXT or MD - maximum 10 MB</p>
               </button>
             )}
           </div>
@@ -1492,7 +1492,7 @@ function ResumeInsightList({ title, items, icon: Icon, tone }) {
   )
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// --- Main --------------------------------------------------------------------
 // Maps a sidebar tab to the notification category that badges it.
 const TAB_CATEGORY = {
   notifications: 'NOTICE',
@@ -1716,8 +1716,8 @@ export default function StudentDashboard() {
         user={{
           name: `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || 'Student',
           role: profile?.isCr
-            ? `Class Representative · ${profile?.departmentName || 'Student'}`
-            : (profile?.departmentName ? `Student · ${profile.departmentName}` : 'Student'),
+            ? `Class Representative - ${profile?.departmentName || 'Student'}`
+            : (profile?.departmentName ? `Student - ${profile.departmentName}` : 'Student'),
           email: profile?.email,
         }}
         notificationCount={unreadCount}

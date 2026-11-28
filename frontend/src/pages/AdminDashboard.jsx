@@ -38,9 +38,9 @@ import {
 import { uiImages } from '../assets/uiImages'
 import { timeAgo } from '../lib/time'
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-const fmtNum = (n, dp = 1) => (n == null ? '—' : Number(n).toFixed(dp))
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+// --- Helpers -----------------------------------------------------------------
+const fmtNum = (n, dp = 1) => (n == null ? '-' : Number(n).toFixed(dp))
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
 
 const PIE_COLORS = ['#4f46e5', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6']
 const RANK_COLORS = ['#f59e0b', '#94a3b8', '#cd7f32', '#6366f1', '#6366f1']
@@ -78,7 +78,7 @@ const NAV_SECTIONS = [
   },
 ]
 
-// ─── Overview Tab ──────────────────────────────────────────────────────────────
+// --- Overview Tab --------------------------------------------------------------
 function OverviewTab({ overview, deptReports, attendanceSummary, placementStats, insights, semesters, onTabChange, onSemesterChange }) {
   const now = new Date()
   const hour = now.getHours()
@@ -91,7 +91,7 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
   const totalStudentsInDepts = (deptReports || []).reduce((s, d) => s + (d.totalStudents || 0), 0) || 1
   const deptDistribution = (deptReports || [])
     .slice(0, 6)
-    .map(d => ({ name: d.departmentCode || d.departmentName?.split(' ')[0] || '—', value: d.totalStudents || 0 }))
+    .map(d => ({ name: d.departmentCode || d.departmentName?.split(' ')[0] || '-', value: d.totalStudents || 0 }))
     .filter(d => d.value > 0)
 
   const topPerformers = insights?.topPerformers || []
@@ -181,8 +181,8 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-current" style={{ opacity: 0.15, backgroundColor: color }} />
                     <div className="flex items-center gap-3.5 p-3 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-colors group-hover:border-indigo-300/70">
                       <div className="flex flex-col items-center justify-center w-10 h-10 rounded-xl shrink-0" style={{ background: `${color}14`, border: `1px solid ${color}30` }}>
-                        <span className="text-[9px] font-bold uppercase" style={{ color }}>{date ? date.toLocaleDateString('en-IN', { month: 'short' }) : '—'}</span>
-                        <span className="text-sm font-extrabold text-slate-800 leading-none">{date ? date.getDate() : '—'}</span>
+                        <span className="text-[9px] font-bold uppercase" style={{ color }}>{date ? date.toLocaleDateString('en-IN', { month: 'short' }) : '-'}</span>
+                        <span className="text-sm font-extrabold text-slate-800 leading-none">{date ? date.getDate() : '-'}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-slate-800 truncate">{ev.title}</p>
@@ -251,7 +251,7 @@ function OverviewTab({ overview, deptReports, attendanceSummary, placementStats,
   )
 }
 
-// ─── Directory (Students / Faculty) ──────────────────────────────────────────
+// --- Directory (Students / Faculty) ------------------------------------------
 function DirectoryTab({
   users, departments, loading, query, fixedRole, title, subtitle, icon,
   onCreateUser, onEditUser, onToggleActive, onCsvImport, importResult,
@@ -504,7 +504,7 @@ function DirectoryTab({
   )
 }
 
-// ─── Academics ───────────────────────────────────────────────────────────────
+// --- Academics ---------------------------------------------------------------
 const YEAR_OPTIONS = [
   { label: 'I Year', value: 1 },
   { label: 'II Year', value: 2 },
@@ -638,7 +638,7 @@ function AcademicsTab({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-800 truncate">{d.departmentName}</p>
-                <p className="text-[11px] text-slate-400">{d.totalStudents} students · {d.totalFaculty} faculty</p>
+                <p className="text-[11px] text-slate-400">{d.totalStudents} students - {d.totalFaculty} faculty</p>
               </div>
               <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors" />
             </button>
@@ -761,7 +761,7 @@ function AcademicsTab({
             <input value={editForm.designation} onChange={e => setEditForm({ ...editForm, designation: e.target.value })} placeholder="Designation" className="collego-input" />
             <label className="col-span-full flex items-center gap-3 rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 cursor-pointer">
               <input type="checkbox" checked={Boolean(editForm.isHod)} onChange={e => setEditForm({ ...editForm, isHod: e.target.checked })} className="h-4 w-4 accent-violet-600" />
-              <span className="text-xs text-slate-600"><span className="font-semibold text-slate-800">Head of Department</span> — can upload class timetables for every section of every year in this department.</span>
+              <span className="text-xs text-slate-600"><span className="font-semibold text-slate-800">Head of Department</span> - can upload class timetables for every section of every year in this department.</span>
             </label>
           </>
         ) : (
@@ -814,7 +814,7 @@ function AcademicsTab({
                       </div>
                     </div>
                   </td>
-                  <td className="text-slate-500 text-xs font-mono">{u.employeeId || '—'}</td>
+                  <td className="text-slate-500 text-xs font-mono">{u.employeeId || '-'}</td>
                   <td className="text-slate-500 text-xs">{u.designation || 'Faculty'}</td>
                   <td style={{ textAlign: 'center' }}>
                     <div className="flex flex-col items-center gap-1.5">
@@ -894,9 +894,9 @@ function AcademicsTab({
                       <div><p className="font-medium text-slate-800">{u.firstName} {u.lastName}</p><p className="text-[11px] text-slate-400">{u.email}</p></div>
                     </div>
                   </td>
-                  <td className="text-slate-500 text-xs font-mono">{u.enrollmentNumber || '—'}</td>
-                  <td style={{ textAlign: 'center' }} className="text-slate-500">{u.semester || '—'}</td>
-                  <td style={{ textAlign: 'center' }}><Badge variant="info">{u.section || '—'}</Badge></td>
+                  <td className="text-slate-500 text-xs font-mono">{u.enrollmentNumber || '-'}</td>
+                  <td style={{ textAlign: 'center' }} className="text-slate-500">{u.semester || '-'}</td>
+                  <td style={{ textAlign: 'center' }}><Badge variant="info">{u.section || '-'}</Badge></td>
                   <td style={{ textAlign: 'center' }}>
                     <div className="flex items-center justify-center gap-2">
                       <button onClick={() => startEdit(u)} className="p-2.5 rounded-xl hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors" title="Edit"><Edit size={14} /></button>
@@ -987,7 +987,7 @@ function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onS
       <PageTitle
         icon={Send}
         title="Broadcast Center"
-        subtitle="Send a direct notification to students or faculty — a whole group, a year, a department or one person."
+        subtitle="Send a direct notification to students or faculty - a whole group, a year, a department or one person."
         accent="emerald"
         image={uiImages.placementTalk}
         imageAlt="Campus announcement"
@@ -1043,7 +1043,7 @@ function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onS
                     {people.map(person => (
                       <option key={person.id} value={person.id}>
                         {person.firstName} {person.lastName}
-                        {person.enrollmentNumber ? ` · ${person.enrollmentNumber}` : person.employeeId ? ` · ${person.employeeId}` : ''}
+                        {person.enrollmentNumber ? ` - ${person.enrollmentNumber}` : person.employeeId ? ` - ${person.employeeId}` : ''}
                       </option>
                     ))}
                   </select>
@@ -1080,7 +1080,7 @@ function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onS
                 ) : (
                   <button type="button" onClick={() => fileRef.current?.click()}
                     className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-3 text-xs font-medium text-slate-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50/50 transition-all">
-                    <Paperclip size={14} /> Attach a file (PDF, image, Office document · max 20 MB)
+                    <Paperclip size={14} /> Attach a file (PDF, image, Office document - max 20 MB)
                   </button>
                 )}
                 <p className="text-[10px] text-slate-400 mt-1.5">Students and faculty can view or download this file from the notification.</p>
@@ -1109,7 +1109,7 @@ function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onS
                     <p className="text-sm font-semibold text-slate-800">{b.title}</p>
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{b.message}</p>
                     <p className="text-[10px] text-slate-400 mt-2">
-                      To {b.audienceLabel} · {b.recipientCount} recipient{b.recipientCount === 1 ? '' : 's'}
+                      To {b.audienceLabel} - {b.recipientCount} recipient{b.recipientCount === 1 ? '' : 's'}
                     </p>
                     {b.hasAttachment && (
                       <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2">
@@ -1409,9 +1409,9 @@ function ReportsTab({ deptReports, subjectReports, departments = [] }) {
                   <tr key={sr.sectionId} className="hover:bg-white/30 transition-colors">
                     <td className="font-medium text-slate-800">{sr.courseName} <span className="text-slate-400 font-mono text-xs">{sr.courseCode}</span></td>
                     <td>{sr.sectionName}</td>
-                    <td className="text-slate-500">{sr.facultyName || '—'}</td>
+                    <td className="text-slate-500">{sr.facultyName || '-'}</td>
                     <td style={{ textAlign: 'center' }}>{sr.totalEnrolled}</td>
-                    <td style={{ textAlign: 'center' }}>{sr.averageMarks != null ? fmtNum(sr.averageMarks, 1) : '—'}</td>
+                    <td style={{ textAlign: 'center' }}>{sr.averageMarks != null ? fmtNum(sr.averageMarks, 1) : '-'}</td>
                     <td style={{ textAlign: 'center' }}><Badge variant={sr.averageAttendance >= 75 ? 'success' : 'warning'}>{fmtNum(sr.averageAttendance, 1)}%</Badge></td>
                     <td style={{ textAlign: 'center' }}><Badge variant={sr.passPercentage >= 60 ? 'success' : 'destructive'}>{fmtNum(sr.passPercentage, 1)}%</Badge></td>
                   </tr>
@@ -1426,7 +1426,7 @@ function ReportsTab({ deptReports, subjectReports, departments = [] }) {
   )
 }
 
-// ─── Notices & Events ────────────────────────────────────────────────────────
+// --- Notices & Events --------------------------------------------------------
 function NoticesTab({ broadcasts = [], insights }) {
   const notices = broadcasts
   const events = insights?.upcomingEvents || []
@@ -1444,7 +1444,7 @@ function NoticesTab({ broadcasts = [], insights }) {
                     <Badge variant={cfg.variant} className="text-[9px] px-2 py-0.5">{cfg.label}</Badge>
                     <span className="text-[10px] text-slate-400">{timeAgo(n.createdAt)}</span>
                     <span className="text-[10px] text-slate-400 ml-auto">
-                      To {n.audienceLabel} · {n.recipientCount} recipient{n.recipientCount === 1 ? '' : 's'}
+                      To {n.audienceLabel} - {n.recipientCount} recipient{n.recipientCount === 1 ? '' : 's'}
                     </span>
                   </div>
                   <p className="text-sm font-semibold text-slate-800">{n.title}</p>
@@ -1463,8 +1463,8 @@ function NoticesTab({ broadcasts = [], insights }) {
               return (
                 <div key={ev.id} className="flex items-center gap-3.5 p-3.5 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm hover:bg-white transition-colors">
                   <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl shrink-0" style={{ background: `${color}14`, border: `1px solid ${color}30` }}>
-                    <span className="text-[9px] font-bold uppercase" style={{ color }}>{date ? date.toLocaleDateString('en-IN', { month: 'short' }) : '—'}</span>
-                    <span className="text-base font-extrabold text-slate-800 leading-none">{date ? date.getDate() : '—'}</span>
+                    <span className="text-[9px] font-bold uppercase" style={{ color }}>{date ? date.toLocaleDateString('en-IN', { month: 'short' }) : '-'}</span>
+                    <span className="text-base font-extrabold text-slate-800 leading-none">{date ? date.getDate() : '-'}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-800 truncate">{ev.title}</p>
@@ -1501,13 +1501,13 @@ function ComingSoonTab({ id }) {
         </div>
         <h3 className="text-lg font-bold text-slate-900">{cfg.title}</h3>
         <p className="text-sm text-slate-500 max-w-md mt-3 leading-relaxed">{cfg.copy}</p>
-        <Badge variant="info" className="mt-6">Backend-ready · UI rolling out</Badge>
+        <Badge variant="info" className="mt-6">Backend-ready - UI rolling out</Badge>
       </div>
     </div>
   )
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// --- Main --------------------------------------------------------------------
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
@@ -1577,7 +1577,7 @@ export default function AdminDashboard() {
   const onCreateUser = async (payload) => {
     try {
       await api.post('/api/admin/users', payload)
-      showMsg(`User created — login details sent to ${payload.email}`)
+      showMsg(`User created - login details sent to ${payload.email}`)
       loadUsers()
       loadAll()
       return true
