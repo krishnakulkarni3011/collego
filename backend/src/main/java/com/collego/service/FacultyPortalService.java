@@ -40,6 +40,7 @@ public class FacultyPortalService {
     private final QuestionPaperRepository questionPaperRepository;
     private final NotificationRepository notificationRepository;
     private final CourseRepository courseRepository;
+    private final DepartmentRepository departmentRepository;
     private final SemesterRepository semesterRepository;
     private final FacultySubjectAssignmentRepository facultySubjectAssignmentRepository;
     private final QuestionPaperService questionPaperService;
@@ -998,16 +999,25 @@ public class FacultyPortalService {
         // Claim the sections that belong to this course + semester so the faculty
         // can immediately manage attendance, marks, assignments and materials.
         List<Section> assignedSections = claimSectionsForFaculty(faculty, course, semester);
+        if (assignedSections.isEmpty()) {
+            throw new BadRequestException("No section is available for this subject and semester.");
+        }
 
-        // Load every student from the academic year that owns this semester into
-        // the faculty's sections, including sections created on the fly.
-        int studentCount = loadYearStudentsIntoOwnedSections(
-                faculty.getDepartment(),
-                year,
-                assignedSections,
-                request.getDivisionFilter(),
-                request.getLoadFromAllDepartments()
-        );
+        int studentCount;
+        if (request.getStudentIds() != null && !request.getStudentIds().isEmpty()) {
+            // Backlog mode: enroll only the particular students chosen from a department.
+            studentCount = enrollSelectedStudents(
+                    request.getStudentIds(), request.getDepartmentId(), assignedSections);
+        } else {
+            Department targetDepartment = department;
+            if (request.getDepartmentId() != null) {
+                targetDepartment = departmentRepository.findById(request.getDepartmentId())
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Department not found: " + request.getDepartmentId()));
+            }
+            studentCount = loadYearStudentsIntoOwnedSections(
+                    targetDepartment, year, assignedSections, request.getSectionFilter());
+        }
 
         log.info("Faculty {} assigned to course {} for semester {} ({}): {} students in {} section(s)",
                 email, course.getName(), semester.getName(), AcademicYearUtils.label(year),
@@ -1043,7 +1053,7 @@ public class FacultyPortalService {
                 continue;
             }
 
-            loadYearStudentsIntoOwnedSections(faculty.getDepartment(), year, ownedSections, null, false);
+            loadYearStudentsIntoOwnedSections(faculty.getDepartment(), year, ownedSections, null);
             synchronizedAssignments++;
         }
 
@@ -1112,6 +1122,7 @@ public class FacultyPortalService {
         FacultyProfile faculty = getFacultyByEmail(email);
         return studentProfileRepository.findAll().stream()
                 .map(student -> {
+                    Long deptId = student.getDepartment() != null ? student.getDepartment().getId() : null;
                     String deptName = student.getDepartment() != null
                             ? student.getDepartment().getName() : "N/A";
                     Integer year = AcademicYearUtils.fromSemester(student.getSemester());
@@ -1122,6 +1133,7 @@ public class FacultyPortalService {
                             .studentId(student.getId())
                             .name(name)
                             .enrollmentNumber(student.getEnrollmentNumber())
+                            .departmentId(deptId)
                             .departmentName(deptName)
                             .section(student.getSection())
                             .year(year)
@@ -1136,8 +1148,8 @@ public class FacultyPortalService {
     }
 
     /**
-     * Creates an open-elective subject and explicitly enrolls the selected
-     * students (who may belong to any department) into the faculty's section.
+     * Creates an open-elective subject and explicitly enrolls particular
+     * students from the selected department into the faculty's section.
      */
     @Transactional
     public FacultySubjectAssignmentResponse createOpenElective(String email, CreateOpenElectiveRequest request) {
@@ -1155,6 +1167,12 @@ public class FacultyPortalService {
         if (request.getStudentIds() == null || request.getStudentIds().isEmpty()) {
             throw new BadRequestException("Select at least one student");
         }
+        Long departmentId = request.getDepartmentId();
+        if (departmentId == null) {
+            throw new BadRequestException("Department is required");
+        }
+        departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found: " + departmentId));
 
         Optional<Course> existingCourse = courseRepository.findByDepartmentId(department.getId()).stream()
                 .filter(c -> c.getName().equalsIgnoreCase(courseName))
@@ -1204,30 +1222,10 @@ public class FacultyPortalService {
             throw new BadRequestException("No section is available for this subject and semester.");
         }
 
-        int enrolled = 0;
-        for (Long studentId : request.getStudentIds()) {
-            StudentProfile student = studentProfileRepository.findById(studentId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentId));
-            boolean already = assignedSections.stream().anyMatch(section ->
-                    enrollmentRepository.existsByStudentIdAndSectionId(student.getId(), section.getId()));
-            if (already) {
-                continue;
-            }
-            Section target = assignedSections.stream()
-                    .filter(section -> student.getSection() != null
-                            && student.getSection().equalsIgnoreCase(section.getName()))
-                    .findFirst()
-                    .orElse(assignedSections.get(0));
-            enrollmentRepository.save(Enrollment.builder()
-                    .student(student)
-                    .section(target)
-                    .status(EnrollmentStatus.ACTIVE)
-                    .build());
-            enrolled++;
-        }
+        int enrolled = enrollSelectedStudents(request.getStudentIds(), departmentId, assignedSections);
 
-        log.info("Faculty {} created open elective {} for semester {} with {} cross-department students",
-                email, course.getName(), semester.getName(), enrolled);
+        log.info("Faculty {} created open elective {} for semester {} with {} students from department {}",
+                email, course.getName(), semester.getName(), enrolled, departmentId);
 
         FacultySubjectAssignmentResponse response = mapSubjectAssignmentToResponse(assignment);
         response.setSectionCount(assignedSections.size());
@@ -1277,76 +1275,90 @@ public class FacultyPortalService {
     }
 
     /**
-     * Ensures every student in the semester's academic year is enrolled in one of
-     * the faculty's sections. Existing enrollments are left untouched.
-     *
-     * @param department   the faculty's department (ignored if loadFromAllDepartments is true)
-     * @param year         the academic year filter
-     * @param sections     the sections to enroll students into
-     * @param divisionFilter optional division filter (e.g., "A", "B"); null/empty means all divisions
-     * @param loadFromAllDepartments if true, load students from all departments (not just the faculty's)
+     * Ensures every student in the semester's academic year and optional section
+     * (A, B, C) is enrolled in one of the faculty's sections.
      */
     private int loadYearStudentsIntoOwnedSections(Department department, Integer year, List<Section> sections,
-            String divisionFilter, Boolean loadFromAllDepartments) {
+            String sectionFilter) {
         if (sections.isEmpty()) {
             return 0;
         }
 
-        List<StudentProfile> yearStudents;
-        if (loadFromAllDepartments != null && loadFromAllDepartments) {
-            yearStudents = studentProfileRepository.findAll().stream()
-                    .filter(student -> Objects.equals(AcademicYearUtils.fromSemester(student.getSemester()), year))
-                    .collect(Collectors.toList());
-        } else {
-            yearStudents = studentProfileRepository.findByDepartmentId(department.getId()).stream()
-                    .filter(student -> Objects.equals(AcademicYearUtils.fromSemester(student.getSemester()), year))
-                    .collect(Collectors.toList());
-        }
+        List<StudentProfile> yearStudents = studentProfileRepository.findByDepartmentId(department.getId()).stream()
+                .filter(student -> Objects.equals(AcademicYearUtils.fromSemester(student.getSemester()), year))
+                .collect(Collectors.toList());
 
         Map<Long, Long> sectionCounts = new HashMap<>();
         sections.forEach(section ->
                 sectionCounts.put(section.getId(), enrollmentRepository.countBySectionId(section.getId())));
 
         for (StudentProfile student : yearStudents) {
-            // Apply division filter if specified. Division and section are
-            // interchangeable in most colleges, so check both fields.
-            if (divisionFilter != null && !divisionFilter.isBlank()) {
-                String studentDivision = student.getDivision();
+            // Section is the primary filter; division is accepted as an alias
+            // because some colleges use the two terms interchangeably.
+            if (sectionFilter != null && !sectionFilter.isBlank()) {
                 String studentSection = student.getSection();
-                boolean matches = (studentDivision != null && studentDivision.equalsIgnoreCase(divisionFilter))
-                        || (studentSection != null && studentSection.equalsIgnoreCase(divisionFilter));
+                String studentDivision = student.getDivision();
+                boolean matches = (studentSection != null && studentSection.equalsIgnoreCase(sectionFilter))
+                        || (studentDivision != null && studentDivision.equalsIgnoreCase(sectionFilter));
                 if (!matches) {
                     continue;
                 }
             }
-
-            boolean alreadyEnrolled = sections.stream()
-                    .anyMatch(section -> enrollmentRepository.existsByStudentIdAndSectionId(
-                            student.getId(), section.getId()));
-            if (alreadyEnrolled) {
-                continue;
-            }
-
-            Section target = sections.stream()
-                    .filter(section -> student.getSection() != null
-                            && student.getSection().equalsIgnoreCase(section.getName()))
-                    .findFirst()
-                    .orElseGet(() -> sections.stream()
-                            .min(Comparator.comparingLong(
-                                    section -> sectionCounts.getOrDefault(section.getId(), 0L)))
-                            .orElse(sections.get(0)));
-
-            enrollmentRepository.save(Enrollment.builder()
-                    .student(student)
-                    .section(target)
-                    .status(EnrollmentStatus.ACTIVE)
-                    .build());
-            sectionCounts.merge(target.getId(), 1L, Long::sum);
+            enrollIfNeeded(student, sections, sectionCounts);
         }
 
         return sections.stream()
                 .mapToInt(section -> (int) enrollmentRepository.countBySectionId(section.getId()))
                 .sum();
+    }
+
+    /** Enroll only the particular (e.g. backlog) students chosen from a department. */
+    private int enrollSelectedStudents(List<Long> studentIds, Long departmentId, List<Section> sections) {
+        Map<Long, Long> sectionCounts = new HashMap<>();
+        sections.forEach(section ->
+                sectionCounts.put(section.getId(), enrollmentRepository.countBySectionId(section.getId())));
+
+        int enrolled = 0;
+        for (Long studentId : studentIds) {
+            StudentProfile student = studentProfileRepository.findById(studentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentId));
+            if (departmentId != null && (student.getDepartment() == null
+                    || !Objects.equals(student.getDepartment().getId(), departmentId))) {
+                throw new BadRequestException(
+                        "Student " + student.getEnrollmentNumber() + " is not from the selected department.");
+            }
+            if (enrollIfNeeded(student, sections, sectionCounts)) {
+                enrolled++;
+            }
+        }
+        return enrolled;
+    }
+
+    /** Enrolls a student into the matching section (or the least-filled one). */
+    private boolean enrollIfNeeded(StudentProfile student, List<Section> sections, Map<Long, Long> sectionCounts) {
+        boolean alreadyEnrolled = sections.stream()
+                .anyMatch(section -> enrollmentRepository.existsByStudentIdAndSectionId(
+                        student.getId(), section.getId()));
+        if (alreadyEnrolled) {
+            return false;
+        }
+
+        Section target = sections.stream()
+                .filter(section -> student.getSection() != null
+                        && student.getSection().equalsIgnoreCase(section.getName()))
+                .findFirst()
+                .orElseGet(() -> sections.stream()
+                        .min(Comparator.comparingLong(
+                                section -> sectionCounts.getOrDefault(section.getId(), 0L)))
+                        .orElse(sections.get(0)));
+
+        enrollmentRepository.save(Enrollment.builder()
+                .student(student)
+                .section(target)
+                .status(EnrollmentStatus.ACTIVE)
+                .build());
+        sectionCounts.merge(target.getId(), 1L, Long::sum);
+        return true;
     }
 
     private String generateCourseCode(Department department, String courseName) {

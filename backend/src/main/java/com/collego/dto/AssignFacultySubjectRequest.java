@@ -7,6 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class AssignFacultySubjectRequest {
     @NotBlank(message = "Course name is required")
@@ -24,9 +26,15 @@ public class AssignFacultySubjectRequest {
     @Max(value = 12, message = "Credits cannot exceed 12")
     private Integer credits;
 
-    /** Division filter (e.g., "A", "B", "C"). Empty/ null means all divisions. */
-    private String divisionFilter;
+    /** Section filter (A, B, C). Empty/null loads all sections of the semester. */
+    private String sectionFilter;
 
-    /** If true, load students from all departments (for backlog/open elective view). */
-    private Boolean loadFromAllDepartments;
+    /** Department to load students from. Empty/null means the faculty's own department. */
+    private Long departmentId;
+
+    /**
+     * Optional explicit student ids (backlog students) from the selected department.
+     * When provided, only these students are enrolled instead of loading a whole section.
+     */
+    private List<Long> studentIds;
 }

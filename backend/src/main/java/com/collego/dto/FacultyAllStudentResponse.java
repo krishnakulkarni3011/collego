@@ -11,6 +11,7 @@ public class FacultyAllStudentResponse {
     private Long studentId;
     private String name;
     private String enrollmentNumber;
+    private Long departmentId;
     private String departmentName;
     private String section;
     private Integer year;

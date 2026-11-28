@@ -9,7 +9,7 @@ import lombok.Data;
 
 import java.util.List;
 
-/** Request to create an open-elective subject with students from any department. */
+/** Open elective subject created from particular students of one department. */
 @Data
 public class CreateOpenElectiveRequest {
     @NotBlank(message = "Course name is required")
@@ -21,6 +21,10 @@ public class CreateOpenElectiveRequest {
     @Min(value = 1, message = "Credits must be at least 1")
     @Max(value = 12, message = "Credits cannot exceed 12")
     private Integer credits;
+
+    /** Department whose students are being added. */
+    @NotNull(message = "Department is required")
+    private Long departmentId;
 
     @NotEmpty(message = "Select at least one student")
     private List<Long> studentIds;
