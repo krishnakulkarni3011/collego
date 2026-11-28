@@ -105,6 +105,7 @@ public class CampusEventService {
         eventRepository.save(event);
     }
 
+    @Transactional(readOnly = true)
     public String getPosterContentType(Long id) {
         CampusEvent event = eventRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Event not found: " + id));
