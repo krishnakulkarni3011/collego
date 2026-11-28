@@ -1135,7 +1135,7 @@ function BroadcastCenterTab({ broadcasts = [], users = [], departments = [], onS
   )
 }
 
-function PlacementsTab({ placementStats, notices = [], departments = [], users = [], onCreatePlacement, onDeactivatePlacement, onCreatePlacedStudents }) {
+function PlacementsTab({ placementStats, notices = [], departments = [], users = [], showMsg, onCreatePlacement, onDeactivatePlacement, onCreatePlacedStudents }) {
   const s = placementStats
   const deptData = s?.departmentBreakdown || []
   const [showCreate, setShowCreate] = useState(false)
@@ -1734,7 +1734,7 @@ export default function AdminDashboard() {
       case 'overview': return <OverviewTab overview={overview} deptReports={deptReports} attendanceSummary={attendanceSummary} placementStats={placementStats} insights={insights} semesters={semesters} onTabChange={setActiveTab} onSemesterChange={handleSemesterChange} />
       case 'academics': return <AcademicsTab users={users} departments={departments} overview={overview} semesters={semesters} deptReports={deptReports} onCreateUser={onCreateUser} onEditUser={onEditUser} onToggleActive={onToggleActive} onReviewResume={onReviewResume} onCsvImport={onCsvImport} importResult={importResult} onCreateDepartment={onCreateDepartment} />
       case 'examinations': return <ExamsAdminTab showMsg={showMsg} />
-      case 'placements': return <PlacementsTab placementStats={placementStats} notices={placementNotices} departments={departments} users={users} onCreatePlacement={onCreatePlacement} onDeactivatePlacement={onDeactivatePlacement} onCreatePlacedStudents={onCreatePlacedStudents} />
+      case 'placements': return <PlacementsTab placementStats={placementStats} notices={placementNotices} departments={departments} users={users} showMsg={showMsg} onCreatePlacement={onCreatePlacement} onDeactivatePlacement={onDeactivatePlacement} onCreatePlacedStudents={onCreatePlacedStudents} />
       case 'broadcasts': return <BroadcastCenterTab broadcasts={broadcasts} users={users} departments={departments} onSend={handleSendBroadcast} />
       case 'reports': return <ReportsTab deptReports={deptReports} subjectReports={subjectReports} departments={departments} />
       case 'promotion': return <PromotionTab semesters={semesters} showMsg={showMsg} />
