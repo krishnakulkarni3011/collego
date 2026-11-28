@@ -1285,41 +1285,49 @@ public class FacultyPortalService {
 private List<Section> claimSectionsForFaculty(FacultyProfile faculty, Course course, Semester semester) {
         List<Section> sections = sectionRepository.findByCourseIdAndSemesterId(course.getId(), semester.getId());
 
-        List<Section> unassigned = sections.stream()
-                .filter(s -> s.getFaculty() == null)
+        // Already owned by this faculty member.
+        List<Section> owned = sections.stream()
+                .filter(section -> isOwnedBy(section, faculty))
                 .collect(Collectors.toList());
+        if (!owned.isEmpty()) {
+            return owned;
+        }
 
+        // Claim unassigned sections for this course/semester.
+        List<Section> unassigned = sections.stream()
+                .filter(section -> section.getFaculty() == null)
+                .collect(Collectors.toList());
         if (!unassigned.isEmpty()) {
             unassigned.forEach(section -> {
                 section.setFaculty(faculty);
                 sectionRepository.save(section);
             });
-        } else if (sections.stream().noneMatch(s -> isOwnedBy(s, faculty))) {
-            // Every existing section is already taken by another faculty member â€”
-            // create a fresh pair of sections for this faculty.
-            int created = 0;
-            for (String name : new String[]{"A", "B", "C", "D", "E", "F", "G", "H"}) {
-                if (created >= 2) break;
-                if (sectionRepository.existsByNameAndCourseIdAndSemesterId(name, course.getId(), semester.getId())) {
-                    continue;
-                }
-                sectionRepository.save(Section.builder()
-                        .name(name)
-                        .course(course)
-                        .semester(semester)
-                        .faculty(faculty)
-                        .maxCapacity(60)
-                        .build());
-                created++;
-            }
+            return unassigned;
         }
 
-        return sectionRepository.findByCourseIdAndSemesterId(course.getId(), semester.getId()).stream()
-                .filter(section -> isOwnedBy(section, faculty))
-                .collect(Collectors.toList());
+        // All existing sections belong to other faculty members. Create fresh,
+        // uniquely named sections for this faculty instead of skipping A/B.
+        List<Section> created = new ArrayList<>();
+        for (String base : new String[]{"A", "B"}) {
+            String name = base + "-" + faculty.getId();
+            int suffix = 1;
+            while (sectionRepository.existsByNameAndCourseIdAndSemesterId(name, course.getId(), semester.getId())) {
+                name = base + "-" + faculty.getId() + "-" + (++suffix);
+            }
+            created.add(sectionRepository.save(Section.builder()
+                    .name(name)
+                    .course(course)
+                    .semester(semester)
+                    .faculty(faculty)
+                    .maxCapacity(60)
+                    .hidden(false)
+                    .build()));
+        }
+
+        return created;
     }
 
-    private boolean isOwnedBy(Section section, FacultyProfile faculty) {
+private boolean isOwnedBy(Section section, FacultyProfile faculty) {
         return section.getFaculty() != null && section.getFaculty().getId().equals(faculty.getId());
     }
 
