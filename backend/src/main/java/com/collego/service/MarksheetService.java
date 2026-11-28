@@ -129,9 +129,6 @@ public class MarksheetService {
             title.setAlignment(Element.ALIGN_CENTER);
             document.add(title);
 
-            Paragraph collegeName = new Paragraph("COLLEGO INSTITUTE OF TECHNOLOGY", SUBTITLE_FONT);
-            collegeName.setAlignment(Element.ALIGN_CENTER);
-            document.add(collegeName);
             document.add(new Paragraph(" "));
 
             // Student Info
@@ -174,10 +171,6 @@ public class MarksheetService {
     // ==================== PDF Building Helpers ====================
 
     private void addHeader(Document document, Semester semester) throws DocumentException {
-        Paragraph collegeName = new Paragraph("COLLEGO INSTITUTE OF TECHNOLOGY", TITLE_FONT);
-        collegeName.setAlignment(Element.ALIGN_CENTER);
-        document.add(collegeName);
-
         Paragraph subtitle = new Paragraph("INTERNAL ASSESSMENT & ATTENDANCE", SUBTITLE_FONT);
         subtitle.setAlignment(Element.ALIGN_CENTER);
         document.add(subtitle);
