@@ -17,8 +17,14 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update            # Auto-create tables on fresh RDS database
+      ddl-auto: none              # Schema is managed by Flyway migrations
     show-sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    locations: classpath:db/migration
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect

@@ -43,6 +43,7 @@ public class FacultyPortalService {
     private final DepartmentRepository departmentRepository;
     private final SemesterRepository semesterRepository;
     private final FacultySubjectAssignmentRepository facultySubjectAssignmentRepository;
+    private final FacultyReminderRepository facultyReminderRepository;
     private final QuestionPaperService questionPaperService;
     private final S3StorageService s3StorageService;
 
@@ -54,6 +55,55 @@ public class FacultyPortalService {
 
     @Value("${collego.aws.s3-bucket-question-papers:collego-question-papers-prod}")
     private String questionPaperBucket;
+
+    // ==================== Personal Reminders ====================
+
+    @Transactional(readOnly = true)
+    public List<FacultyReminderResponse> getFacultyReminders(String email) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        return facultyReminderRepository.findByFacultyIdOrderByCompletedAscCreatedAtDesc(faculty.getId())
+                .stream().map(this::mapFacultyReminder).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public FacultyReminderResponse createFacultyReminder(String email, CreateReminderRequest request) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        FacultyReminder reminder = FacultyReminder.builder()
+                .faculty(faculty)
+                .title(request.getTitle().trim())
+                .build();
+        facultyReminderRepository.save(reminder);
+        return mapFacultyReminder(reminder);
+    }
+
+    @Transactional
+    public FacultyReminderResponse toggleFacultyReminder(String email, Long reminderId) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        FacultyReminder reminder = facultyReminderRepository.findByIdAndFacultyId(reminderId, faculty.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Reminder not found: " + reminderId));
+        reminder.setCompleted(!reminder.isCompleted());
+        reminder.setCompletedAt(reminder.isCompleted() ? LocalDateTime.now() : null);
+        facultyReminderRepository.save(reminder);
+        return mapFacultyReminder(reminder);
+    }
+
+    @Transactional
+    public void deleteFacultyReminder(String email, Long reminderId) {
+        FacultyProfile faculty = getFacultyByEmail(email);
+        FacultyReminder reminder = facultyReminderRepository.findByIdAndFacultyId(reminderId, faculty.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Reminder not found: " + reminderId));
+        facultyReminderRepository.delete(reminder);
+    }
+
+    private FacultyReminderResponse mapFacultyReminder(FacultyReminder reminder) {
+        return FacultyReminderResponse.builder()
+                .id(reminder.getId())
+                .title(reminder.getTitle())
+                .completed(reminder.isCompleted())
+                .createdAt(reminder.getCreatedAt())
+                .completedAt(reminder.getCompletedAt())
+                .build();
+    }
 
     // ==================== Sections ====================
 

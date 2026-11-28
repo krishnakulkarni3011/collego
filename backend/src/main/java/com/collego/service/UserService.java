@@ -168,6 +168,14 @@ public class UserService {
     }
 
     @Transactional
+    public void setPassword(Long id, String rawPassword) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        userRepository.save(user);
+    }
+
+    @Transactional
     public UserResponse deactivateUser(Long id, String adminEmail, String ipAddress) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));

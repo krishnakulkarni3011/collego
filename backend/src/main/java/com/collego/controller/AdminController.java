@@ -124,6 +124,13 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/users/{id}/password")
+    public ResponseEntity<Void> setUserPassword(@PathVariable Long id,
+                                                 @Valid @RequestBody SetPasswordRequest request) {
+        userService.setPassword(id, request.getPassword());
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/users/{id}/deactivate")
     public ResponseEntity<UserResponse> deactivateUser(@PathVariable Long id,
                                                         Authentication auth,

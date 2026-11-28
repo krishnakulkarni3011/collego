@@ -227,19 +227,36 @@ resource "aws_s3_bucket_public_access_block" "app_buckets" {
   restrict_public_buckets = true
 }
 
-# Lifecycle: move DB backups to Glacier after 30 days, delete after 90
+# Lifecycle: keep weekly DB backups for 30 days and deploy assets for 7 days
 resource "aws_s3_bucket_lifecycle_configuration" "db_backups" {
   bucket = aws_s3_bucket.app_buckets["collego-db-backups"].id
+
   rule {
     id     = "backup-lifecycle"
     status = "Enabled"
     filter {}
-    transition {
-      days          = 30
-      storage_class = "GLACIER"
+    expiration {
+      days = 30
+    }
+    noncurrent_version_expiration {
+      noncurrent_days = 1
+    }
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+
+  rule {
+    id     = "deploy-assets-lifecycle"
+    status = "Enabled"
+    filter {
+      prefix = "deploy/"
     }
     expiration {
-      days = 90
+      days = 7
+    }
+    noncurrent_version_expiration {
+      noncurrent_days = 1
     }
   }
 }
@@ -259,16 +276,29 @@ resource "aws_ecr_lifecycle_policy" "repos" {
   for_each   = aws_ecr_repository.repos
   repository = each.value.name
   policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "Keep last 10 images"
-      selection = {
-        tagStatus   = "any"
-        countType   = "imageCountMoreThan"
-        countNumber = 10
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Expire untagged images after 1 day"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 1
+        }
+        action = { type = "expire" }
+      },
+      {
+        rulePriority = 2
+        description  = "Keep last 5 tagged images"
+        selection = {
+          tagStatus   = "tagged"
+          countType   = "imageCountMoreThan"
+          countNumber = 5
+        }
+        action = { type = "expire" }
       }
-      action = { type = "expire" }
-    }]
+    ]
   })
 }
 
