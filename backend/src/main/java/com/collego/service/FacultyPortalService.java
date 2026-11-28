@@ -1110,6 +1110,7 @@ public class FacultyPortalService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<SemesterResponse> getAllSemesters() {
         return semesterRepository.findAllByOrderByNumberAsc()
                 .stream()
