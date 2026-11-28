@@ -1231,7 +1231,7 @@ function PlacementsTab({ placementStats, notices = [], departments = [], users =
 
       <Panel title="Upcoming Placement Drives" icon={CalendarDays} accent="emerald">
         {upcoming.length === 0 ? (
-          <EmptyState icon={Briefcase} title="No upcoming placements" accent="emerald" description="Use “Add Upcoming Placement” to announce a new drive." />
+          <EmptyState icon={Briefcase} title="No upcoming placements" accent="emerald" description="Use 'Add Upcoming Placement' to announce a new drive." />
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {upcoming.map(n => (
@@ -1244,7 +1244,7 @@ function PlacementsTab({ placementStats, notices = [], departments = [], users =
                   <Badge variant="success">{n.driveDate ? fmtDate(n.driveDate) : 'Upcoming'}</Badge>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
-                  {n.packageOffered && <Badge variant="success">₹ {n.packageOffered}</Badge>}
+                  {n.packageOffered && <Badge variant="success">Rs. {n.packageOffered}</Badge>}
                   {n.departmentName && <Badge variant="info">{n.departmentName}</Badge>}
                   {n.lastDate && <Badge variant="secondary">Apply by {fmtDate(n.lastDate)}</Badge>}
                 </div>

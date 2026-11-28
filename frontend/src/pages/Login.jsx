@@ -495,7 +495,7 @@ export default function Login() {
           </motion.div>
 
           <p className="text-center text-slate-400 text-xs mt-8">
-            © {new Date().getFullYear()} Collego - AI-Powered College ERP
+            (c) {new Date().getFullYear()} Collego - AI-Powered College ERP
           </p>
         </div>
       </main>

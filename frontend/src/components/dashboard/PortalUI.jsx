@@ -309,7 +309,7 @@ export function StatCard({
           <div className="flex items-center gap-1.5 mt-2">
             {trend != null && (
               <span className={cn('text-[11px] font-semibold', positive ? 'text-emerald-600' : 'text-red-500')}>
-                {positive ? '▲' : '▼'} {Math.abs(trend)}%
+                {positive ? '+' : '-'} {Math.abs(trend)}%
               </span>
             )}
             {(trendLabel || sub) && <span className="text-[11px] text-slate-400">{trendLabel || sub}</span>}
@@ -589,14 +589,14 @@ export function WelcomeBanner({ greeting, name, subtitle, quote, accent = 'indig
                 {badge}
               </span>
             )}{' '}
-            <span className="text-slate-400">👋</span>
+            <span className="text-slate-400"></span>
           </h1>
           <p className="text-slate-600 text-sm mt-1.5">{subtitle}</p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3">
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-white/70 border border-white rounded-full px-3 py-1">
               <Calendar size={12} className={a.text} /> {dateStr}
             </span>
-            {quote && <p className="text-xs text-slate-500 italic">“{quote}”</p>}
+            {quote && <p className="text-xs text-slate-500 italic">'{quote}'</p>}
           </div>
         </div>
         <div className="pointer-events-none absolute right-0 top-0 hidden h-full w-[38%] max-w-[560px] sm:block lg:w-[42%]">

@@ -946,7 +946,7 @@ function PlacementsTab({ notices, onDownload }) {
                     <p className="text-sm text-slate-500 mb-4 line-clamp-3">{notice.description}</p>
                     <div className="flex flex-wrap gap-2">
                       {notice.eligibilityCriteria && <Badge variant="secondary">{notice.eligibilityCriteria}</Badge>}
-                      {notice.packageOffered && <Badge variant="success">₹ {notice.packageOffered}</Badge>}
+                      {notice.packageOffered && <Badge variant="success">Rs. {notice.packageOffered}</Badge>}
                       {notice.departmentName && <Badge variant="info">{notice.departmentName}</Badge>}
                     </div>
                     <div className="flex flex-wrap items-center gap-4 mt-4 text-[11px] text-slate-500">
@@ -1124,7 +1124,7 @@ const stripMarkdown = (text) => String(text ?? '')
   .replace(/^\s*[-*]\s+/gm, '- ')
 
 const formatPerformanceInsight = (r) => [
-  '📈 Performance prediction',
+  ' Performance prediction',
   '',
   `Predicted SGPA: ${fmtNumber(r.predictedSgpa)}`,
   `Predicted CGPA: ${fmtNumber(r.predictedCgpa)}`,
@@ -1135,7 +1135,7 @@ const formatPerformanceInsight = (r) => [
 ].join('\n')
 
 const formatAttendanceRisk = (r) => [
-  '⚠️ Attendance risk',
+  ' Attendance risk',
   '',
   `Overall risk: ${r.overallRisk || '-'}`,
   r.summary || '',
@@ -1153,7 +1153,7 @@ const formatAttendanceRisk = (r) => [
 ].filter(Boolean).join('\n')
 
 const formatPlacementReadiness = (r) => [
-  '💼 Placement readiness',
+  ' Placement readiness',
   '',
   r.advice || '',
   ...(r.recommendations?.length
@@ -1164,7 +1164,7 @@ const formatPlacementReadiness = (r) => [
 ].filter(Boolean).join('\n')
 
 function AiAssistantTab({ overall, cgpa }) {
-  const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Collego AI 🤖 Ask me anything about your attendance, marks, placements, timetable, and more. You can also use the quick tools below for predictions, risk analysis, placement readiness and smart search." }])
+  const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm Collego AI  Ask me anything about your attendance, marks, placements, timetable, and more. You can also use the quick tools below for predictions, risk analysis, placement readiness and smart search." }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState('')
