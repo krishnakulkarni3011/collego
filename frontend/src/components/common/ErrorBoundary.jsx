@@ -20,9 +20,14 @@ export class ErrorBoundary extends Component {
             <pre className="mt-4 p-3 rounded-xl bg-slate-50 text-left text-[11px] text-red-500 overflow-auto max-h-40">
               {String(this.state.error?.message || this.state.error)}
             </pre>
-            <button onClick={() => window.location.href = '/login'} className="mt-5 px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
-              Back to login
-            </button>
+            <div className="mt-5 flex justify-center gap-3">
+              <button onClick={() => window.location.reload()} className="px-5 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50">
+                Reload page
+              </button>
+              <button onClick={() => window.location.href = '/login'} className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
+                Back to login
+              </button>
+            </div>
           </div>
         </div>
       )
