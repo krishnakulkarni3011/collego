@@ -2113,38 +2113,50 @@ export default function FacultyDashboard() {
   const facultyDepartmentName = sections.find(s => s.departmentName)?.departmentName || 'your department'
   const showMsg = useCallback((text, type = 'success') => setMessage({ text, type }), [])
 
-  const remindersKey = `collego-faculty-reminders-${email || 'faculty'}`
-  const loadFacultyReminders = useCallback(() => {
+  const loadFacultyReminders = useCallback(async () => {
+    setFacultyRemindersLoading(true)
     try {
-      const stored = JSON.parse(localStorage.getItem(remindersKey) || '[]')
-      setFacultyReminders(Array.isArray(stored) ? stored : [])
+      const res = await api.get('/api/faculty/reminders')
+      setFacultyReminders(Array.isArray(res.data) ? res.data : [])
     } catch { setFacultyReminders([]) }
     finally { setFacultyRemindersLoading(false) }
-  }, [remindersKey])
+  }, [])
 
   useEffect(() => { loadFacultyReminders() }, [loadFacultyReminders])
 
-  const persistFacultyReminders = useCallback((list) => {
-    setFacultyReminders(list)
-    try { localStorage.setItem(remindersKey, JSON.stringify(list)) } catch { /* ignore */ }
-  }, [remindersKey])
+  const sortReminders = (list) => [...list].sort((a, b) =>
+    Number(a.completed) - Number(b.completed) ||
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-  const handleCreateReminder = useCallback((title) => {
-    const reminder = { id: Date.now(), title, completed: false, createdAt: new Date().toISOString(), completedAt: null }
-    persistFacultyReminders([reminder, ...facultyReminders])
-    showMsg('Reminder added')
-  }, [facultyReminders, persistFacultyReminders, showMsg])
+  const handleCreateReminder = useCallback(async (title) => {
+    try {
+      const res = await api.post('/api/faculty/reminders', { title })
+      setFacultyReminders(prev => sortReminders([res.data, ...prev]))
+      showMsg('Reminder added')
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to add reminder', 'error')
+      throw err
+    }
+  }, [showMsg])
 
-  const handleToggleReminder = useCallback((id) => {
-    persistFacultyReminders(facultyReminders.map(r => r.id === id
-      ? { ...r, completed: !r.completed, completedAt: !r.completed ? new Date().toISOString() : null }
-      : r))
-  }, [facultyReminders, persistFacultyReminders])
+  const handleToggleReminder = useCallback(async (id) => {
+    try {
+      const res = await api.put(`/api/faculty/reminders/${id}/toggle`)
+      setFacultyReminders(prev => sortReminders(prev.map(r => r.id === id ? res.data : r)))
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to update reminder', 'error')
+    }
+  }, [showMsg])
 
-  const handleDeleteReminder = useCallback((id) => {
-    persistFacultyReminders(facultyReminders.filter(r => r.id !== id))
-    showMsg('Reminder deleted')
-  }, [facultyReminders, persistFacultyReminders, showMsg])
+  const handleDeleteReminder = useCallback(async (id) => {
+    try {
+      await api.delete(`/api/faculty/reminders/${id}`)
+      setFacultyReminders(prev => prev.filter(r => r.id !== id))
+      showMsg('Reminder deleted')
+    } catch (err) {
+      showMsg(err.response?.data?.message || 'Failed to delete reminder', 'error')
+    }
+  }, [showMsg])
 
   const fetchSections = useCallback(async () => {
     setLoading(true)
