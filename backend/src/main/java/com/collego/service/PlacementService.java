@@ -599,6 +599,7 @@ public class PlacementService {
         return created;
     }
 
+    @Transactional(readOnly = true)
     public List<PlacedStudentResponse> listPlacedStudents() {
         return placedStudentRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::mapPlacedStudent)
